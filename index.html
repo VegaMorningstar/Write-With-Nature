@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Write w/ Nature">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <meta name="description" content="Compose text as NASA Landsat satellite imagery — rivers, glaciers and coastlines shaped into letters from orbit.">
 <meta property="og:title" content="Write with Nature">
@@ -905,14 +905,18 @@ function rr(ctx, x, y, w, h, r) {
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 let _tt;
-function showToast(msg) {
+function showToast(msg, ms = 2500) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  clearTimeout(_tt); _tt = setTimeout(() => t.classList.remove('show'), 2500);
+  clearTimeout(_tt); _tt = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 // ── PWA Install ───────────────────────────────────────────────────────────
 let _deferredInstall = null;
+const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const _isStandalone = window.matchMedia('(display-mode: standalone)').matches || !!window.navigator.standalone;
+
+// Android/Chrome: native install prompt
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); _deferredInstall = e;
   document.getElementById('install-btn').classList.add('visible');
@@ -922,7 +926,17 @@ window.addEventListener('appinstalled', () => {
   document.getElementById('install-btn').classList.remove('visible');
   showToast('App installed — find it on your home screen');
 });
+
+// iOS Safari: no beforeinstallprompt — show button anyway with instructions
+if (_isIOS && !_isStandalone) {
+  document.getElementById('install-btn').classList.add('visible');
+}
+
 function installApp() {
+  if (_isIOS) {
+    showToast('Tap the Share icon ↑ then "Add to Home Screen"', 4000);
+    return;
+  }
   if (!_deferredInstall) { showToast('Open in Chrome or Edge to install'); return; }
   _deferredInstall.prompt();
   _deferredInstall.userChoice.then(c => { if (c.outcome === 'accepted') showToast('Installing…'); _deferredInstall = null; });
