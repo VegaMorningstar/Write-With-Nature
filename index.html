@@ -303,6 +303,7 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
   border-radius: 14px; padding: 1.75rem;
   min-height: 190px; display: flex; flex-direction: column;
   gap: 6px; box-shadow: 2px 5px 22px var(--shadow); position: relative;
+  overflow-x: auto;
 }
 
 .board-empty {
@@ -318,7 +319,7 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
 }
 
 .collage-row {
-  display: flex; flex-wrap: wrap;
+  display: flex; flex-wrap: nowrap;
   gap: 6px; align-items: flex-end; align-content: flex-start;
   position: relative; z-index: 1;
 }
@@ -650,6 +651,7 @@ const LETTERS = {
 // ── State ────────────────────────────────────────────────────────────────
 let tileW = 118;
 const VS = {};
+const emptyEl = document.getElementById('empty-state');
 
 // ── Title ────────────────────────────────────────────────────────────────
 const TITLE_WORDS = ['WRITE', 'WITH', 'NATURE'];
@@ -688,16 +690,38 @@ function renderTitle() {
 renderTitle();
 
 // ── Render ────────────────────────────────────────────────────────────────
+function autoSizeTiles(lines) {
+  const gap = 6;
+  const board = document.getElementById('collage');
+  const availW = board.clientWidth - 56; // subtract 1.75rem padding each side
+  if (availW <= 0) return;
+  let size = 118;
+  for (const rawLine of lines) {
+    const cleaned = rawLine.toUpperCase().replace(/[^A-Z ]/g, '').replace(/ {2,}/g, ' ').trim();
+    if (!cleaned) continue;
+    const chars = [...cleaned];
+    const letters = chars.filter(c => c !== ' ' && LETTERS[c]).length;
+    const spaces  = chars.filter(c => c === ' ').length;
+    const n = letters + spaces;
+    if (n < 2) continue;
+    // letters*t + spaces*(0.37*t) + (n-1)*gap = availW  →  solve for t
+    const fit = (availW - (n - 1) * gap) / (letters + spaces * 0.37);
+    if (fit > 0) size = Math.min(size, fit);
+  }
+  tileW = Math.max(32, Math.floor(size));
+}
+
 function render() {
   const raw = document.getElementById('textInput').value;
   const board = document.getElementById('collage');
-  const empty = document.getElementById('empty-state');
-  if (!raw.trim()) { board.innerHTML = ''; board.appendChild(empty); return; }
-  empty.style.display = 'none';
+  if (!raw.trim()) { board.innerHTML = ''; board.appendChild(emptyEl); return; }
+  emptyEl.style.display = 'none';
   board.innerHTML = '';
 
   let ci = 0;
   const inputLines = raw.split('\n');
+
+  autoSizeTiles(inputLines);
 
   inputLines.forEach((rawLine, lineIdx) => {
     const cleaned = rawLine
@@ -720,12 +744,14 @@ function render() {
 
     for (const ch of cleaned) {
       if (ch === ' ') {
-        const sp = document.createElement('div'); sp.className = 'tile-space';
+        const sp = document.createElement('div');
+        sp.className = 'tile-space';
+        sp.style.width = Math.round(tileW * 0.37) + 'px';
         row.appendChild(sp); ci++; continue;
       }
       if (!LETTERS[ch]) { ci++; continue; }
       const key = ci + '-' + ch;
-      if (VS[key] === undefined) VS[key] = 0;
+      if (VS[key] === undefined) VS[key] = Math.floor(Math.random() * LETTERS[ch].length);
       row.appendChild(makeTile(ch, key));
       ci++;
     }
@@ -785,14 +811,15 @@ function shuffleAll() {
 }
 
 function resizeTiles(d) {
-  tileW = Math.max(60, Math.min(200, tileW + d));
+  tileW = Math.max(32, Math.min(200, tileW + d));
   document.querySelectorAll('.tile').forEach(t => { t.style.width = t.style.height = tileW + 'px'; });
+  document.querySelectorAll('.tile-space').forEach(s => { s.style.width = Math.round(tileW * 0.37) + 'px'; });
 }
 
 function clearAll() {
   document.getElementById('textInput').value = '';
   const b = document.getElementById('collage'); b.innerHTML = '';
-  const e = document.getElementById('empty-state'); e.style.display = ''; b.appendChild(e);
+  emptyEl.style.display = ''; b.appendChild(emptyEl);
   document.getElementById('collage-meta').textContent = 'Collage';
 }
 
