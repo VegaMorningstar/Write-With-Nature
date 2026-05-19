@@ -320,6 +320,7 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
 
 .collage-row {
   display: flex; flex-wrap: nowrap;
+  align-self: flex-start;
   gap: 6px; align-items: flex-end; align-content: flex-start;
   position: relative; z-index: 1;
 }
@@ -708,7 +709,7 @@ function autoSizeTiles(lines) {
     const fit = (availW - (n - 1) * gap) / (letters + spaces * 0.37);
     if (fit > 0) size = Math.min(size, fit);
   }
-  tileW = Math.max(32, Math.floor(size));
+  tileW = Math.max(72, Math.floor(size));
 }
 
 function render() {
@@ -751,7 +752,7 @@ function render() {
       }
       if (!LETTERS[ch]) { ci++; continue; }
       const key = ci + '-' + ch;
-      if (VS[key] === undefined) VS[key] = Math.floor(Math.random() * LETTERS[ch].length);
+      VS[key] = Math.floor(Math.random() * LETTERS[ch].length);
       row.appendChild(makeTile(ch, key));
       ci++;
     }
