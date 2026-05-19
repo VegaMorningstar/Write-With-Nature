@@ -1,7 +1,7 @@
 // Write with Nature — Service Worker
 // Bump APP_VERSION after each deployment to bust stale caches.
 
-const APP_VERSION  = 'v1';
+const APP_VERSION  = 'v2';
 const SHELL_CACHE  = `wwn-shell-${APP_VERSION}`;
 const IMAGE_CACHE  = `wwn-images-${APP_VERSION}`;
 const NASA_HOST    = 'assets.science.nasa.gov';
@@ -45,9 +45,9 @@ self.addEventListener('fetch', event => {
       caches.open(IMAGE_CACHE).then(cache =>
         cache.match(event.request).then(cached => {
           if (cached) return cached;
-          return fetch(event.request, { mode: 'cors' })
+          return fetch(event.request)
             .then(res => {
-              if (res && res.status === 200) cache.put(event.request, res.clone());
+              if (res && (res.status === 200 || res.type === 'opaque')) cache.put(event.request, res.clone());
               return res;
             })
             .catch(() => new Response(
