@@ -851,36 +851,33 @@ async function downloadCollage() {
   if (!rows.length) { showToast('Nothing to export yet'); return; }
   showToast('Preparing your image…');
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-  const gap = 6, pad = 32;
+  const gap = 2, pad = 12;
+  const spW = Math.round(tileW * 0.37);
   let maxW = 0, totalH = pad;
   const layouts = [];
   rows.forEach(row => {
-    const tiles = [...row.querySelectorAll('.tile')];
-    const spaces = [...row.querySelectorAll('.tile-space')];
-    const rW = tiles.length * tileW + spaces.length * 44 + (tiles.length + spaces.length - 1) * gap;
-    maxW = Math.max(maxW, rW);
-    layouts.push(tiles);
-    totalH += (row.offsetHeight || tileW) + gap;
+    const items = [...row.children].filter(el => el.classList.contains('tile') || el.classList.contains('tile-space'));
+    const rowW = items.reduce((sum, el) => sum + (el.classList.contains('tile') ? tileW : spW), 0)
+                 + Math.max(0, items.length - 1) * gap;
+    maxW = Math.max(maxW, rowW);
+    layouts.push(items);
+    totalH += tileW + gap;
   });
-  document.querySelectorAll('.stanza-break').forEach(() => { totalH += 18; });
   totalH += pad - gap;
   cv.width = maxW + pad * 2; cv.height = totalH;
   ctx.fillStyle = '#f0ead8'; ctx.fillRect(0, 0, cv.width, cv.height);
-  const vg = ctx.createRadialGradient(cv.width/2, cv.height/2, 0, cv.width/2, cv.height/2, Math.max(cv.width, cv.height) * 0.75);
-  vg.addColorStop(0, 'rgba(240,234,216,0)'); vg.addColorStop(1, 'rgba(28,26,16,0.07)');
-  ctx.fillStyle = vg; ctx.fillRect(0, 0, cv.width, cv.height);
   let y = pad;
-  for (const tiles of layouts) {
+  for (const items of layouts) {
     let x = pad;
-    for (const tile of tiles) {
-      const img = tile.querySelector('img');
-      ctx.save(); rr(ctx, x, y, tileW, tileW, 7); ctx.clip();
+    for (const el of items) {
+      if (el.classList.contains('tile-space')) { x += spW + gap; continue; }
+      const img = el.querySelector('img');
+      ctx.save(); rr(ctx, x, y, tileW, tileW, 5); ctx.clip();
       if (img?.complete && img.naturalWidth > 0) {
         ctx.drawImage(img, x, y, tileW, tileW);
-        ctx.globalAlpha = 0.05; ctx.fillStyle = '#c8962a'; ctx.fillRect(x, y, tileW, tileW);
       } else {
         ctx.fillStyle = '#ddd4b8'; ctx.fillRect(x, y, tileW, tileW);
-        const lbl = tile.querySelector('.tile-char')?.textContent || '';
+        const lbl = el.querySelector('.tile-char')?.textContent || '';
         ctx.globalAlpha = 0.18; ctx.fillStyle = '#1c1a10';
         ctx.font = `bold ${Math.round(tileW * 0.48)}px 'Playfair Display',Georgia,serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
