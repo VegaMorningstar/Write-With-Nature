@@ -1,7 +1,7 @@
 // Write with Nature — Service Worker
 // Bump APP_VERSION after each deployment to bust stale caches.
 
-const APP_VERSION  = 'v2';
+const APP_VERSION  = 'v3';
 const SHELL_CACHE  = `wwn-shell-${APP_VERSION}`;
 const IMAGE_CACHE  = `wwn-images-${APP_VERSION}`;
 const NASA_HOST    = 'assets.science.nasa.gov';
