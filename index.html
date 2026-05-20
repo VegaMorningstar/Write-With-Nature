@@ -119,7 +119,7 @@ body::before {
   justify-content: center;
   align-items: flex-end;
   gap: 4px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .title-tile {
@@ -657,9 +657,19 @@ const emptyEl = document.getElementById('empty-state');
 // ── Title ────────────────────────────────────────────────────────────────
 const TITLE_WORDS = ['WRITE', 'WITH', 'NATURE'];
 
+function titleTileSize() {
+  const container = document.getElementById('title-collage');
+  const availW = container.clientWidth;
+  if (availW <= 0) return 64;
+  const gap = 4;
+  const maxLen = Math.max(...TITLE_WORDS.map(w => [...w].filter(c => LETTERS[c]).length));
+  return Math.max(28, Math.min(64, Math.floor((availW - (maxLen - 1) * gap) / maxLen)));
+}
+
 function renderTitle() {
   const container = document.getElementById('title-collage');
   container.innerHTML = '';
+  const tSize = titleTileSize();
   TITLE_WORDS.forEach((word, wi) => {
     const row = document.createElement('div');
     row.className = 'title-row';
@@ -673,6 +683,7 @@ function renderTitle() {
       const { url, label } = variants[vi];
       const tile = document.createElement('div');
       tile.className = 'title-tile';
+      tile.style.width = tile.style.height = tSize + 'px';
       const img = document.createElement('img');
       img.className = 'loading';
       img.alt = `${ch} — ${label}`;
@@ -689,6 +700,7 @@ function renderTitle() {
   });
 }
 renderTitle();
+window.addEventListener('resize', renderTitle);
 
 // ── Render ────────────────────────────────────────────────────────────────
 function autoSizeTiles(lines) {
