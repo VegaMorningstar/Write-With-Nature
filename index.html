@@ -857,6 +857,15 @@ function buildAlphaGrid() {
 }
 buildAlphaGrid();
 
+// ── Preload all letter images in the background ───────────────────────────
+// Runs 1.5s after page load so it doesn't compete with above-the-fold tiles.
+// After first visit the SW caches everything; subsequent renders are instant.
+setTimeout(() => {
+  Object.values(LETTERS).forEach(variants =>
+    variants.forEach(({ url }) => { const i = new Image(); i.src = url; })
+  );
+}, 1500);
+
 // ── Download PNG ──────────────────────────────────────────────────────────
 async function downloadCollage() {
   const rows = document.querySelectorAll('.collage-row');
@@ -864,12 +873,13 @@ async function downloadCollage() {
   showToast('Preparing your image…');
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
   const gap = 2, pad = 12;
-  const spW = Math.round(tileW * 0.37);
+  const spW = Math.max(24, Math.round(tileW * 0.6));
   let maxW = 0, totalH = pad;
   const layouts = [];
   rows.forEach(row => {
     const items = [...row.children].filter(el => el.classList.contains('tile') || el.classList.contains('tile-space'));
-    const rowW = items.reduce((sum, el) => sum + (el.classList.contains('tile') ? tileW : spW), 0)
+    const rSpW = Math.max(24, Math.round(tileW * 0.6));
+    const rowW = items.reduce((sum, el) => sum + (el.classList.contains('tile') ? tileW : rSpW), 0)
                  + Math.max(0, items.length - 1) * gap;
     maxW = Math.max(maxW, rowW);
     layouts.push(items);
