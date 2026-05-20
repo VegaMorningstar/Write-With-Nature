@@ -662,29 +662,46 @@ const VS = {};
 const emptyEl = document.getElementById('empty-state');
 
 // ── Title ────────────────────────────────────────────────────────────────
-const TITLE_WORDS = ['WRITE', 'WITH', 'NATURE'];
+// Each string is one row; spaces within a string become word gaps.
+const TITLE_LINES = ['WRITE WITH', 'NATURE'];
+const SP_RATIO = 0.5; // word-space width as fraction of tile size
 
 function titleTileSize() {
   const container = document.getElementById('title-collage');
   const availW = container.clientWidth;
   if (availW <= 0) return 64;
   const gap = 4;
-  const maxLen = Math.max(...TITLE_WORDS.map(w => [...w].filter(c => LETTERS[c]).length));
-  return Math.max(28, Math.min(64, Math.floor((availW - (maxLen - 1) * gap) / maxLen)));
+  let minFit = 64;
+  TITLE_LINES.forEach(line => {
+    const letters = [...line].filter(c => c !== ' ' && LETTERS[c]).length;
+    const spaces  = [...line].filter(c => c === ' ').length;
+    const n = letters + spaces;
+    if (n < 1) return;
+    // letters*t + spaces*(t*SP_RATIO) + (n-1)*gap = availW  →  solve for t
+    const fit = (availW - (n - 1) * gap) / (letters + spaces * SP_RATIO);
+    if (fit > 0) minFit = Math.min(minFit, fit);
+  });
+  return Math.max(28, Math.min(64, Math.floor(minFit)));
 }
 
 function renderTitle() {
   const container = document.getElementById('title-collage');
   container.innerHTML = '';
   const tSize = titleTileSize();
-  TITLE_WORDS.forEach((word, wi) => {
+  TITLE_LINES.forEach((line, li) => {
     const row = document.createElement('div');
     row.className = 'title-row';
-    for (let i = 0; i < word.length; i++) {
-      const ch = word[i];
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === ' ') {
+        const sp = document.createElement('div');
+        sp.style.cssText = `width:${Math.round(tSize * SP_RATIO)}px;flex-shrink:0;`;
+        row.appendChild(sp);
+        continue;
+      }
       const variants = LETTERS[ch];
       if (!variants) continue;
-      const key = `title-${wi}-${i}-${ch}`;
+      const key = `title-${li}-${i}-${ch}`;
       if (VS[key] === undefined) VS[key] = Math.floor(Math.random() * variants.length);
       const vi = VS[key] % variants.length;
       const { url, label } = variants[vi];
