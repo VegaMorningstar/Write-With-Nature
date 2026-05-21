@@ -914,23 +914,61 @@ async function downloadCollage() {
   const rows = document.querySelectorAll('.collage-row');
   if (!rows.length) { showToast('Nothing to export yet'); return; }
   showToast('Preparing your image…');
+
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-  const gap = 2, pad = 12;
+  const gap = 2, pad = 32;
   const spW = Math.max(24, Math.round(tileW * 0.6));
+
+  // Measure layout
   let maxW = 0, totalH = pad;
   const layouts = [];
   rows.forEach(row => {
     const items = [...row.children].filter(el => el.classList.contains('tile') || el.classList.contains('tile-space'));
-    const rSpW = Math.max(24, Math.round(tileW * 0.6));
-    const rowW = items.reduce((sum, el) => sum + (el.classList.contains('tile') ? tileW : rSpW), 0)
+    const rowW = items.reduce((sum, el) => sum + (el.classList.contains('tile') ? tileW : spW), 0)
                  + Math.max(0, items.length - 1) * gap;
     maxW = Math.max(maxW, rowW);
     layouts.push(items);
     totalH += tileW + gap;
   });
   totalH += pad - gap;
-  cv.width = maxW + pad * 2; cv.height = totalH;
-  ctx.fillStyle = '#f0ead8'; ctx.fillRect(0, 0, cv.width, cv.height);
+  cv.width = maxW + pad * 2;
+  cv.height = totalH;
+
+  // 1 ── Paper base
+  ctx.fillStyle = '#f0ead8';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // 2 ── Watercolor layer (cover-scale from the viewport paint canvas)
+  const wc = document.getElementById('wc');
+  if (wc && wc.width > 0 && wc.height > 0) {
+    const scale = Math.max(cv.width / wc.width, cv.height / wc.height);
+    const sw = cv.width / scale, sh = cv.height / scale;
+    const sx = Math.max(0, (wc.width  - sw) / 2);
+    const sy = Math.max(0, (wc.height - sh) / 2);
+    ctx.drawImage(wc, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+  }
+
+  // 3 ── Paper grain texture (same SVG noise as CSS background)
+  await new Promise(resolve => {
+    const gi = new Image();
+    gi.onload = () => {
+      ctx.globalCompositeOperation = 'multiply';
+      const ts = 180;
+      for (let x = 0; x < cv.width; x += ts)
+        for (let y = 0; y < cv.height; y += ts)
+          ctx.drawImage(gi, x, y, ts, ts);
+      ctx.globalCompositeOperation = 'source-over';
+      resolve();
+    };
+    gi.onerror = resolve;
+    gi.src = 'data:image/svg+xml,' + encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'>" +
+      "<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/></filter>" +
+      "<rect width='180' height='180' filter='url(#n)' opacity='0.10'/></svg>"
+    );
+  });
+
+  // 4 ── Tiles
   let y = pad;
   for (const items of layouts) {
     let x = pad;
@@ -948,13 +986,24 @@ async function downloadCollage() {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(lbl, x + tileW / 2, y + tileW / 2);
       }
-      ctx.restore(); x += tileW + gap;
+      ctx.restore();
+      x += tileW + gap;
     }
     y += tileW + gap;
   }
+
+  // 5 ── Download
   const a = document.createElement('a');
-  a.download = 'write-with-nature.png'; a.href = cv.toDataURL('image/png'); a.click();
+  a.download = 'write-with-nature.png';
+  a.href = cv.toDataURL('image/png');
+  a.click();
   showToast('Saved · write-with-nature.png');
+
+  // 6 ── Clear watercolor — new session
+  if (wc) {
+    const wctx = wc.getContext('2d');
+    wctx.clearRect(0, 0, wc.width, wc.height);
+  }
 }
 
 function rr(ctx, x, y, w, h, r) {
@@ -1017,6 +1066,7 @@ function installApp() {
   ];
 
   const cv = document.createElement('canvas');
+  cv.id = 'wc';
   cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;';
   document.body.insertBefore(cv, document.body.firstChild);
   const ctx = cv.getContext('2d');
