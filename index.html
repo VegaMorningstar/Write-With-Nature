@@ -19,7 +19,8 @@
 <meta property="og:image" content="icon-512.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400;1,700&family=Crimson+Pro:wght@300;400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
 
 :root {
@@ -33,10 +34,7 @@
   --gold:   #c8962a;
   --amber:  #e8b84b;
   --rust:   #b8542a;
-  --terra:  #d4694a;
   --teal:   #2a6b5e;
-  --sky:    #4a9e8e;
-  --shadow: rgba(28,26,16,0.14);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -287,7 +285,7 @@ textarea:focus {
   border-color: var(--teal);
   box-shadow: 0 0 0 3px rgba(42,107,94,0.09);
 }
-textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
+textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 
 .render-btn {
   display: flex; flex-direction: column;
@@ -328,7 +326,7 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
 
 .compose-note {
   margin-top: 0.9rem; font-size: 0.85rem;
-  color: rgba(28,26,16,0.42); font-style: italic;
+  color: rgba(28,26,16,0.60); font-style: italic;
   display: flex; align-items: flex-start; gap: 6px; line-height: 1.5;
 }
 
@@ -403,7 +401,7 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
 .board-empty {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; min-height: 140px;
-  color: rgba(28,26,16,0.22); gap: 12px; text-align: center;
+  color: rgba(28,26,16,0.40); gap: 12px; text-align: center;
   position: relative; z-index: 1;
 }
 .board-empty p { font-style: italic; font-size: 1rem; }
@@ -551,7 +549,7 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
   font-family: 'Playfair Display', serif; font-style: italic;
   font-weight: 400; font-size: 1rem; color: var(--moss); margin-bottom: 0.5rem;
 }
-.colophon-text p { font-size: 0.86rem; color: rgba(28,26,16,0.48); line-height: 1.7; }
+.colophon-text p { font-size: 0.86rem; color: rgba(28,26,16,0.68); line-height: 1.7; }
 .colophon-text a {
   color: var(--teal); text-decoration: none;
   border-bottom: 1px solid rgba(42,107,94,0.25); transition: border-color 0.15s;
@@ -562,17 +560,12 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
 .alpha-cell {
   width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255,252,245,0.16);
-  backdrop-filter: blur(16px) saturate(1.8);
-  -webkit-backdrop-filter: blur(16px) saturate(1.8);
+  background: rgba(255,252,245,0.30);
   border-radius: 6px;
   font-family: 'Playfair Display', serif; font-weight: 700;
-  font-size: 0.9rem; color: rgba(28,26,16,0.28);
-  border: 1px solid rgba(255,255,255,0.40);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.75),
-    inset 0 -1px 0 rgba(0,0,0,0.06),
-    0 2px 6px rgba(28,26,16,0.10);
+  font-size: 0.9rem; color: rgba(28,26,16,0.48);
+  border: 1px solid rgba(255,255,255,0.50);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.80), 0 1px 3px rgba(28,26,16,0.08);
   transition: all 0.15s;
 }
 .alpha-cell.has {
@@ -1177,13 +1170,13 @@ function installApp() {
 // ── Watercolor canvas ─────────────────────────────────────────────────────
 (function () {
   const COLORS = [
-    [245, 210, 55],   // sunflower yellow
-    [255, 185, 40],   // amber yellow
-    [45,  200, 190],  // turquoise
-    [55,  170, 215],  // sky turquoise
-    [100, 215, 195],  // mint turquoise
-    [185, 145, 225],  // lilac
-    [215, 175, 248],  // pale lilac
+    [242, 222, 120],  // soft yellow
+    [248, 205, 110],  // warm amber
+    [110, 215, 205],  // pastel turquoise
+    [130, 200, 230],  // sky blue
+    [160, 225, 215],  // mint
+    [200, 170, 232],  // soft lilac
+    [218, 195, 245],  // pale lavender
   ];
 
   const cv = document.createElement('canvas');
@@ -1194,7 +1187,7 @@ function installApp() {
 
   function resize() { cv.width = window.innerWidth; cv.height = window.innerHeight; }
   resize();
-  window.addEventListener('resize', resize);
+  let _rt; window.addEventListener('resize', () => { clearTimeout(_rt); _rt = setTimeout(resize, 150); });
 
   let lx = -1, ly = -1, ci = 0, traveled = 0;
 
@@ -1217,7 +1210,7 @@ function installApp() {
   }
 
   function blob(x, y) {
-    const alpha = 0.45 + Math.random() * 0.25;
+    const alpha = 0.28 + Math.random() * 0.18;
     const rad   = 38 + Math.random() * 36;
     drop(x, y, rad, alpha);
     const satellites = 3 + Math.floor(Math.random() * 4);
@@ -1251,15 +1244,6 @@ function installApp() {
     }
     ci = (ci + 1) % COLORS.length;
   }
-
-  // Seed a few blobs on load so canvas is never empty
-  setTimeout(() => {
-    const W = cv.width, H = cv.height;
-    [[0.15,0.25],[0.78,0.18],[0.88,0.65],[0.22,0.72],[0.50,0.42]].forEach(([fx,fy]) => {
-      splatter(W * fx, H * fy);
-      ci = (ci + 1) % COLORS.length;
-    });
-  }, 200);
 
   document.addEventListener('mousemove', e => paint(e.clientX, e.clientY));
   document.addEventListener('mouseleave', () => { lx = -1; ly = -1; });
