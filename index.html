@@ -42,7 +42,13 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--paper);
+  background:
+    radial-gradient(ellipse 70% 55% at 15% 20%, rgba(42,107,94,0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 85% 12%, rgba(200,150,42,0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 70% 75%, rgba(74,124,63,0.13) 0%, transparent 65%),
+    radial-gradient(ellipse 45% 40% at 8%  80%, rgba(184,84,42,0.11) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 50% 50%, rgba(122,182,72,0.07) 0%, transparent 70%),
+    var(--paper);
   color: var(--ink);
   font-family: 'Crimson Pro', Georgia, serif;
   min-height: 100vh;
@@ -1098,7 +1104,7 @@ function installApp() {
 
   const cv = document.createElement('canvas');
   cv.id = 'wc';
-  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9998;mix-blend-mode:multiply;';
+  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9998;';
   document.body.insertBefore(cv, document.body.firstChild);
   const ctx = cv.getContext('2d');
 
@@ -1111,7 +1117,7 @@ function installApp() {
   function drop(x, y, rad, alpha) {
     const [r, g, b] = COLORS[ci];
     const grd = ctx.createRadialGradient(x, y, 0, x, y, rad);
-    grd.addColorStop(0,    `rgba(${r},${g},${b},${(alpha * 1.5).toFixed(3)})`);
+    grd.addColorStop(0,    `rgba(${r},${g},${b},${Math.min(0.90, alpha * 1.8).toFixed(3)})`);
     grd.addColorStop(0.45, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
     grd.addColorStop(1,    `rgba(${r},${g},${b},0)`);
     ctx.save();
@@ -1127,8 +1133,8 @@ function installApp() {
   }
 
   function blob(x, y) {
-    const alpha = 0.10 + Math.random() * 0.12;
-    const rad   = 26 + Math.random() * 26;
+    const alpha = 0.22 + Math.random() * 0.20;
+    const rad   = 28 + Math.random() * 28;
     drop(x, y, rad, alpha);
     const satellites = 3 + Math.floor(Math.random() * 4);
     for (let i = 0; i < satellites; i++) {
