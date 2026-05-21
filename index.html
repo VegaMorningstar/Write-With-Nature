@@ -43,11 +43,11 @@
 
 body {
   background:
-    radial-gradient(ellipse 70% 55% at 15% 20%, rgba(42,107,94,0.18) 0%, transparent 65%),
-    radial-gradient(ellipse 55% 45% at 85% 12%, rgba(200,150,42,0.14) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 70% 75%, rgba(74,124,63,0.13) 0%, transparent 65%),
-    radial-gradient(ellipse 45% 40% at 8%  80%, rgba(184,84,42,0.11) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 35% at 50% 50%, rgba(122,182,72,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 75% 60% at 12% 18%, rgba(42,107,94,0.38) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at 88% 10%, rgba(200,150,42,0.32) 0%, transparent 60%),
+    radial-gradient(ellipse 65% 55% at 72% 78%, rgba(74,124,63,0.30) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 45% at 6%  82%, rgba(184,84,42,0.26) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at 50% 48%, rgba(122,182,72,0.14) 0%, transparent 70%),
     var(--paper);
   color: var(--ink);
   font-family: 'Crimson Pro', Georgia, serif;
@@ -1196,6 +1196,15 @@ function installApp() {
     }
     ci = (ci + 1) % COLORS.length;
   }
+
+  // Seed a few blobs on load so canvas is never empty
+  setTimeout(() => {
+    const W = cv.width, H = cv.height;
+    [[0.15,0.25],[0.78,0.18],[0.88,0.65],[0.22,0.72],[0.50,0.42]].forEach(([fx,fy]) => {
+      splatter(W * fx, H * fy);
+      ci = (ci + 1) % COLORS.length;
+    });
+  }, 200);
 
   document.addEventListener('mousemove', e => paint(e.clientX, e.clientY));
   document.addEventListener('mouseleave', () => { lx = -1; ly = -1; });
