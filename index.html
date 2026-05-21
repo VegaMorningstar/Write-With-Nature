@@ -142,15 +142,36 @@ body::after {
   border-radius: 6px;
   overflow: hidden;
   background: var(--paper3);
-  border: 1.5px solid rgba(28,26,16,0.08);
+  border: 1px solid rgba(255,255,255,0.35);
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  box-shadow:
+    0 6px 18px rgba(28,26,16,0.30),
+    0 2px 5px rgba(0,0,0,0.20);
 }
 .title-tile:hover {
-  transform: translateY(-3px) scale(1.06);
-  box-shadow: 0 8px 18px rgba(28,26,16,0.2);
+  transform: translateY(-5px) scale(1.07);
+  box-shadow: 0 14px 32px rgba(28,26,16,0.38), 0 3px 8px rgba(0,0,0,0.22);
   border-color: var(--gold);
   z-index: 5;
+}
+/* Glaze on title tiles */
+.title-tile::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none; z-index: 2;
+  background: linear-gradient(
+    155deg,
+    rgba(255,255,255,0.45) 0%,
+    rgba(255,255,255,0.14) 28%,
+    rgba(255,255,255,0.00) 54%,
+    rgba(0,0,0,0.08) 100%
+  );
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.82),
+    inset 1px 0 0   rgba(255,255,255,0.24),
+    inset 0 -1.5px 0 rgba(0,0,0,0.14);
 }
 .title-tile img {
   width: 100%; height: 100%;
@@ -272,22 +293,32 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
   display: flex; flex-direction: column;
   align-items: center; gap: 5px;
   padding: 14px 24px;
-  background: rgba(45,74,30,0.55);
-  backdrop-filter: blur(24px) saturate(2) brightness(1.05);
-  -webkit-backdrop-filter: blur(24px) saturate(2) brightness(1.05);
+  background: rgba(30,58,18,0.82);
+  backdrop-filter: blur(28px) saturate(2.2) brightness(1.05);
+  -webkit-backdrop-filter: blur(28px) saturate(2.2) brightness(1.05);
   color: var(--amber);
-  border: 1px solid rgba(122,182,72,0.4);
+  border: 1px solid rgba(122,182,72,0.50);
   border-radius: 14px;
   cursor: pointer; font-family: 'Playfair Display', serif;
   font-size: 1.05rem; font-style: italic;
   transition: background 0.2s, transform 0.15s, box-shadow 0.15s;
   box-shadow:
-    inset 0 1.5px 0 rgba(122,182,72,0.5),
-    inset 0 -1px 0 rgba(0,0,0,0.12),
-    0 6px 20px rgba(45,74,30,0.25);
+    inset 0 1.5px 0 rgba(162,222,112,0.60),
+    inset 0 -2px 0 rgba(0,0,0,0.28),
+    inset 1px 0 0 rgba(122,182,72,0.18),
+    0 8px 28px rgba(20,42,10,0.55),
+    0 2px 6px rgba(0,0,0,0.30);
   white-space: nowrap; min-width: 96px; align-self: flex-end;
 }
-.render-btn:hover { background: rgba(74,124,63,0.65); transform: translateY(-2px); }
+.render-btn:hover {
+  background: rgba(45,80,25,0.90);
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1.5px 0 rgba(162,222,112,0.65),
+    inset 0 -2px 0 rgba(0,0,0,0.30),
+    0 12px 36px rgba(20,42,10,0.60),
+    0 3px 8px rgba(0,0,0,0.35);
+}
 .render-btn:active { transform: none; }
 .render-btn small {
   font-family: 'DM Mono', monospace; font-size: 0.52rem;
@@ -502,8 +533,16 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
 
 /* ── Colophon ── */
 .colophon {
-  margin-top: 3rem; padding-top: 1.5rem;
-  border-top: 1.5px solid var(--paper3);
+  margin-top: 3rem; padding: 1.8rem 2rem;
+  border-radius: 18px;
+  background: rgba(255,252,245,0.11);
+  backdrop-filter: blur(28px) saturate(2.2) brightness(1.06);
+  -webkit-backdrop-filter: blur(28px) saturate(2.2) brightness(1.06);
+  border: 1px solid rgba(255,255,255,0.38);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.88),
+    inset 0 -1px 0 rgba(0,0,0,0.04),
+    0 8px 32px rgba(28,26,16,0.10);
   display: flex; align-items: flex-start; gap: 2.5rem; flex-wrap: wrap;
 }
 
@@ -519,16 +558,32 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
 }
 .colophon-text a:hover { border-color: var(--teal); }
 
-.alpha-grid { display: flex; flex-wrap: wrap; gap: 4px; max-width: 270px; }
+.alpha-grid { display: flex; flex-wrap: wrap; gap: 5px; max-width: 280px; }
 .alpha-cell {
   width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
-  background: var(--paper3); border-radius: 4px;
+  background: rgba(255,252,245,0.16);
+  backdrop-filter: blur(16px) saturate(1.8);
+  -webkit-backdrop-filter: blur(16px) saturate(1.8);
+  border-radius: 6px;
   font-family: 'Playfair Display', serif; font-weight: 700;
-  font-size: 0.9rem; color: rgba(28,26,16,0.22);
-  border: 1px solid rgba(28,26,16,0.06); transition: all 0.15s;
+  font-size: 0.9rem; color: rgba(28,26,16,0.28);
+  border: 1px solid rgba(255,255,255,0.40);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.75),
+    inset 0 -1px 0 rgba(0,0,0,0.06),
+    0 2px 6px rgba(28,26,16,0.10);
+  transition: all 0.15s;
 }
-.alpha-cell.has { color: var(--moss); background: rgba(74,124,63,0.09); border-color: rgba(74,124,63,0.18); }
+.alpha-cell.has {
+  color: var(--moss);
+  background: rgba(74,124,63,0.22);
+  border-color: rgba(122,182,72,0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(162,222,112,0.55),
+    inset 0 -1px 0 rgba(0,0,0,0.08),
+    0 3px 10px rgba(45,74,30,0.18);
+}
 
 /* ── Toast ── */
 .toast {
@@ -1133,8 +1188,8 @@ function installApp() {
 
   const cv = document.createElement('canvas');
   cv.id = 'wc';
-  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9998;';
-  document.body.insertBefore(cv, document.body.firstChild);
+  cv.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';
+  document.body.appendChild(cv);
   const ctx = cv.getContext('2d');
 
   function resize() { cv.width = window.innerWidth; cv.height = window.innerHeight; }
@@ -1146,8 +1201,8 @@ function installApp() {
   function drop(x, y, rad, alpha) {
     const [r, g, b] = COLORS[ci];
     const grd = ctx.createRadialGradient(x, y, 0, x, y, rad);
-    grd.addColorStop(0,    `rgba(${r},${g},${b},${Math.min(0.90, alpha * 1.8).toFixed(3)})`);
-    grd.addColorStop(0.45, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
+    grd.addColorStop(0,    `rgba(${r},${g},${b},${Math.min(0.95, alpha * 1.6).toFixed(3)})`);
+    grd.addColorStop(0.40, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
     grd.addColorStop(1,    `rgba(${r},${g},${b},0)`);
     ctx.save();
     ctx.translate(x, y);
@@ -1162,8 +1217,8 @@ function installApp() {
   }
 
   function blob(x, y) {
-    const alpha = 0.22 + Math.random() * 0.20;
-    const rad   = 28 + Math.random() * 28;
+    const alpha = 0.45 + Math.random() * 0.25;
+    const rad   = 38 + Math.random() * 36;
     drop(x, y, rad, alpha);
     const satellites = 3 + Math.floor(Math.random() * 4);
     for (let i = 0; i < satellites; i++) {
@@ -1178,7 +1233,7 @@ function installApp() {
     if (lx < 0) { lx = x; ly = y; return; }
     const dx = x - lx, dy = y - ly;
     const d = Math.sqrt(dx * dx + dy * dy);
-    if (d < 14) return;
+    if (d < 8) return;
     blob(x, y);
     traveled += d;
     if (traveled > 70 + Math.random() * 110) {
