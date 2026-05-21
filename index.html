@@ -229,30 +229,30 @@ body::after {
 
 /* ── Liquid-glass shared style ── */
 .glass {
-  background: rgba(255,255,255,0.16);
-  backdrop-filter: blur(24px) saturate(1.8) brightness(1.04);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8) brightness(1.04);
-  border: 1px solid rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  border: 1px solid rgba(255,255,255,0.32);
   box-shadow:
-    inset 3px 3px 10px rgba(255,255,255,0.52),
-    inset -2px -2px 7px rgba(0,0,0,0.07),
-    5px 5px 18px rgba(28,26,16,0.12),
-    -1px -1px 5px rgba(255,255,255,0.45);
+    -3px -3px 9px rgba(255,255,255,0.58),
+    4px 4px 14px rgba(0,0,0,0.16),
+    inset 1px 1px 5px rgba(255,255,255,0.42),
+    inset -1px -1px 4px rgba(0,0,0,0.05);
 }
 
 /* ── Compose card ── */
 .compose-card {
-  background: rgba(255,255,255,0.16);
-  backdrop-filter: blur(24px) saturate(1.8) brightness(1.04);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8) brightness(1.04);
-  border: 1px solid rgba(255,255,255,0.58);
+  background: rgba(255,255,255,0.09);
+  backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  border: 1px solid rgba(255,255,255,0.32);
   border-radius: 20px;
   padding: 1.5rem 1.5rem 1.25rem;
   box-shadow:
-    inset 4px 4px 12px rgba(255,255,255,0.55),
-    inset -2px -2px 8px rgba(0,0,0,0.07),
-    6px 6px 22px rgba(28,26,16,0.13),
-    -1px -1px 5px rgba(255,255,255,0.50);
+    -4px -4px 10px rgba(255,255,255,0.62),
+    5px 5px 16px rgba(0,0,0,0.18),
+    inset 1px 1px 5px rgba(255,255,255,0.44),
+    inset -1px -1px 4px rgba(0,0,0,0.05);
   position: relative; overflow: hidden;
 }
 .compose-card::after {
@@ -270,14 +270,15 @@ body::after {
 
 textarea {
   flex: 1;
-  background: rgba(255,255,255,0.22);
-  backdrop-filter: blur(12px) saturate(1.6);
-  -webkit-backdrop-filter: blur(12px) saturate(1.6);
-  border: 1px solid rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.14);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,0.32);
   box-shadow:
-    inset 3px 3px 9px rgba(255,255,255,0.50),
-    inset -1px -1px 5px rgba(0,0,0,0.05),
-    3px 3px 12px rgba(28,26,16,0.08);
+    -2px -2px 7px rgba(255,255,255,0.55),
+    3px 3px 10px rgba(0,0,0,0.12),
+    inset 1px 1px 4px rgba(255,255,255,0.40),
+    inset -1px -1px 3px rgba(0,0,0,0.04);
   border-radius: 10px; color: var(--ink);
   font-family: 'Crimson Pro', Georgia, serif;
   font-size: 1.2rem; font-weight: 300;
@@ -306,20 +307,20 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
   font-size: 1.05rem; font-style: italic;
   transition: background 0.2s, transform 0.15s, box-shadow 0.15s;
   box-shadow:
-    inset 3px 3px 10px rgba(140,220,100,0.35),
-    inset -2px -2px 8px rgba(0,0,0,0.30),
-    6px 6px 22px rgba(10,30,5,0.45),
-    -1px -1px 4px rgba(140,200,80,0.25);
+    -3px -3px 8px rgba(160,220,100,0.40),
+    5px 5px 18px rgba(5,20,0,0.50),
+    inset 1px 1px 5px rgba(140,210,90,0.35),
+    inset -1px -1px 4px rgba(0,0,0,0.22);
   white-space: nowrap; min-width: 96px; align-self: flex-end;
 }
 .render-btn:hover {
   background: rgba(45,80,25,0.90);
   transform: translateY(-3px);
   box-shadow:
-    inset 3px 3px 12px rgba(150,230,110,0.40),
-    inset -2px -2px 8px rgba(0,0,0,0.32),
-    8px 8px 28px rgba(10,30,5,0.50),
-    -1px -1px 5px rgba(140,200,80,0.30);
+    -4px -4px 10px rgba(160,220,100,0.48),
+    7px 7px 24px rgba(5,20,0,0.55),
+    inset 1px 1px 6px rgba(150,220,100,0.40),
+    inset -1px -1px 5px rgba(0,0,0,0.24);
 }
 .render-btn:active { transform: none; }
 .render-btn small {
@@ -345,37 +346,37 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 .icon-btn {
   width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,0.18);
-  backdrop-filter: blur(20px) saturate(1.8) brightness(1.04);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(1.04);
-  border: 1px solid rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.10);
+  backdrop-filter: blur(18px) saturate(1.3) brightness(1.02);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3) brightness(1.02);
+  border: 1px solid rgba(255,255,255,0.30);
   border-radius: 10px; cursor: pointer; color: var(--teal);
   font-size: 0.95rem; transition: all 0.15s;
   box-shadow:
-    inset 2px 2px 7px rgba(255,255,255,0.55),
-    inset -1px -1px 5px rgba(0,0,0,0.07),
-    3px 3px 10px rgba(28,26,16,0.10),
-    -1px -1px 3px rgba(255,255,255,0.40);
+    -2px -2px 6px rgba(255,255,255,0.58),
+    3px 3px 9px rgba(0,0,0,0.14),
+    inset 1px 1px 4px rgba(255,255,255,0.42),
+    inset -1px -1px 3px rgba(0,0,0,0.05);
 }
-.icon-btn:hover { background: rgba(255,255,255,0.28); color: var(--moss); }
+.icon-btn:hover { background: rgba(255,255,255,0.18); color: var(--moss); }
 
 .save-btn {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 8px 18px;
-  background: rgba(184,84,42,0.14);
-  backdrop-filter: blur(20px) saturate(1.8) brightness(1.04);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(1.04);
-  color: var(--rust); border: 1px solid rgba(255,200,160,0.45);
+  background: rgba(184,84,42,0.10);
+  backdrop-filter: blur(18px) saturate(1.3) brightness(1.02);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3) brightness(1.02);
+  color: var(--rust); border: 1px solid rgba(255,200,160,0.30);
   border-radius: 12px; cursor: pointer;
   font-family: 'Playfair Display', serif; font-size: 0.9rem;
   font-style: italic; transition: all 0.15s;
   box-shadow:
-    inset 2px 2px 8px rgba(255,220,190,0.50),
-    inset -1px -1px 5px rgba(80,20,0,0.07),
-    3px 3px 12px rgba(184,84,42,0.14),
-    -1px -1px 4px rgba(255,200,160,0.35);
+    -2px -2px 7px rgba(255,220,190,0.55),
+    3px 3px 11px rgba(100,30,0,0.14),
+    inset 1px 1px 4px rgba(255,210,180,0.42),
+    inset -1px -1px 3px rgba(80,20,0,0.05);
 }
-.save-btn:hover { background: rgba(184,84,42,0.65); color: var(--paper); }
+.save-btn:hover { background: rgba(184,84,42,0.60); color: var(--paper); }
 
 .install-btn {
   display: none; align-items: center; gap: 7px;
@@ -390,18 +391,18 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 
 /* ── Collage board ── */
 .board {
-  background: rgba(255,255,255,0.14);
-  backdrop-filter: blur(28px) saturate(1.8) brightness(1.04);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8) brightness(1.04);
-  border: 1px solid rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  border: 1px solid rgba(255,255,255,0.30);
   border-radius: 20px; padding: 1.75rem;
   min-height: 190px; display: flex; flex-direction: column;
   gap: 6px;
   box-shadow:
-    inset 4px 4px 14px rgba(255,255,255,0.52),
-    inset -2px -2px 8px rgba(0,0,0,0.06),
-    6px 6px 24px rgba(28,26,16,0.12),
-    -1px -1px 5px rgba(255,255,255,0.45);
+    -4px -4px 10px rgba(255,255,255,0.60),
+    5px 5px 18px rgba(0,0,0,0.16),
+    inset 1px 1px 5px rgba(255,255,255,0.42),
+    inset -1px -1px 4px rgba(0,0,0,0.05);
   position: relative; overflow-x: auto;
 }
 
@@ -540,15 +541,15 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 .colophon {
   margin-top: 3rem; padding: 1.8rem 2rem;
   border-radius: 20px;
-  background: rgba(255,255,255,0.15);
-  backdrop-filter: blur(28px) saturate(1.8) brightness(1.04);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8) brightness(1.04);
-  border: 1px solid rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  border: 1px solid rgba(255,255,255,0.30);
   box-shadow:
-    inset 4px 4px 12px rgba(255,255,255,0.52),
-    inset -2px -2px 8px rgba(0,0,0,0.06),
-    5px 5px 20px rgba(28,26,16,0.11),
-    -1px -1px 5px rgba(255,255,255,0.42);
+    -3px -3px 9px rgba(255,255,255,0.58),
+    4px 4px 15px rgba(0,0,0,0.15),
+    inset 1px 1px 5px rgba(255,255,255,0.40),
+    inset -1px -1px 4px rgba(0,0,0,0.04);
   display: flex; align-items: flex-start; gap: 2.5rem; flex-wrap: wrap;
 }
 
