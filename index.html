@@ -597,7 +597,7 @@ textarea::placeholder { color: rgba(28,26,16,0.32); font-style: italic; }
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-canvas { display: none; }
+#c { display: none; }
 </style>
 </head>
 <body>
@@ -1177,13 +1177,13 @@ function installApp() {
 // ── Watercolor canvas ─────────────────────────────────────────────────────
 (function () {
   const COLORS = [
-    [45,  74,  30],   // moss
-    [74,  124, 63],   // fern
-    [200, 150, 42],   // gold
-    [184, 84,  42],   // rust
-    [42,  107, 94],   // teal
-    [122, 182, 72],   // leaf
-    [232, 184, 75],   // amber
+    [245, 210, 55],   // sunflower yellow
+    [255, 185, 40],   // amber yellow
+    [45,  200, 190],  // turquoise
+    [55,  170, 215],  // sky turquoise
+    [100, 215, 195],  // mint turquoise
+    [185, 145, 225],  // lilac
+    [215, 175, 248],  // pale lilac
   ];
 
   const cv = document.createElement('canvas');
