@@ -961,6 +961,7 @@ function render() {
 
   updateMeta(raw);
   buildAlphaGrid();
+  setTimeout(() => document.getElementById('collage').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 }
 
 function makeTile(ch, key) {
