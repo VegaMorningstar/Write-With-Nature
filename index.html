@@ -230,8 +230,8 @@ body::after {
 /* ── Liquid-glass shared style ── */
 .glass {
   background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  backdrop-filter: url(#glass-surface) blur(28px) saturate(130%) brightness(1.08);
+  -webkit-backdrop-filter: url(#glass-surface) blur(28px) saturate(130%) brightness(1.08);
   border: 1px solid rgba(255,255,255,0.32);
   box-shadow:
     -3px -3px 9px rgba(255,255,255,0.58),
@@ -243,8 +243,8 @@ body::after {
 /* ── Compose card ── */
 .compose-card {
   background: rgba(255,255,255,0.09);
-  backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  backdrop-filter: url(#glass-surface) blur(28px) saturate(130%) brightness(1.08);
+  -webkit-backdrop-filter: url(#glass-surface) blur(28px) saturate(130%) brightness(1.08);
   border: 1px solid rgba(255,255,255,0.32);
   border-radius: 20px;
   padding: 1.5rem 1.5rem 1.25rem;
@@ -271,8 +271,8 @@ body::after {
 textarea {
   flex: 1;
   background: rgba(255,255,255,0.14);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: url(#glass-element) blur(16px) saturate(160%) brightness(1.10);
+  -webkit-backdrop-filter: url(#glass-element) blur(16px) saturate(160%) brightness(1.10);
   border: 1px solid rgba(255,255,255,0.32);
   box-shadow:
     -2px -2px 7px rgba(255,255,255,0.55),
@@ -298,8 +298,8 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
   align-items: center; gap: 5px;
   padding: 14px 24px;
   background: rgba(30,58,18,0.82);
-  backdrop-filter: blur(28px) saturate(2.2) brightness(1.05);
-  -webkit-backdrop-filter: blur(28px) saturate(2.2) brightness(1.05);
+  backdrop-filter: url(#glass-element) blur(14px) saturate(150%);
+  -webkit-backdrop-filter: url(#glass-element) blur(14px) saturate(150%);
   color: var(--amber);
   border: 1px solid rgba(122,182,72,0.50);
   border-radius: 14px;
@@ -347,8 +347,8 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
   width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
   background: rgba(255,255,255,0.10);
-  backdrop-filter: blur(18px) saturate(1.3) brightness(1.02);
-  -webkit-backdrop-filter: blur(18px) saturate(1.3) brightness(1.02);
+  backdrop-filter: url(#glass-element) blur(16px) saturate(160%) brightness(1.10);
+  -webkit-backdrop-filter: url(#glass-element) blur(16px) saturate(160%) brightness(1.10);
   border: 1px solid rgba(255,255,255,0.30);
   border-radius: 10px; cursor: pointer; color: var(--teal);
   font-size: 0.95rem; transition: all 0.15s;
@@ -364,8 +364,8 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
   display: inline-flex; align-items: center; gap: 7px;
   padding: 8px 18px;
   background: rgba(184,84,42,0.10);
-  backdrop-filter: blur(18px) saturate(1.3) brightness(1.02);
-  -webkit-backdrop-filter: blur(18px) saturate(1.3) brightness(1.02);
+  backdrop-filter: url(#glass-element) blur(16px) saturate(160%) brightness(1.10);
+  -webkit-backdrop-filter: url(#glass-element) blur(16px) saturate(160%) brightness(1.10);
   color: var(--rust); border: 1px solid rgba(255,200,160,0.30);
   border-radius: 12px; cursor: pointer;
   font-family: 'Playfair Display', serif; font-size: 0.9rem;
@@ -392,8 +392,8 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 /* ── Collage board ── */
 .board {
   background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  backdrop-filter: url(#glass-surface) blur(28px) saturate(130%) brightness(1.08);
+  -webkit-backdrop-filter: url(#glass-surface) blur(28px) saturate(130%) brightness(1.08);
   border: 1px solid rgba(255,255,255,0.30);
   border-radius: 20px; padding: 1.75rem;
   min-height: 190px; display: flex; flex-direction: column;
@@ -542,8 +542,8 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
   margin-top: 3rem; padding: 1.8rem 2rem;
   border-radius: 20px;
   background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.02);
+  backdrop-filter: url(#glass-surface) blur(28px) saturate(130%) brightness(1.08);
+  -webkit-backdrop-filter: url(#glass-surface) blur(28px) saturate(130%) brightness(1.08);
   border: 1px solid rgba(255,255,255,0.30);
   box-shadow:
     -3px -3px 9px rgba(255,255,255,0.58),
@@ -569,12 +569,17 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 .alpha-cell {
   width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255,252,245,0.30);
+  background: rgba(255,255,255,0.10);
+  backdrop-filter: url(#glass-element) blur(12px) saturate(140%) brightness(1.06);
+  -webkit-backdrop-filter: url(#glass-element) blur(12px) saturate(140%) brightness(1.06);
   border-radius: 6px;
   font-family: 'Playfair Display', serif; font-weight: 700;
   font-size: 0.9rem; color: rgba(28,26,16,0.48);
-  border: 1px solid rgba(255,255,255,0.50);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.80), 0 1px 3px rgba(28,26,16,0.08);
+  border: 1px solid rgba(255,255,255,0.32);
+  box-shadow:
+    -1px -1px 4px rgba(255,255,255,0.55),
+    2px 2px 6px rgba(0,0,0,0.10),
+    inset 1px 1px 3px rgba(255,255,255,0.40);
   transition: all 0.15s;
 }
 .alpha-cell.has {
@@ -598,6 +603,23 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
   box-shadow: 0 6px 24px rgba(28,26,16,0.22); white-space: nowrap;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Glass performance isolation ── */
+.board, .compose-card, .colophon, .tile, .title-tile,
+.icon-btn, .save-btn, .install-btn, .render-btn, .alpha-cell {
+  contain: layout style;
+  will-change: transform;
+  isolation: isolate;
+}
+
+/* ── Reduced motion: fall back to plain blur ── */
+@media (prefers-reduced-motion: reduce) {
+  .board, .compose-card, .colophon, textarea,
+  .icon-btn, .save-btn, .install-btn, .render-btn, .alpha-cell {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
 
 #c { display: none; }
 </style>
@@ -1283,5 +1305,41 @@ document.getElementById('textInput').addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); render(); }
 });
 </script>
+
+<!-- SVG Liquid Glass filters — feDisplacementMap warps background like a real lens -->
+<svg style="display:none;position:absolute" xmlns="http://www.w3.org/2000/svg">
+  <!-- Large surface: cards, board, colophon — gentle warp, heavy blur -->
+  <filter id="glass-surface" x="-10%" y="-10%" width="120%" height="120%"
+          color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.008"
+                  numOctaves="2" seed="92" result="noise"/>
+    <feGaussianBlur in="noise" stdDeviation="3" result="softMap"/>
+    <feSpecularLighting in="softMap" surfaceScale="5" specularConstant="0.8"
+                        specularExponent="120" lighting-color="white" result="specLight">
+      <fePointLight x="-300" y="-300" z="400"/>
+    </feSpecularLighting>
+    <feComposite in="specLight" in2="SourceAlpha" operator="in" result="specClipped"/>
+    <feComposite in="SourceGraphic" in2="specClipped"
+                 operator="arithmetic" k1="0" k2="1" k3="0.4" k4="0" result="litSrc"/>
+    <feDisplacementMap in="litSrc" in2="softMap" scale="18"
+                       xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <!-- Element glass: buttons, icon-btns, alpha-cells — stronger warp -->
+  <filter id="glass-element" x="-20%" y="-20%" width="140%" height="140%"
+          color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.012"
+                  numOctaves="2" seed="47" result="noise"/>
+    <feGaussianBlur in="noise" stdDeviation="2" result="softMap"/>
+    <feSpecularLighting in="softMap" surfaceScale="6" specularConstant="1"
+                        specularExponent="140" lighting-color="white" result="specLight">
+      <fePointLight x="-200" y="-200" z="300"/>
+    </feSpecularLighting>
+    <feComposite in="specLight" in2="SourceAlpha" operator="in" result="specClipped"/>
+    <feComposite in="SourceGraphic" in2="specClipped"
+                 operator="arithmetic" k1="0" k2="1" k3="0.5" k4="0" result="litSrc"/>
+    <feDisplacementMap in="litSrc" in2="softMap" scale="28"
+                       xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
 </body>
 </html>
