@@ -6,7 +6,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 export default function Colophon() {
   const colophonRef = useRef(null)
-  useLiquidGlass(colophonRef, { scale: -80, chroma: 5, blur: 24, saturate: 1.3 })
+  useLiquidGlass(colophonRef, { scale: -80, chroma: 5, blur: 24, saturate: 1.3, mode: 'polar', aberrationIntensity: 5, elasticity: 0.3 })
 
   return (
     <footer className="colophon" ref={colophonRef}>
