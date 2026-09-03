@@ -41,10 +41,10 @@ function TuneFluid({ opts, blendMode }) {
 // ── UI primitives ─────────────────────────────────────────────────────────────
 const mono = { fontFamily: 'DM Mono, monospace' }
 
-function Slider({ label, value, min, max, step = 0.01, fmt, onChange }) {
+function Slider({ label, value, min, max, step = 0.01, fmt, onChange, description }) {
   const display = fmt ? fmt(value) : value.toFixed(step >= 1 ? 0 : 2)
   return (
-    <label style={{ display: 'block', marginBottom: 9 }}>
+    <label style={{ display: 'block', marginBottom: description ? 13 : 9 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
         <span style={{ ...mono, fontSize: 10, color: '#3a4a2a', letterSpacing: '0.05em' }}>{label}</span>
         <span style={{ ...mono, fontSize: 10, color: '#4a7c3f', minWidth: 40, textAlign: 'right' }}>{display}</span>
@@ -53,7 +53,33 @@ function Slider({ label, value, min, max, step = 0.01, fmt, onChange }) {
         onChange={e => onChange(parseFloat(e.target.value))}
         style={{ width: '100%', accentColor: '#4a7c3f', cursor: 'pointer', display: 'block' }}
       />
+      {description && (
+        <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.36)', marginTop: 3, lineHeight: 1.55 }}>
+          {description}
+        </div>
+      )}
     </label>
+  )
+}
+
+function Toggle({ label, value, onChange, description }) {
+  return (
+    <div style={{ marginBottom: description ? 13 : 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: description ? 3 : 0 }}>
+        <span style={{ ...mono, fontSize: 10, color: '#3a4a2a', letterSpacing: '0.05em' }}>{label}</span>
+        <button onClick={() => onChange(!value)} style={{
+          ...mono, fontSize: 9, padding: '2px 10px', cursor: 'pointer', borderRadius: 4,
+          border: `1px solid ${value ? '#4a7c3f' : 'rgba(0,0,0,0.15)'}`,
+          background: value ? 'rgba(74,124,63,0.16)' : 'rgba(255,255,255,0.4)',
+          color: value ? '#1a3a0a' : '#999', minWidth: 38, textAlign: 'center',
+        }}>{value ? 'ON' : 'OFF'}</button>
+      </div>
+      {description && (
+        <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.36)', lineHeight: 1.55 }}>
+          {description}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -109,8 +135,15 @@ function GlassSection({ title, opts, onChange, open, onToggle }) {
 
 // ── Defaults (match current app values) ──────────────────────────────────────
 const FLUID_DEF = {
-  densityDissipation: 1.2, velocityDissipation: 1.6,
-  curl: 24, splatRadius: 0.30, splatForce: 5500, colorUpdateSpeed: 6,
+  densityDissipation:  1.2,
+  velocityDissipation: 1.6,
+  pressure:            0.8,
+  pressureIterations:  20,
+  curl:                24,
+  splatRadius:         0.30,
+  splatForce:          5500,
+  colorUpdateSpeed:    6,
+  shading:             true,
 }
 const BLEND_DEF = 'multiply'
 const GLASS_DEF = {
@@ -311,25 +344,85 @@ export default function TunePage() {
 
         {/* ── Fluid Cursor ── */}
         <AccordionSection title="FLUID CURSOR" open={openSection === 'fluid'} onToggle={() => toggle('fluid')}>
-          <Slider label="Density Dissipation"  value={pendingFluid.densityDissipation}  min={0.1} max={6}     step={0.05} onChange={v => setFluid('densityDissipation', v)} />
-          <Slider label="Velocity Dissipation" value={pendingFluid.velocityDissipation} min={0.1} max={4}     step={0.05} onChange={v => setFluid('velocityDissipation', v)} />
-          <Slider label="Curl"                 value={pendingFluid.curl}                min={0}   max={60}    step={1}    fmt={v => v.toFixed(0)} onChange={v => setFluid('curl', v)} />
-          <Slider label="Splat Radius"         value={pendingFluid.splatRadius}         min={0.05} max={0.7}  step={0.01} onChange={v => setFluid('splatRadius', v)} />
-          <Slider label="Splat Force"          value={pendingFluid.splatForce}          min={500} max={12000} step={100}  fmt={v => v.toFixed(0)} onChange={v => setFluid('splatForce', v)} />
-          <Slider label="Color Speed"          value={pendingFluid.colorUpdateSpeed}    min={1}   max={20}    step={0.5}  onChange={v => setFluid('colorUpdateSpeed', v)} />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            FADE &amp; PERSISTENCE
+          </div>
+
+          <Slider label="Density Dissipation" value={pendingFluid.densityDissipation} min={0.1} max={6} step={0.05}
+            onChange={v => setFluid('densityDissipation', v)}
+            description="How fast the color fades. Low = trails linger like wet ink. High = color evaporates almost instantly." />
+
+          <Slider label="Velocity Dissipation" value={pendingFluid.velocityDissipation} min={0.1} max={4} step={0.05}
+            onChange={v => setFluid('velocityDissipation', v)}
+            description="How quickly the fluid's momentum dies. Low = fluid keeps drifting and swirling long after cursor stops. High = motion snaps to a halt the moment you lift." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            PRESSURE &amp; PHYSICS
+          </div>
+
+          <Slider label="Pressure" value={pendingFluid.pressure} min={0} max={1} step={0.01}
+            onChange={v => setFluid('pressure', v)}
+            description="How strongly the fluid resists compression. Low = soft and blobby, pools in place. High = tight and incompressible, spreads more evenly." />
+
+          <Slider label="Pressure Iterations" value={pendingFluid.pressureIterations} min={1} max={50} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setFluid('pressureIterations', v)}
+            description="How many solver passes per frame. Low (1–5) = fast but pressure distributes loosely, blobby edges. High (30–50) = more physically accurate, costs GPU." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            TURBULENCE &amp; SPIN
+          </div>
+
+          <Slider label="Curl (Vorticity)" value={pendingFluid.curl} min={0} max={60} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setFluid('curl', v)}
+            description="Controls spiral energy. Low = smooth laminar ribbons that follow your motion. High = chaotic coiling vortices that spin and take on a life of their own." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            CURSOR STAMP
+          </div>
+
+          <Slider label="Splat Radius" value={pendingFluid.splatRadius} min={0.05} max={0.7} step={0.01}
+            onChange={v => setFluid('splatRadius', v)}
+            description="Size of the paint blob deposited at the cursor tip each frame. Low = fine hairline strokes. High = wide painterly blobs that cover more area." />
+
+          <Slider label="Splat Force" value={pendingFluid.splatForce} min={500} max={12000} step={100}
+            fmt={v => v.toFixed(0)} onChange={v => setFluid('splatForce', v)}
+            description="How hard the cursor shoves the fluid outward. Low = gentle nudges, slow drift. High = explosive bursts that fling paint across the entire canvas." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            COLOUR &amp; LOOK
+          </div>
+
+          <Slider label="Color Speed" value={pendingFluid.colorUpdateSpeed} min={1} max={20} step={0.5}
+            onChange={v => setFluid('colorUpdateSpeed', v)}
+            description="Rate at which the hue cycles through the spectrum. Low = long sustained streaks of one colour. High = rapid rainbow flickering with every movement." />
+
+          <Toggle label="Shading" value={pendingFluid.shading}
+            onChange={v => setFluid('shading', v)}
+            description="Simulated light on the fluid surface. ON = subtle 3D relief and gloss. OFF = flat uniform colour only." />
+
           <Chips label="Blend Mode" value={blendMode}
             options={['multiply', 'screen', 'overlay', 'normal', 'color-burn', 'soft-light']}
             onChange={setBlendMode}
           />
-          <div style={{ marginTop: 2, padding: '4px 0', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-            <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.35)', marginBottom: 5 }}>
-              Blend mode applies immediately · other params require Apply
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', marginBottom: 6, lineHeight: 1.6 }}>
+            multiply = stains paper · screen = glowing light · overlay = both · normal = opaque
+          </div>
+
+          <div style={{ padding: '6px 0 2px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+            <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 6 }}>
+              Blend mode applies instantly · all other params need Apply &amp; Restart
             </div>
             <button onClick={applyFluid} style={{
               ...mono, width: '100%', padding: '7px', cursor: 'pointer',
               background: 'rgba(74,124,63,0.14)', border: '1px solid rgba(74,124,63,0.28)',
               borderRadius: 6, fontSize: 10, letterSpacing: '0.1em', color: '#1a3a0a',
-            }}>APPLY & RESTART FLUID</button>
+            }}>APPLY &amp; RESTART FLUID</button>
           </div>
         </AccordionSection>
 
