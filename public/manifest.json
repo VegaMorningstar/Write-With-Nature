@@ -1,0 +1,33 @@
+{
+  "name": "Write with Nature",
+  "short_name": "Write w/ Nature",
+  "description": "Compose text as NASA Landsat satellite imagery — rivers, glaciers and coastlines shaped into letters from orbit.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f0ead8",
+  "theme_color": "#2d4a1e",
+  "orientation": "any",
+  "lang": "en",
+  "categories": ["art", "education", "photography"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
