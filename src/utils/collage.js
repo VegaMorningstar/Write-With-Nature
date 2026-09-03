@@ -6,48 +6,102 @@ function rr(ctx, x, y, w, h, r) {
   ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath()
 }
 
+// Draws an elliptical radial gradient onto ctx, matching CSS radial-gradient(ellipse ...)
+function ellipticGrad(ctx, cw, ch, cx_pct, cy_pct, rx_pct, ry_pct, rgb, alpha, stopPct) {
+  const cx = cw * cx_pct, cy = ch * cy_pct
+  const rx = cw * rx_pct, ry = ch * ry_pct
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(1, ry / rx)
+  const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, rx)
+  grd.addColorStop(0,        `rgba(${rgb},${alpha})`)
+  grd.addColorStop(stopPct,  `rgba(${rgb},0)`)
+  grd.addColorStop(1,        `rgba(${rgb},0)`)
+  ctx.fillStyle = grd
+  const r = rx * 1.1
+  ctx.fillRect(-r, -r, r * 2, r * 2)
+  ctx.restore()
+}
+
 export async function downloadCollage(exportCanvas, showToast) {
   const rows = document.querySelectorAll('.collage-row')
   if (!rows.length) { showToast('Nothing to export yet'); return }
-  showToast('Preparing your image…')
+  showToast('Preparing high-res image…')
 
   const cv = exportCanvas
   const ctx = cv.getContext('2d')
-  const gap = 2, pad = 32
+  const GAP = 6, ROW_GAP = 14, PAD = 52
 
-  // Infer tileW from the first tile in DOM
+  // Tile width: use DOM value but at least 160px for export quality
   const firstTile = document.querySelector('.collage-row .tile')
-  const tileW = firstTile ? firstTile.offsetWidth : 118
-  const spW = Math.max(24, Math.round(tileW * 0.6))
+  const domTileW = firstTile ? firstTile.offsetWidth : 118
+  const tileW = Math.max(domTileW, 160)
+  const scale = tileW / domTileW         // scale factor relative to DOM
+  const spW   = Math.round(tileW * 0.37)
 
-  let maxW = 0, totalH = pad
-  const layouts = []
-  rows.forEach(row => {
-    const items = [...row.children].filter(el =>
+  // ── Pre-pass: collect images and compute portrait heights ─────────────────
+  const rowLayouts = []
+  let maxRowW = 0, totalH = PAD
+
+  for (const row of rows) {
+    const domItems = [...row.children].filter(el =>
       el.classList.contains('tile') || el.classList.contains('tile-space'))
-    const rowW = items.reduce((sum, el) =>
-      sum + (el.classList.contains('tile') ? tileW : spW), 0)
-      + Math.max(0, items.length - 1) * gap
-    maxW = Math.max(maxW, rowW)
-    layouts.push(items)
-    totalH += tileW + gap
-  })
-  totalH += pad - gap
-  cv.width  = maxW + pad * 2
-  cv.height = totalH
 
-  ctx.fillStyle = '#f0ead8'
-  ctx.fillRect(0, 0, cv.width, cv.height)
+    let rowW = 0, rowH = tileW
+    const cells = []
 
-  const wc = document.getElementById('wc')
-  if (wc && wc.width > 0 && wc.height > 0) {
-    const scale = Math.max(cv.width / wc.width, cv.height / wc.height)
-    const sw = cv.width / scale, sh = cv.height / scale
-    const sx = Math.max(0, (wc.width  - sw) / 2)
-    const sy = Math.max(0, (wc.height - sh) / 2)
-    ctx.drawImage(wc, sx, sy, sw, sh, 0, 0, cv.width, cv.height)
+    for (const el of domItems) {
+      if (el.classList.contains('tile-space')) {
+        cells.push({ space: true, w: spW })
+        rowW += spW
+      } else {
+        const img = el.querySelector('img')
+        let h = tileW // fallback square
+        if (img?.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+          h = Math.round(tileW * img.naturalHeight / img.naturalWidth)
+        }
+        rowH = Math.max(rowH, h)
+        const letter = el.querySelector('.tile-char')?.textContent || ''
+        cells.push({ space: false, w: tileW, h, img, letter })
+        rowW += tileW
+      }
+    }
+    if (cells.length > 1) rowW += (cells.length - 1) * GAP
+    maxRowW = Math.max(maxRowW, rowW)
+    rowLayouts.push({ cells, rowH })
+    totalH += rowH + ROW_GAP
   }
 
+  totalH += PAD - ROW_GAP
+  cv.width  = maxRowW + PAD * 2
+  cv.height = totalH
+
+  // ── 1. Paper base colour ──────────────────────────────────────────────────
+  ctx.fillStyle = '#d9cdb4'
+  ctx.fillRect(0, 0, cv.width, cv.height)
+
+  // ── 2. Replicate the 5 CSS body radial gradients ─────────────────────────
+  // radial-gradient(ellipse W H at X Y, rgba(...) 0%, transparent STOP)
+  ctx.globalCompositeOperation = 'source-over'
+  ellipticGrad(ctx, cv.width, cv.height, 0.12, 0.18, 0.75, 0.60, '42,107,94',   0.38, 0.65)
+  ellipticGrad(ctx, cv.width, cv.height, 0.88, 0.10, 0.60, 0.50, '200,150,42',  0.32, 0.60)
+  ellipticGrad(ctx, cv.width, cv.height, 0.72, 0.78, 0.65, 0.55, '74,124,63',   0.30, 0.65)
+  ellipticGrad(ctx, cv.width, cv.height, 0.06, 0.82, 0.50, 0.45, '184,84,42',   0.26, 0.60)
+  ellipticGrad(ctx, cv.width, cv.height, 0.50, 0.48, 0.55, 0.40, '122,182,72',  0.14, 0.70)
+
+  // ── 3. Fluid cursor capture (WebGL — works if called before next rAF) ─────
+  const fluidCanvas = document.getElementById('fluid-cursor-canvas')
+  if (fluidCanvas?.width > 0 && fluidCanvas?.height > 0) {
+    try {
+      ctx.globalCompositeOperation = 'multiply'
+      ctx.drawImage(fluidCanvas, 0, 0, cv.width, cv.height)
+      ctx.globalCompositeOperation = 'source-over'
+    } catch (_) {
+      ctx.globalCompositeOperation = 'source-over'
+    }
+  }
+
+  // ── 4. Paper grain overlay (matching body::before SVG noise) ─────────────
   await new Promise(resolve => {
     const gi = new Image()
     gi.onload = () => {
@@ -67,36 +121,56 @@ export async function downloadCollage(exportCanvas, showToast) {
     )
   })
 
-  let y = pad
-  for (const items of layouts) {
-    let x = pad
-    for (const el of items) {
-      if (el.classList.contains('tile-space')) { x += spW + gap; continue }
-      const img = el.querySelector('img')
-      ctx.save(); rr(ctx, x, y, tileW, tileW, 5); ctx.clip()
+  // ── 5. Draw tiles at natural portrait aspect ratio ────────────────────────
+  let y = PAD
+  for (const { cells, rowH } of rowLayouts) {
+    let x = PAD
+    for (const cell of cells) {
+      if (cell.space) { x += cell.w + GAP; continue }
+
+      const { img, w, letter } = cell
+      const h = cell.h || rowH
+      const radius = Math.max(6, Math.round(w * 0.055))
+
+      ctx.save()
+      rr(ctx, x, y, w, h, radius)
+      ctx.clip()
+
       if (img?.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, x, y, tileW, tileW)
+        // Draw at full natural aspect — no squashing
+        ctx.drawImage(img, x, y, w, h)
       } else {
-        ctx.fillStyle = '#ddd4b8'; ctx.fillRect(x, y, tileW, tileW)
-        const lbl = el.querySelector('.tile-char')?.textContent || ''
-        ctx.globalAlpha = 0.18; ctx.fillStyle = '#1c1a10'
-        ctx.font = `bold ${Math.round(tileW * 0.48)}px 'Playfair Display',Georgia,serif`
+        ctx.fillStyle = '#cfc3a8'
+        ctx.fillRect(x, y, w, h)
+        ctx.globalAlpha = 0.15
+        ctx.fillStyle = '#1c1a10'
+        ctx.font = `bold ${Math.round(w * 0.48)}px 'Playfair Display',Georgia,serif`
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        ctx.fillText(lbl, x + tileW / 2, y + tileW / 2)
+        ctx.fillText(letter, x + w / 2, y + h / 2)
       }
       ctx.restore()
-      x += tileW + gap
+
+      // Subtle dark vignette rim on each tile (matches .tile-wash)
+      ctx.save()
+      rr(ctx, x, y, w, h, radius)
+      ctx.clip()
+      const rim = ctx.createLinearGradient(x, y, x, y + h)
+      rim.addColorStop(0,   'rgba(200,150,42,0)')
+      rim.addColorStop(0.7, 'rgba(200,150,42,0)')
+      rim.addColorStop(1,   'rgba(200,150,42,0.05)')
+      ctx.fillStyle = rim
+      ctx.fillRect(x, y, w, h)
+      ctx.restore()
+
+      x += w + GAP
     }
-    y += tileW + gap
+    y += rowH + ROW_GAP
   }
 
+  // ── 6. Export ─────────────────────────────────────────────────────────────
   const a = document.createElement('a')
   a.download = 'write-with-nature.png'
   a.href = cv.toDataURL('image/png')
   a.click()
   showToast('Saved · write-with-nature.png')
-
-  if (wc) {
-    wc.getContext('2d').clearRect(0, 0, wc.width, wc.height)
-  }
 }

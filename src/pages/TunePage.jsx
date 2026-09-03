@@ -114,9 +114,9 @@ const FLUID_DEF = {
 }
 const BLEND_DEF = 'multiply'
 const GLASS_DEF = {
-  compose:  { scale: -80, chroma: 5, blur: 24, saturate: 1.3, aberrationIntensity: 6,  elasticity: 0.35, mode: 'standard'  },
-  board:    { scale: -60, chroma: 4, blur: 22, saturate: 1.3, aberrationIntensity: 8,  elasticity: 0.30, mode: 'prominent' },
-  colophon: { scale: -80, chroma: 5, blur: 24, saturate: 1.3, aberrationIntensity: 5,  elasticity: 0.30, mode: 'polar'     },
+  compose:  { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, aberrationIntensity: 6, elasticity: 0, mode: 'standard'  },
+  board:    { scale: -60, chroma: 4, blur: 2.5, saturate: 1.3, aberrationIntensity: 8, elasticity: 0, mode: 'prominent' },
+  colophon: { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, aberrationIntensity: 5, elasticity: 0, mode: 'polar'     },
 }
 
 const TILE_COLORS = [

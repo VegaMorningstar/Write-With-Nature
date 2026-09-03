@@ -53,7 +53,7 @@ export default function App() {
   const exportCanvasRef = useRef(null)
   const toastTimer    = useRef(null)
 
-  useLiquidGlass(composeRef, { scale: -80, chroma: 5, blur: 24, saturate: 1.3, mode: 'standard', aberrationIntensity: 6, elasticity: 0.35 })
+  useLiquidGlass(composeRef, { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, mode: 'standard', aberrationIntensity: 6, elasticity: 0 })
 
   const showToast = useCallback((msg, ms = 2500) => {
     setToastMsg(msg)
