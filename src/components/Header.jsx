@@ -17,7 +17,7 @@ function titleTileSize(container) {
     const fit = (availW - (n - 1) * GAP) / (letters + spaces * SP_RATIO)
     if (fit > 0) minFit = Math.min(minFit, fit)
   })
-  return Math.max(28, Math.min(64, Math.floor(minFit)))
+  return Math.max(36, Math.min(84, Math.floor(minFit)))
 }
 
 function initTitleVs() {
@@ -35,7 +35,7 @@ function initTitleVs() {
 
 export default function Header() {
   const containerRef = useRef(null)
-  const [tSize, setTSize] = useState(64)
+  const [tSize, setTSize] = useState(84)
   const [vs, setVs] = useState(initTitleVs)
 
   const recalcSize = useCallback(() => {

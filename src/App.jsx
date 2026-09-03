@@ -6,6 +6,7 @@ import Colophon from './components/Colophon'
 import WatercolorCanvas from './components/WatercolorCanvas'
 import { downloadCollage } from './utils/collage'
 import useLiquidGlass from './hooks/useLiquidGlass'
+import FluidCursor from './components/FluidCursor'
 
 function parseLines(rawText) {
   return rawText.split('\n').map((line, lineIdx) => {
@@ -163,6 +164,7 @@ export default function App() {
 
   return (
     <>
+      <FluidCursor />
       <WatercolorCanvas />
       <canvas ref={exportCanvasRef} id="c" style={{ display: 'none' }} />
 
