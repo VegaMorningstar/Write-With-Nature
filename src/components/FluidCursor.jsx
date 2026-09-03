@@ -8,26 +8,21 @@ export default function FluidCursor() {
     _booted = true
 
     import('smokey-fluid-cursor').then(({ initFluid }) => {
-      // Canvas is already in the DOM (rendered below), so getElementById finds it.
-      // The library injects its own <style> that sets position/size/pointer-events.
-      // Our inline zIndex 6 on the canvas overrides the library's z-index: -9999.
       initFluid({
         transparent: true,
-        densityDissipation: 3.5,
-        velocityDissipation: 2,
-        curl: 28,
-        splatRadius: 0.26,
-        splatForce: 6000,
+        // Slower dissipation → trails linger on the background like paint drying
+        densityDissipation: 1.2,
+        velocityDissipation: 1.6,
+        curl: 24,
+        splatRadius: 0.30,
+        splatForce: 5500,
         shading: true,
-        colorUpdateSpeed: 8,
+        colorUpdateSpeed: 6,
         id: 'fluid-cursor-canvas',
       })
     })
   }, [])
 
-  // Canvas must be in the DOM before initFluid is called.
-  // The library styles position/size via an injected <style>;
-  // inline zIndex overrides the library's z-index: -9999.
   return (
     <canvas
       id="fluid-cursor-canvas"
@@ -35,7 +30,11 @@ export default function FluidCursor() {
         position: 'fixed', top: 0, left: 0,
         width: '100%', height: '100%',
         pointerEvents: 'none',
-        zIndex: 6,
+        // z-index 5: same layer as the old watercolor canvas — behind glass panels (z:20)
+        zIndex: 5,
+        // multiply blend makes the fluid color stain the paper background
+        // rather than sit as a floating overlay above it
+        mixBlendMode: 'multiply',
       }}
     />
   )

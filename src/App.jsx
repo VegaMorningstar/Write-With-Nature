@@ -3,7 +3,6 @@ import { LETTERS } from './data/letters'
 import Header from './components/Header'
 import Board from './components/Board'
 import Colophon from './components/Colophon'
-import WatercolorCanvas from './components/WatercolorCanvas'
 import { downloadCollage } from './utils/collage'
 import useLiquidGlass from './hooks/useLiquidGlass'
 import FluidCursor from './components/FluidCursor'
@@ -165,8 +164,7 @@ export default function App() {
   return (
     <>
       <FluidCursor />
-      <WatercolorCanvas />
-      <canvas ref={exportCanvasRef} id="c" style={{ display: 'none' }} />
+<canvas ref={exportCanvasRef} id="c" style={{ display: 'none' }} />
 
       {/* SVG glass filter for small elements (buttons, inputs, alpha-cells) */}
       <svg style={{ display: 'none', position: 'absolute' }} xmlns="http://www.w3.org/2000/svg">
