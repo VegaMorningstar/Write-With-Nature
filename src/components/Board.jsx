@@ -1,10 +1,13 @@
 import { forwardRef } from 'react'
 import Tile from './Tile'
+import useLiquidGlass from '../hooks/useLiquidGlass'
 
 const Board = forwardRef(function Board(
   { renderedLines, tileW, vs, onShuffle, onResize, onClear, onCycleVariant, onSave, onInstall, installVisible },
   ref
 ) {
+  useLiquidGlass(ref, { scale: -60, chroma: 4, blur: 22, saturate: 1.3 })
+
   const hasContent = renderedLines.some(l => l.type === 'row')
 
   const letterCount = renderedLines.flatMap(l => l.type === 'row' ? l.chars.filter(c => c.type === 'letter') : []).length

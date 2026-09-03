@@ -1,10 +1,15 @@
+import { useRef } from 'react'
 import { LETTERS } from '../data/letters'
+import useLiquidGlass from '../hooks/useLiquidGlass'
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 export default function Colophon() {
+  const colophonRef = useRef(null)
+  useLiquidGlass(colophonRef, { scale: -80, chroma: 5, blur: 24, saturate: 1.3 })
+
   return (
-    <footer className="colophon">
+    <footer className="colophon" ref={colophonRef}>
       <div className="colophon-text">
         <h3>About this tool</h3>
         <p>

@@ -5,6 +5,7 @@ import Board from './components/Board'
 import Colophon from './components/Colophon'
 import WatercolorCanvas from './components/WatercolorCanvas'
 import { downloadCollage } from './utils/collage'
+import useLiquidGlass from './hooks/useLiquidGlass'
 
 function parseLines(rawText) {
   return rawText.split('\n').map((line, lineIdx) => {
@@ -48,8 +49,11 @@ export default function App() {
   const [installVisible,setInstallVisible]= useState(false)
 
   const boardRef      = useRef(null)
+  const composeRef    = useRef(null)
   const exportCanvasRef = useRef(null)
   const toastTimer    = useRef(null)
+
+  useLiquidGlass(composeRef, { scale: -80, chroma: 5, blur: 24, saturate: 1.3 })
 
   const showToast = useCallback((msg, ms = 2500) => {
     setToastMsg(msg)
@@ -162,18 +166,8 @@ export default function App() {
       <WatercolorCanvas />
       <canvas ref={exportCanvasRef} id="c" style={{ display: 'none' }} />
 
-      {/* Inline SVG glass filters — referenced by backdrop-filter: url(#...) in CSS */}
+      {/* SVG glass filter for small elements (buttons, inputs, alpha-cells) */}
       <svg style={{ display: 'none', position: 'absolute' }} xmlns="http://www.w3.org/2000/svg">
-        <filter id="glass-surface" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.008 0.008" numOctaves="2" seed="92" result="noise"/>
-          <feGaussianBlur in="noise" stdDeviation="3" result="softMap"/>
-          <feSpecularLighting in="softMap" surfaceScale="5" specularConstant="0.8" specularExponent="120" lightingColor="white" result="specLight">
-            <fePointLight x="-300" y="-300" z="400"/>
-          </feSpecularLighting>
-          <feComposite in="specLight" in2="SourceAlpha" operator="in" result="specClipped"/>
-          <feComposite in="SourceGraphic" in2="specClipped" operator="arithmetic" k1="0" k2="1" k3="0.4" k4="0" result="litSrc"/>
-          <feDisplacementMap in="litSrc" in2="softMap" scale="18" xChannelSelector="R" yChannelSelector="G"/>
-        </filter>
         <filter id="glass-element" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.012 0.012" numOctaves="2" seed="47" result="noise"/>
           <feGaussianBlur in="noise" stdDeviation="2" result="softMap"/>
@@ -206,7 +200,7 @@ export default function App() {
 
         <section className="section">
           <div className="section-label">Compose</div>
-          <div className="compose-card">
+          <div className="compose-card" ref={composeRef}>
             <div className="textarea-row">
               <textarea
                 value={text}
