@@ -18,10 +18,21 @@ export default function FluidCursor() {
     }
 
     import('smokey-fluid-cursor').then(({ initFluid }) => {
-      document.addEventListener = _origAdd  // restore before any app code runs
+      document.addEventListener = _origAdd  // restore touch listener override
+
+      // Force preserveDrawingBuffer:true so the WebGL canvas stays readable
+      // after each frame — required to drawImage() it into the PNG export.
+      // initFluid() creates the WebGL context synchronously, so we intercept
+      // getContext only for the duration of that call, then restore.
+      const _origGetCtx = HTMLCanvasElement.prototype.getContext
+      HTMLCanvasElement.prototype.getContext = function (type, opts) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          opts = { ...(opts || {}), preserveDrawingBuffer: true }
+        }
+        return _origGetCtx.call(this, type, opts)
+      }
       initFluid({
         transparent: true,
-        // Slower dissipation → trails linger on the background like paint drying
         densityDissipation: 1.2,
         velocityDissipation: 1.6,
         curl: 24,
@@ -31,6 +42,7 @@ export default function FluidCursor() {
         colorUpdateSpeed: 6,
         id: 'fluid-cursor-canvas',
       })
+      HTMLCanvasElement.prototype.getContext = _origGetCtx  // restore
     })
   }, [])
 

@@ -27,7 +27,15 @@ function TuneFluid({ opts, blendMode }) {
     }
     import('smokey-fluid-cursor').then(({ initFluid }) => {
       document.addEventListener = _origAdd
+      const _origGetCtx = HTMLCanvasElement.prototype.getContext
+      HTMLCanvasElement.prototype.getContext = function (type, o) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          o = { ...(o || {}), preserveDrawingBuffer: true }
+        }
+        return _origGetCtx.call(this, type, o)
+      }
       initFluid({ transparent: true, id: 'tune-fluid-canvas', ...opts })
+      HTMLCanvasElement.prototype.getContext = _origGetCtx
     })
   }, []) // eslint-disable-line
   return (
