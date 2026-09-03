@@ -7,7 +7,18 @@ export default function FluidCursor() {
     if (_booted) return
     _booted = true
 
+    // Force the library's document-level touch listeners to be passive so
+    // calling preventDefault() inside them doesn't block native page scroll.
+    const _origAdd = document.addEventListener.bind(document)
+    document.addEventListener = (type, fn, opts) => {
+      if (type === 'touchstart' || type === 'touchmove') {
+        opts = typeof opts === 'object' ? { ...opts, passive: true } : { passive: true }
+      }
+      _origAdd(type, fn, opts)
+    }
+
     import('smokey-fluid-cursor').then(({ initFluid }) => {
+      document.addEventListener = _origAdd  // restore before any app code runs
       initFluid({
         transparent: true,
         // Slower dissipation → trails linger on the background like paint drying

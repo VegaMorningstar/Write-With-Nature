@@ -18,7 +18,15 @@ function TuneFluid({ opts, blendMode }) {
   useEffect(() => {
     if (bootedRef.current) return
     bootedRef.current = true
+    const _origAdd = document.addEventListener.bind(document)
+    document.addEventListener = (type, fn, opts) => {
+      if (type === 'touchstart' || type === 'touchmove') {
+        opts = typeof opts === 'object' ? { ...opts, passive: true } : { passive: true }
+      }
+      _origAdd(type, fn, opts)
+    }
     import('smokey-fluid-cursor').then(({ initFluid }) => {
+      document.addEventListener = _origAdd
       initFluid({ transparent: true, id: 'tune-fluid-canvas', ...opts })
     })
   }, []) // eslint-disable-line
