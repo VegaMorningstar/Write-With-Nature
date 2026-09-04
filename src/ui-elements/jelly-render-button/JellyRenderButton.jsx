@@ -14,12 +14,12 @@ const JIGGLE_MS = 1100
 // partial `hover` prop and anything missing falls back to these.
 export const HOVER_DEFAULTS = {
   // How far from the canvas the jelly still reacts, in CSS pixels
-  radius: 220,
+  radius: 510,
   // Ceiling on the hover impulse, as a fraction of a full nudge
-  strength: 0.6,
+  strength: 1.15,
   // Pointer travel in pixels that produces a full-scale impulse. Lower is
   // twitchier; this is the sensitivity dial.
-  sensitivity: 26,
+  sensitivity: 45,
   // Impulse into the rocking spring, from horizontal travel
   rockGain: 1.8,
   // Impulse into the squash springs, from total travel

@@ -78,8 +78,8 @@ export const AO_INTENSITY = 0.5;
 export const AO_BIAS = SURF_DIST * 5;
 
 
-// Spring dynamics, exactly as tuned in TypeGPU's jelly-switch. The wobble
-// envelope these give is e^(-5t) on squashX, so it settles in roughly 0.8s.
+// Spring dynamics. The squash pair is TypeGPU's tuning untouched, giving an
+// e^(-5t) envelope on squashX so it settles in roughly 0.8s.
 export const squashXProperties: SpringProperties = {
   mass: 1,
   stiffness: 1000,
@@ -90,9 +90,12 @@ export const squashZProperties: SpringProperties = {
   stiffness: 900,
   damping: 12,
 };
+// Softened from TypeGPU's 1000 to slow the rock from 5.0 Hz to 3.5 Hz. The decay
+// rate is unchanged — that is damping / 2m, which stiffness does not touch — so
+// this is a slower sway over the same span, not a longer one.
 export const wiggleXProperties: SpringProperties = {
   mass: 1,
-  stiffness: 1000,
+  stiffness: 480,
   damping: 20,
 };
 
