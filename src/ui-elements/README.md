@@ -33,17 +33,21 @@ defers GPU init to `requestIdleCallback` so it never blocks page load.
 
 | Constant | Does |
 | --- | --- |
-| `JELLY_BASE_ALPHA` | How much of the page shows through the middle of the blob |
-| `JELLY_TINT` | Colour strength. Lower reads as clearer glass |
-| `JELLY_DISPERSION` | Width of the chromatic fringe |
+| `MATERIAL_DEFAULTS` | The whole glass material — transparency, IOR, dispersion, blur, tint, absorption, scatter, specular, exposure, shadow, glow |
+| `JELLY_HALFSIZE` / `JELLY_ROUND` / `JELLY_BEND` | Shape of the blob |
 | `LABEL_CENTER_Z` | See below — retune whenever the camera or blob thickness moves |
 | `squash*/wiggle*Properties` | Spring tuning, currently TypeGPU's verbatim |
+
+`MATERIAL_DEFAULTS` is written into a uniform rather than baked into the WGSL, so
+it can be changed at runtime through the `material` prop without recompiling the
+shader. The geometry constants above it are still compile-time.
 
 Hover response lives in `JellyRenderButton.jsx` as `HOVER_DEFAULTS`, since it is
 pointer handling rather than rendering. Both it and the springs can be overridden
 live through the `hover` and `springs` props — the tune page at **`?tune`** drives
-them with sliders under JELLY — POINTER and JELLY — SPRINGS, and Copy Config
-emits the values under a `jelly` key. Retuning does not rebuild the scene.
+those and the material with sliders under JELLY — GLASS, JELLY — POINTER and
+JELLY — SPRINGS, and Copy Config emits the values under a `jelly` key. None of it
+rebuilds the scene.
 
 **`LABEL_CENTER_Z` is the fragile one.** The word is a texture on a plane inside
 the scene, not DOM behind the canvas, which is what lets it refract and pick up

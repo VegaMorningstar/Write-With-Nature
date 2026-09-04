@@ -37,6 +37,7 @@ export default function JellyRenderButton({
   label = 'RENDER',
   hover,
   springs,
+  material,
 }) {
   const canvasRef  = useRef(null)
   const sceneRef   = useRef(null)
@@ -56,6 +57,12 @@ export default function JellyRenderButton({
     springsRef.current = springs
     if (springs) sceneRef.current?.switchBehavior.setSpringProperties(springs)
   }, [springs])
+
+  const materialRef = useRef(material)
+  useEffect(() => {
+    materialRef.current = material
+    if (material && sceneRef.current) sceneRef.current.material = material
+  }, [material])
 
   // Pointer proximity: the blob stirs as the cursor comes near, not only once it
   // is over the canvas, so it reads as aware of the pointer before you arrive.
@@ -144,6 +151,7 @@ export default function JellyRenderButton({
         scene.darkMode   = false
 
         if (springsRef.current) scene.switchBehavior.setSpringProperties(springsRef.current)
+        if (materialRef.current) scene.material = materialRef.current
 
         sceneRef.current   = scene
         cleanupRef.current = () => { scene.onCleanup(); root.destroy() }

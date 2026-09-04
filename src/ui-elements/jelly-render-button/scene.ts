@@ -1,9 +1,16 @@
 import { tgpu, common, d, std, type TgpuRoot } from 'typegpu';
 import * as sdf from '@typegpu/sdf';
+import { randf } from '@typegpu/noise';
 
 import { SwitchBehavior } from './switch.ts';
 import { CameraController } from './camera.ts';
-import { BoundingBox, DirectionalLight, Ray, sampleLayout } from './dataTypes.ts';
+import {
+  BoundingBox,
+  DirectionalLight,
+  JellyMaterial,
+  Ray,
+  sampleLayout,
+} from './dataTypes.ts';
 import { beerLambert, createTextures, fresnelSchlick, intersectBox } from './utils.ts';
 import { TAAResolver } from './taa.ts';
 import { createLabelTexture } from './label.ts';
@@ -14,24 +21,17 @@ import {
   AO_INTENSITY,
   AO_RADIUS,
   AO_STEPS,
-  EXPOSURE,
-  JELLY_BASE_ALPHA,
   JELLY_BEND,
-  JELLY_DISPERSION,
   JELLY_HALFSIZE,
-  JELLY_IOR,
   JELLY_ROUND,
-  JELLY_SCATTER_STRENGTH,
   JELLY_SINK,
-  JELLY_SPECULAR,
-  JELLY_TINT,
   LABEL_CENTER_Z,
   LABEL_HALF_D,
   LABEL_HALF_W,
   LABEL_INK,
   LABEL_INK_DARK,
+  MATERIAL_DEFAULTS,
   MAX_STEPS,
-  SHADOW_STRENGTH,
   SPECULAR_INTENSITY,
   SPECULAR_POWER,
   SURF_DIST,
@@ -89,6 +89,12 @@ export async function setupScene(
   const jellyColorUniform = root.createUniform(d.vec4f, d.vec4f(1.0, 0.45, 0.075, 1.0));
 
   const darkModeUniform = root.createUniform(d.u32);
+
+  const materialState = { ...MATERIAL_DEFAULTS };
+  const materialUniform = root.createUniform(JellyMaterial, materialState);
+
+  // Reseeded per frame; drives the stochastic blur, which the TAA resolves.
+  const randomUniform = root.createUniform(d.vec2f);
 
   const getRay = (ndc: d.v2f) => {
     'use gpu';
@@ -272,7 +278,7 @@ export async function setupScene(
     const q = std.abs(xz.sub(d.vec2f(0.015, 0.045))).sub(half);
     const dist = std.length(std.max(q, d.vec2f(0))) + std.min(std.max(q.x, q.y), 0);
 
-    return (1 - std.smoothstep(-0.03, 0.18, dist)) * SHADOW_STRENGTH;
+    return (1 - std.smoothstep(-0.03, 0.18, dist)) * materialUniform.$.shadowStrength;
   };
 
   // Deliberately banded rather than a smooth ramp: dispersion is only visible where
@@ -305,7 +311,10 @@ export async function setupScene(
     // Fade the lit plane out with distance so the blob's edges do not look like
     // they are refracting an infinite white plate.
     const fade = 1 - std.smoothstep(1.2, 2.4, std.length(p.xz));
-    return std.mix(sky, litPlane(origin, p, 0.5), fade);
+    // Blur also biases the mip level, so a single frame already reads as frosted
+    // rather than purely noisy while the TAA converges.
+    const lod = 0.5 + materialUniform.$.blur * 8;
+    return std.mix(sky, litPlane(origin, p, lod), fade);
   };
 
   const refractDirection = (I: d.v3f, N: d.v3f, cosi: number, ior: number) => {
@@ -330,7 +339,13 @@ export async function setupScene(
     if (std.dot(direction, direction) < 0.5) {
       return d.vec3f();
     }
-    return refractedSample(hitPosition.add(direction.mul(SURF_DIST * 4.0)), direction);
+    // Frosting: scatter the refracted ray a little. Each frame samples a
+    // different direction and the TAA averages them into a genuine blur, which
+    // is cheaper than taking many samples per frame.
+    const scattered = std.normalize(
+      direction.add(randf.inUnitSphere().mul(materialUniform.$.blur * 0.4)),
+    );
+    return refractedSample(hitPosition.add(scattered.mul(SURF_DIST * 4.0)), scattered);
   };
 
   /** The word and its shadow, for rays that never reach the blob. */
@@ -353,7 +368,7 @@ export async function setupScene(
     const normal = d.vec3f(0, 1, 0);
     const lit = surfaceLighting(p, normal, rayOrigin);
     // AO gives the tight contact shading; shadowAt gives the broader cast pool
-    const contact = (1 - calculateAO(p, normal)) * SHADOW_STRENGTH;
+    const contact = (1 - calculateAO(p, normal)) * materialUniform.$.shadowStrength;
     const shadow = std.saturate(std.max(contact, shadowAt(p.xz)));
 
     // Outside the blob the plane itself stays transparent so the page shows
@@ -384,51 +399,53 @@ export async function setupScene(
         const hitPosition = rayOrigin.add(rayDirection.mul(distanceFromOrigin));
         const state = switchBehavior.stateUniform.$;
 
+        const m = materialUniform.$;
+
         const N = getNormal(hitPosition);
         const I = rayDirection;
         const cosi = std.min(1.0, std.max(0.0, std.dot(std.neg(I), N)));
-        const F = fresnelSchlick(cosi, d.f32(1.0), d.f32(JELLY_IOR));
+        const F = fresnelSchlick(cosi, d.f32(1.0), m.ior);
 
         const reflection = std.saturate(d.vec3f(hitPosition.y * 1.6 + 0.25));
 
-        const refrDir = refractDirection(I, N, cosi, JELLY_IOR);
+        const refrDir = refractDirection(I, N, cosi, m.ior);
         let refractedColor = d.vec3f();
 
         if (std.dot(refrDir, refrDir) > 0.5) {
           // Chromatic aberration: march the surround once per channel at its own
           // refractive index and keep R from the red march, G from green, B from blue.
-          const envR = refractedEnv(I, N, cosi, hitPosition, JELLY_IOR - JELLY_DISPERSION);
-          const envG = refractedEnv(I, N, cosi, hitPosition, JELLY_IOR);
-          const envB = refractedEnv(I, N, cosi, hitPosition, JELLY_IOR + JELLY_DISPERSION);
+          const envR = refractedEnv(I, N, cosi, hitPosition, m.ior - m.dispersion);
+          const envG = refractedEnv(I, N, cosi, hitPosition, m.ior);
+          const envB = refractedEnv(I, N, cosi, hitPosition, m.ior + m.dispersion);
           const env = d.vec3f(envR.x, envG.y, envB.z);
 
           const jellyColor = jellyColorUniform.$;
           const scatterTint = jellyColor.rgb.mul(1.5);
-          const absorb = d.vec3f(1.0).sub(jellyColor.rgb).mul(20.0);
+          const absorb = d.vec3f(1.0).sub(jellyColor.rgb).mul(m.absorbDensity);
 
           // Deeper parts of the blob absorb more, giving the vertical colour ramp
           const depth =
             std.saturate(
               std.mix(1, 0.6, hitPosition.y * (1 / (JELLY_HALFSIZE.y * 2)) + 0.25),
-            ) * JELLY_TINT;
+            ) * m.tint;
 
           const T = beerLambert(absorb.mul(depth ** 2), 0.08);
 
           const lightDir = std.neg(lightUniform.$.direction);
           const forward = std.max(0.0, std.dot(lightDir, refrDir));
-          const scatter = scatterTint.mul(JELLY_SCATTER_STRENGTH * forward * depth ** 3);
+          const scatter = scatterTint.mul(m.scatter * forward * depth ** 3);
 
           refractedColor = env.mul(T).add(scatter);
         }
 
         // Wobble energy lights the blob from within, so the click reads as landing
-        const emission = jellyColorUniform.$.rgb.mul(state.glow * 0.55);
+        const emission = jellyColorUniform.$.rgb.mul(state.glow * m.glowGain);
 
         // Blinn-Phong highlight. Refraction alone gives the top face almost no
         // gradient, which is most of why a wide shape reads as flat glass.
         const toLight = std.neg(lightUniform.$.direction);
         const halfVector = std.normalize(toLight.sub(rayDirection));
-        const specular = std.max(0.0, std.dot(N, halfVector)) ** 42 * JELLY_SPECULAR;
+        const specular = std.max(0.0, std.dot(N, halfVector)) ** 42 * m.specular;
 
         const body = std
           .add(reflection.mul(F), refractedColor.mul(1 - F))
@@ -437,9 +454,9 @@ export async function setupScene(
 
         // Nearly clear looking straight through, opaque at grazing angles where
         // Fresnel takes over. Everything it does not cover is left to the page.
-        const bodyAlpha = std.saturate(JELLY_BASE_ALPHA + F * 3.5 + state.glow * 0.15);
+        const bodyAlpha = std.saturate(m.baseAlpha + F * m.fresnelAlpha + state.glow * 0.15);
 
-        return d.vec4f(std.tanh(body.mul(EXPOSURE)), bodyAlpha);
+        return d.vec4f(std.tanh(body.mul(m.exposure)), bodyAlpha);
       }
 
       if (distanceFromOrigin > intersection.tMax) {
@@ -454,6 +471,8 @@ export async function setupScene(
     in: { uv: d.vec2f },
     out: d.vec4f,
   })(({ uv }) => {
+    randf.seed2(randomUniform.$.mul(uv));
+
     const ndc = d.vec2f(uv.x * 2 - 1, -(uv.y * 2 - 1));
     const ray = getRay(ndc);
     const color = rayMarch(ray.origin, ray.direction);
@@ -507,6 +526,8 @@ export async function setupScene(
       );
       lastTimestamp = timestamp;
 
+      randomUniform.write(d.vec2f((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2));
+
       switchBehavior.update(deltaTime);
 
       const currentFrame = frameCount % 2;
@@ -555,6 +576,11 @@ export async function setupScene(
     },
     set darkMode(v: boolean) {
       darkModeUniform.write(d.u32(v ? 1 : 0));
+    },
+    /** Partial material override; merged over whatever is already set. */
+    set material(v: Partial<typeof MATERIAL_DEFAULTS>) {
+      Object.assign(materialState, v);
+      materialUniform.write(materialState);
     },
     set qualityScale(v: number) {
       qualityScale = v;
