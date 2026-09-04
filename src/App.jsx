@@ -6,6 +6,7 @@ import Colophon from './components/Colophon'
 import { downloadCollage } from './utils/collage'
 import useLiquidGlass from './hooks/useLiquidGlass'
 import FluidCursor from './components/FluidCursor'
+import JellySlider from './components/JellySlider'
 
 function parseLines(rawText) {
   return rawText.split('\n').map((line, lineIdx) => {
@@ -201,17 +202,15 @@ export default function App() {
         <section className="section">
           <div className="section-label">Compose</div>
           <div className="compose-card" ref={composeRef}>
-            <div className="textarea-row">
-              <textarea
-                value={text}
-                onChange={e => setText(e.target.value)}
-                placeholder={'Paste a poem, a sentence, a whole essay…\nPunctuation & numbers are stripped automatically.\nEach line becomes its own row of satellite tiles.'}
-                rows={4}
-              />
-              <button className="render-btn" onClick={handleRender}>
-                Render
-                <small>⌘ ↵</small>
-              </button>
+            <textarea
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder={'Paste a poem, a sentence, a whole essay…\nPunctuation & numbers are stripped automatically.\nEach line becomes its own row of satellite tiles.'}
+              rows={4}
+              style={{ width: '100%' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+              <JellySlider onClick={handleRender} />
             </div>
             <p className="compose-note">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
