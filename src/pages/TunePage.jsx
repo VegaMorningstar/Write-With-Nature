@@ -7,6 +7,18 @@ import {
   squashZProperties,
   wiggleXProperties,
 } from '../ui-elements/jelly-render-button/constants.ts'
+import JellyWireframeButton, { HOVER_DEFAULTS as WIRE_HOVER_DEFAULTS } from '../ui-elements/jelly-wireframe-button/JellyWireframeButton'
+import {
+  CAMERA_DEFAULTS as WIRE_CAMERA_DEFAULTS,
+  JIGGLE_SQUASH_X as WIRE_JIGGLE_X,
+  JIGGLE_SQUASH_Z as WIRE_JIGGLE_Z,
+  JIGGLE_WIGGLE_X as WIRE_JIGGLE_W,
+  LIGHT_DEFAULTS as WIRE_LIGHT_DEFAULTS,
+  MATERIAL_DEFAULTS as WIRE_MATERIAL_DEFAULTS,
+  squashXProperties as wireSquashX,
+  squashZProperties as wireSquashZ,
+  wiggleXProperties as wireWiggleX,
+} from '../ui-elements/jelly-wireframe-button/constants.ts'
 
 // Rebuilds the glass effect whenever opts change (slider-reactive)
 function useLiveGlass(ref, opts) {
@@ -161,6 +173,27 @@ const GLASS_DEF = {
 
 const JELLY_HOVER_DEF = { ...HOVER_DEFAULTS }
 const JELLY_MATERIAL_DEF = { ...MATERIAL_DEFAULTS }
+// The wireframe carries its own complete material now — its glass has diverged
+// from the render button's far enough (no Fresnel rim, much less transparent)
+// that inheriting would misrepresent it.
+const WIRE_MATERIAL_DEF = { ...WIRE_MATERIAL_DEFAULTS }
+const WIRE_HOVER_DEF = { ...WIRE_HOVER_DEFAULTS }
+const WIRE_SPRING_DEF = {
+  squashX: { ...wireSquashX },
+  squashZ: { ...wireSquashZ },
+  wiggleX: { ...wireWiggleX },
+}
+const WIRE_STAGE_DEF = {
+  camera: { ...WIRE_CAMERA_DEFAULTS },
+  light: { ...WIRE_LIGHT_DEFAULTS },
+  quality: 2.0,
+}
+const WIRE_CLICK_DEF = {
+  squashX: WIRE_JIGGLE_X,
+  squashZ: WIRE_JIGGLE_Z,
+  wiggleX: WIRE_JIGGLE_W,
+  delayMs: 1100,
+}
 const JELLY_SPRING_DEF = {
   squashX: { ...squashXProperties },
   squashZ: { ...squashZProperties },
@@ -190,6 +223,155 @@ function SpringRow({ label, value, onChange, description }) {
   )
 }
 
+function HoverControls({ hover, setHover }) {
+  const set = (k, v) => setHover(h => ({ ...h, [k]: v }))
+  return (
+    <>
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+        padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+        REACH
+      </div>
+
+      <Slider label="Hover Radius (px)" value={hover.radius} min={0} max={700} step={10}
+        fmt={v => v.toFixed(0)} onChange={v => set('radius', v)}
+        description="How far from the button the jelly still notices the cursor. 0 = only reacts once you are on it. Large = stirs from across the card." />
+
+      <Slider label="Strength" value={hover.strength} min={0} max={2} step={0.05}
+        onChange={v => set('strength', v)}
+        description="Ceiling on the hover impulse, reached when the cursor is directly over the blob. Falls off with the square of distance from there." />
+
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+        padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+        SENSITIVITY
+      </div>
+
+      <Slider label="Travel per Impulse (px)" value={hover.sensitivity} min={4} max={140} step={1}
+        fmt={v => v.toFixed(0)} onChange={v => set('sensitivity', v)}
+        description="Pointer travel needed for a full-scale kick. This is the sensitivity dial and it is inverted — LOW = twitchy, responds to the smallest drift. High = only a fast sweep moves it." />
+
+      <Slider label="Rock Gain" value={hover.rockGain} min={0} max={6} step={0.1}
+        onChange={v => set('rockGain', v)}
+        description="Sideways lean, driven by horizontal travel only, so it tips the way you swept. This is the one you feel most." />
+
+      <Slider label="Squash Gain" value={hover.squashGain} min={0} max={4} step={0.05}
+        onChange={v => set('squashGain', v)}
+        description="Wobble driven by total travel in both axes, so vertical movement registers here and nowhere else. Raise it if moving up and down the jelly feels dead." />
+
+      <Slider label="Throttle (ms)" value={hover.throttleMs} min={16} max={220} step={2}
+        fmt={v => v.toFixed(0)} onChange={v => set('throttleMs', v)}
+        description="Gap between impulses. Low = smoother and more alive, more work per second. High = a stuttery pulse. Also caps how often the button's position is measured." />
+
+      <Slider label="Enter Kick" value={hover.enterImpulse} min={0} max={1} step={0.02}
+        onChange={v => set('enterImpulse', v)}
+        description="One-off jolt the moment the cursor crosses onto the button, on top of the continuous stir. 0 = no distinct arrival." />
+    </>
+  )
+}
+
+function SpringControls({ springs, setSprings }) {
+  const set = (k, v) => setSprings(s => ({ ...s, [k]: v }))
+  return (
+    <>
+      <SpringRow label="Rock (wiggle X)" value={springs.wiggleX}
+        onChange={v => set('wiggleX', v)}
+        description="The side-to-side tip. Damping sets the decay and stiffness sets the pitch, so a stiff, lightly damped rock is a fast sway that carries — which is where most of the motion goes once the squash pair is damped down." />
+
+      <SpringRow label="Squash X" value={springs.squashX}
+        onChange={v => set('squashX', v)}
+        description="Widen and flatten. This is the one that carries the click; below about 4 damping the wobble lasts several seconds, above about 25 the body barely deforms at all." />
+
+      <SpringRow label="Squash Z" value={springs.squashZ}
+        onChange={v => set('squashZ', v)}
+        description="Depth-wise pinch, the quieter partner to squash X." />
+
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+        Retunes live · no scene rebuild. Values above ~200,000 stiffness will
+        outrun the integrator.
+      </div>
+    </>
+  )
+}
+
+// Shared by both jelly widgets — they carry the same material struct, they just
+// no longer agree on the values.
+function GlassMaterialControls({ mat, set }) {
+  return (
+    <>
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+        padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+        TRANSPARENCY
+      </div>
+
+      <Slider label="Base Transparency" value={1 - mat.baseAlpha} min={0} max={1} step={0.01}
+        onChange={v => set('baseAlpha', 1 - v)}
+        description="How much of the page and the word show through the middle of the blob. High = clear glass, but the interior shading washes out. Low = solid gummy." />
+
+      <Slider label="Edge Opacity" value={mat.fresnelAlpha} min={0} max={10} step={0.1}
+        onChange={v => set('fresnelAlpha', v)}
+        description="How hard Fresnel drives the rim opaque at grazing angles. This is what gives glass its dense bright edge against a clear centre. 0 = uniform transparency, looks like tinted film." />
+
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+        padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+        REFRACTION
+      </div>
+
+      <Slider label="Refractive Index" value={mat.ior} min={1.01} max={2.4} step={0.01}
+        onChange={v => set('ior', v)}
+        description="How hard light bends entering the jelly. 1.0 = no bend, invisible. 1.33 water, 1.42 stock, 1.5 glass, 2.4 diamond. Raising it throws the word further back and needs Label Depth moved with it." />
+
+      <Slider label="Chromatic Aberration" value={mat.dispersion} min={0} max={0.35} step={0.005}
+        fmt={v => v.toFixed(3)} onChange={v => set('dispersion', v)}
+        description="Splits red, green and blue onto their own refractive indices. Widens the colour fringe at the rim and along the letter edges. 0 = achromatic." />
+
+      <Slider label="Frost / Blur" value={mat.blur} min={0} max={0.6} step={0.01}
+        onChange={v => set('blur', v)}
+        description="Scatters the refracted ray. The TAA averages it across frames into a real blur, so it settles about a third of a second after you stop dragging. Past ~0.35 the noise outruns what the TAA can resolve and it starts to sparkle." />
+
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+        padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+        COLOUR &amp; ABSORPTION
+      </div>
+
+      <Slider label="Tint Strength" value={mat.tint} min={0} max={1.5} step={0.01}
+        onChange={v => set('tint', v)}
+        description="Overall colour saturation. TypeGPU's liquid-glass example runs 0.05 — glass reads as glass when the tint is a suggestion rather than a filter." />
+
+      <Slider label="Absorption Density" value={mat.absorbDensity} min={0} max={60} step={0.5}
+        fmt={v => v.toFixed(1)} onChange={v => set('absorbDensity', v)}
+        description="Beer-Lambert density. Sets how fast colour deepens with depth through the body, so it darkens the bottom far more than the top. High values swallow the word." />
+
+      <Slider label="Subsurface Scatter" value={mat.scatter} min={0} max={10} step={0.1}
+        onChange={v => set('scatter', v)}
+        description="Forward scattering toward the light — the glow you get holding a gummy up to a lamp. Only shows where the refracted ray points at the light." />
+
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+        padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+        LIGHT &amp; SHADOW
+      </div>
+
+      <Slider label="Specular" value={mat.specular} min={0} max={1.5} step={0.01}
+        onChange={v => set('specular', v)}
+        description="Hard highlight on the top face. Refraction alone gives a wide shape almost no gradient, which is most of what makes it read flat — this is the cue that says the surface has form." />
+
+      <Slider label="Exposure" value={mat.exposure} min={0.5} max={5} step={0.05}
+        onChange={v => set('exposure', v)}
+        description="Tonemap gain before the tanh curve. Raises overall brightness and rolls off into the highlights rather than clipping." />
+
+      <Slider label="Contact Shadow" value={mat.shadowStrength} min={0} max={1} step={0.01}
+        onChange={v => set('shadowStrength', v)}
+        description="Darkness of the pool under the blob. This is what seats it on the page rather than floating over it." />
+
+      <Slider label="Wobble Glow" value={mat.glowGain} min={0} max={2} step={0.02}
+        onChange={v => set('glowGain', v)}
+        description="Emission driven by leftover wobble energy, so the jelly lights from inside as it lands and fades as it settles. Click it to see this one." />
+
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+        All live — these are a uniform, not baked shader constants.
+      </div>
+    </>
+  )
+}
+
 const TILE_COLORS = [
   '#6e9e7e','#5a8a62','#7aac72','#4a8e7e','#8aba88',
   '#6a9e6a','#5a7e8a','#7aaa98','#8ab08a','#6e8a5a',
@@ -213,6 +395,17 @@ export default function TunePage() {
   const [jellySprings, setJellySprings] = useState(JELLY_SPRING_DEF)
   const [jellyMat,     setJellyMat]     = useState(JELLY_MATERIAL_DEF)
   const setMat = (k, v) => setJellyMat(m => ({ ...m, [k]: v }))
+
+  // Wireframe variant — separate widget, and now separate everything
+  const [wireMat, setWireMat] = useState(WIRE_MATERIAL_DEF)
+  const setWire = (k, v) => setWireMat(m => ({ ...m, [k]: v }))
+  const [wireHover,   setWireHover]   = useState(WIRE_HOVER_DEF)
+  const [wireSprings, setWireSprings] = useState(WIRE_SPRING_DEF)
+  const [wireStage,   setWireStage]   = useState(WIRE_STAGE_DEF)
+  const [wireClick,   setWireClick]   = useState(WIRE_CLICK_DEF)
+  const setStageCam   = (k, v) => setWireStage(s => ({ ...s, camera: { ...s.camera, [k]: v } }))
+  const setStageLight = (k, v) => setWireStage(s => ({ ...s, light:  { ...s.light,  [k]: v } }))
+  const setClick      = (k, v) => setWireClick(c => ({ ...c, [k]: v }))
 
   // Accordion open state
   const [openSection, setOpenSection] = useState('fluid')
@@ -240,6 +433,13 @@ export default function TunePage() {
       fluid:   { ...appliedFluid, blendMode },
       glass:   { compose: composeG, board: boardG, colophon: colophonG },
       jelly:   { hover: jellyHover, springs: jellySprings, material: jellyMat },
+      jellyWireframe: {
+        hover: wireHover,
+        springs: wireSprings,
+        material: wireMat,
+        stage: wireStage,
+        click: wireClick,
+      },
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -251,6 +451,19 @@ export default function TunePage() {
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
     setJellyHover({ ...JELLY_HOVER_DEF })
     setJellyMat({ ...JELLY_MATERIAL_DEF })
+    setWireMat({ ...WIRE_MATERIAL_DEF })
+    setWireHover({ ...WIRE_HOVER_DEF })
+    setWireSprings({
+      squashX: { ...WIRE_SPRING_DEF.squashX },
+      squashZ: { ...WIRE_SPRING_DEF.squashZ },
+      wiggleX: { ...WIRE_SPRING_DEF.wiggleX },
+    })
+    setWireStage({
+      camera: { ...WIRE_STAGE_DEF.camera },
+      light: { ...WIRE_STAGE_DEF.light },
+      quality: WIRE_STAGE_DEF.quality,
+    })
+    setWireClick({ ...WIRE_CLICK_DEF })
     setJellySprings({
       squashX: { ...JELLY_SPRING_DEF.squashX },
       squashZ: { ...JELLY_SPRING_DEF.squashZ },
@@ -315,8 +528,29 @@ export default function TunePage() {
                 style={{ width: '100%' }}
                 defaultValue={'Rivers, glaciers & coastlines — shaped into letters from orbit.\nEach line becomes its own row of satellite tiles.'}
               />
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-                <JellyRenderButton hover={jellyHover} springs={jellySprings} material={jellyMat} onClick={() => {}} />
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 340px', maxWidth: 480 }}>
+                  <div style={{ ...mono, fontSize: 9, letterSpacing: '0.12em', opacity: 0.4, textAlign: 'center', marginBottom: 4 }}>
+                    CURRENT
+                  </div>
+                  <JellyRenderButton hover={jellyHover} springs={jellySprings} material={jellyMat} onClick={() => {}} />
+                </div>
+                <div style={{ flex: '1 1 340px', maxWidth: 480 }}>
+                  <div style={{ ...mono, fontSize: 9, letterSpacing: '0.12em', opacity: 0.4, textAlign: 'center', marginBottom: 4 }}>
+                    WIREFRAME
+                  </div>
+                  <JellyWireframeButton
+                    hover={wireHover}
+                    springs={wireSprings}
+                    material={wireMat}
+                    camera={wireStage.camera}
+                    light={wireStage.light}
+                    quality={wireStage.quality}
+                    impulses={wireClick}
+                    jiggleMs={wireClick.delayMs}
+                    onClick={() => {}}
+                  />
+                </div>
               </div>
               <p className="compose-note">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
@@ -488,119 +722,240 @@ export default function TunePage() {
 
         <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
 
-        {/* ── Jelly render button ── */}
-        <AccordionSection title="JELLY — GLASS" open={openSection === 'jellyMat'} onToggle={() => toggle('jellyMat')}>
+        {/* ── Wireframe variant ── */}
+        <AccordionSection title="WIREFRAME — EDGES" open={openSection === 'wire'} onToggle={() => toggle('wire')}>
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
-            TRANSPARENCY
+            Second widget · own files · drives the right-hand blob only
           </div>
 
-          <Slider label="Base Transparency" value={1 - jellyMat.baseAlpha} min={0} max={1} step={0.01}
-            onChange={v => setMat('baseAlpha', 1 - v)}
-            description="How much of the page and the word show through the middle of the blob. High = clear glass, but the interior shading washes out. Low = solid gummy." />
+          <Slider label="Line Width" value={wireMat.frameWidth} min={0} max={0.08} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('frameWidth', v)}
+            description="Half-thickness of the bars in world units, against a blob 1.6 wide. 0 removes the wireframe entirely and leaves the plain jelly." />
 
-          <Slider label="Edge Opacity" value={jellyMat.fresnelAlpha} min={0} max={10} step={0.1}
-            onChange={v => setMat('fresnelAlpha', v)}
-            description="How hard Fresnel drives the rim opaque at grazing angles. This is what gives glass its dense bright edge against a clear centre. 0 = uniform transparency, looks like tinted film." />
+          <Slider label="Line Opacity" value={wireMat.frameGain} min={0} max={3} step={0.05}
+            onChange={v => setWire('frameGain', v)}
+            description="How solid the lines read. Goes into the alpha channel as well as the colour, so above 1 the edges stay opaque even where the body is see-through." />
+
+          <Slider label="Line Softness" value={wireMat.frameSoftness} min={0} max={2} step={0.02}
+            onChange={v => setWire('frameSoftness', v)}
+            description="Edge falloff as a fraction of the bar width. Near 0 aliases badly; around 0.5 is a clean drawn line; high smears it into a glow." />
+
+          <Slider label="Line Brightness" value={wireMat.frameBrightness} min={0} max={1} step={0.01}
+            onChange={v => setWire('frameBrightness', v)}
+            description="0 = near-black ink, like the sketch. 1 = white, which reads as light caught in the edges rather than a drawn line." />
+
+          <Slider label="Line Falloff" value={wireMat.frameFalloff} min={0.15} max={4} step={0.05}
+            onChange={v => setWire('frameFalloff', v)}
+            description="Curve of the gradient out from the line's core — Softness sets how wide the falloff reaches, this sets its shape. Below 1 spreads it into a broad halo with no hard core; above 1 pulls it into a bright thread with a long faint tail. 1 is the plain S-curve." />
+
+          <Slider label="Ink → Light" value={wireMat.frameGlow} min={0} max={1} step={0.01}
+            onChange={v => setWire('frameGlow', v)}
+            description="How the line blends. 0 paints it over the body, so it sits on the glass like ink. 1 adds it as light, so it comes through the glass and brightens whatever it crosses — and stops forcing the body opaque underneath it. This is the one that makes the edges feel organic rather than drawn." />
+
+          <Slider label="Line Dispersion" value={wireMat.frameDispersion} min={0} max={3} step={0.05}
+            onChange={v => setWire('frameDispersion', v)}
+            description="Chromatic aberration on the edges themselves. The body splits the environment across three refractive indices, but the frame was traced once and monochrome, so the lines stayed achromatic however much dispersion the glass had — this is why you could not see it on them. Multiplies the glass's own Chromatic Aberration, so 1 matches the body. Costs two extra marches above 0, the most expensive thing in this shader." />
+
+          <Slider label="Depth Fade" value={wireMat.frameDepthFade} min={0} max={4} step={0.05}
+            onChange={v => setWire('frameDepthFade', v)}
+            description="Dims edges by how deep into the body they sit. At 0 all twelve draw at identical weight however far back they are, which is most of what makes the shape read as a diagram — you are looking through more jelly to see the far ones, so they should be fainter. Raising this separates near from far and is what gives the box its depth." />
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
-            REFRACTION
+            SHAPE FIT
           </div>
 
-          <Slider label="Refractive Index" value={jellyMat.ior} min={1.01} max={2.4} step={0.01}
-            onChange={v => setMat('ior', v)}
-            description="How hard light bends entering the jelly. 1.0 = no bend, invisible. 1.33 water, 1.42 stock, 1.5 glass, 2.4 diamond. Raising it displaces the word further back — past about 1.6 it slides out from under the blob and LABEL_CENTER_Z needs retuning." />
+          <Slider label="Corner Radius" value={wireMat.round} min={0.01} max={0.2} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('round', v)}
+            description="The render button runs 0.13, but a fillet that large leaves no corner for a frame to sit on and the lines float clear of the silhouette. Low keeps them aligned at the cost of some softness." />
 
-          <Slider label="Chromatic Aberration" value={jellyMat.dispersion} min={0} max={0.35} step={0.005}
-            fmt={v => v.toFixed(3)} onChange={v => setMat('dispersion', v)}
-            description="Splits red, green and blue onto their own refractive indices. Widens the colour fringe at the rim and along the letter edges. 0 = achromatic." />
-
-          <Slider label="Frost / Blur" value={jellyMat.blur} min={0} max={0.6} step={0.01}
-            onChange={v => setMat('blur', v)}
-            description="Scatters the refracted ray. The TAA averages it across frames into a real blur, so it settles about a third of a second after you stop dragging. Past ~0.35 the noise outruns what the TAA can resolve and it starts to sparkle." />
+          <Slider label="Bend" value={wireMat.bend} min={0} max={0.4} step={0.01}
+            onChange={v => setWire('bend', v)}
+            description="Droop along the long axis. The bend is not an affine transform, so the wireframe cannot follow it — past about 0.15 the lines visibly peel away from the body's edges. 0 keeps them locked." />
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
-            COLOUR &amp; ABSORPTION
+            SOFT INNER EDGE
           </div>
 
-          <Slider label="Tint Strength" value={jellyMat.tint} min={0} max={1.5} step={0.01}
-            onChange={v => setMat('tint', v)}
-            description="Overall colour saturation. TypeGPU's liquid-glass example runs 0.05 — glass reads as glass when the tint is a suggestion rather than a filter." />
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            Not drawn — the floor darkens in a band where the blob meets it, and
+            refraction shows that band as an inset edge. Turn the line sliders to
+            0 and work with these alone to compare against TypeGPU&apos;s look.
+          </div>
 
-          <Slider label="Absorption Density" value={jellyMat.absorbDensity} min={0} max={60} step={0.5}
-            fmt={v => v.toFixed(1)} onChange={v => setMat('absorbDensity', v)}
-            description="Beer-Lambert density. Sets how fast colour deepens with depth through the body, so it darkens the bottom far more than the top. High values swallow the word." />
+          <Slider label="Edge Width" value={wireMat.edgeWidth} min={0.005} max={0.35} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('edgeWidth', v)}
+            description="Width of the band, measured horizontally out from the blob's silhouette. Narrow reads as a crisp seated edge; wide spreads into a soft vignette around the floor." />
 
-          <Slider label="Subsurface Scatter" value={jellyMat.scatter} min={0} max={10} step={0.1}
-            onChange={v => setMat('scatter', v)}
-            description="Forward scattering toward the light — the glow you get holding a gummy up to a lamp. Only shows where the refracted ray points at the light." />
+          <Slider label="Edge Darkness" value={wireMat.edgeDark} min={0} max={1} step={0.01}
+            onChange={v => setWire('edgeDark', v)}
+            description="How far the band darkens. 0 removes the soft edge entirely and leaves only the drawn lines." />
+
+          <Slider label="Base Brightness" value={wireMat.baseBright} min={0} max={1.4} step={0.01}
+            onChange={v => setWire('baseBright', v)}
+            description="Overall light on the floor under the blob. This was the murk in the base: occlusion marched up from the floor sees the blob overhead across the entire footprint, so it dimmed everything uniformly rather than banding at the contact. 1 keeps the base reading as translucent." />
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
-            LIGHT &amp; SHADOW
+            WORD PLACEMENT
           </div>
 
-          <Slider label="Specular" value={jellyMat.specular} min={0} max={1.5} step={0.01}
-            onChange={v => setMat('specular', v)}
-            description="Hard highlight on the top face. Refraction alone gives a wide shape almost no gradient, which is most of what makes it read flat — this is the cue that says the surface has form." />
-
-          <Slider label="Exposure" value={jellyMat.exposure} min={0.5} max={5} step={0.05}
-            onChange={v => setMat('exposure', v)}
-            description="Tonemap gain before the tanh curve. Raises overall brightness and rolls off into the highlights rather than clipping." />
-
-          <Slider label="Contact Shadow" value={jellyMat.shadowStrength} min={0} max={1} step={0.01}
-            onChange={v => setMat('shadowStrength', v)}
-            description="Darkness of the pool under the blob. This is what seats it on the page rather than floating over it." />
-
-          <Slider label="Wobble Glow" value={jellyMat.glowGain} min={0} max={2} step={0.02}
-            onChange={v => setMat('glowGain', v)}
-            description="Emission driven by leftover wobble energy, so the jelly lights from inside as it lands and fades as it settles. Click it to see this one." />
+          <Slider label="Label Depth (z)" value={wireMat.labelCenterZ} min={-0.9} max={0.4} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('labelCenterZ', v)}
+            description="Slides the plane the word sits on. Larger moves its refracted image toward the camera and so DOWN the screen; smaller pushes it up and back. 0 sits the word physically centred on the floor, but refraction still throws the image you see about a quarter unit backwards from there." />
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
-            All live — these are a uniform, not baked shader constants.
+            The second, upside-down RENDER is the front face refracting the same
+            word — a real double image through a thick faceted body, not a bug.
+            Lowering IOR or thickness weakens it. Everything else about this blob
+            is on the JELLY sliders below.
           </div>
         </AccordionSection>
 
-        <AccordionSection title="JELLY — POINTER" open={openSection === 'jellyHover'} onToggle={() => toggle('jellyHover')}>
+        {/* ── Jelly render button ── */}
+        <AccordionSection title="JELLY — GLASS" open={openSection === 'jellyMat'} onToggle={() => toggle('jellyMat')}>
+          <GlassMaterialControls mat={jellyMat} set={setMat} />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — GLASS" open={openSection === 'wireMat'} onToggle={() => toggle('wireMat')}>
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
-            REACH
+            Same controls, own values · drives the right-hand blob
+          </div>
+          <GlassMaterialControls mat={wireMat} set={setWire} />
+        </AccordionSection>
+
+        <AccordionSection title="JELLY — POINTER" open={openSection === 'jellyHover'} onToggle={() => toggle('jellyHover')}>
+          <HoverControls hover={jellyHover} setHover={setJellyHover} />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — POINTER" open={openSection === 'wireHover'} onToggle={() => toggle('wireHover')}>
+          <HoverControls hover={wireHover} setHover={setWireHover} />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — SPRINGS" open={openSection === 'wireSprings'} onToggle={() => toggle('wireSprings')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            Own values · drives the right-hand blob
+          </div>
+          <SpringControls springs={wireSprings} setSprings={setWireSprings} />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — SHAPE" open={openSection === 'wireShape'} onToggle={() => toggle('wireShape')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            Half-extents · the blob is twice these across
           </div>
 
-          <Slider label="Hover Radius (px)" value={jellyHover.radius} min={0} max={700} step={10}
-            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, radius: v }))}
-            description="How far from the button the jelly still notices the cursor. 0 = only reacts once you are on it. Large = stirs from across the card." />
+          <Slider label="Width (X)" value={wireMat.halfX} min={0.1} max={1.8} step={0.01}
+            onChange={v => setWire('halfX', v)}
+            description="Half the blob's length. The word has to stay inside this or it pokes out from under the glass — Label Scale is the other half of that balance." />
 
-          <Slider label="Strength" value={jellyHover.strength} min={0} max={2} step={0.05}
-            onChange={v => setJellyHover(h => ({ ...h, strength: v }))}
-            description="Ceiling on the hover impulse, reached when the cursor is directly over the blob. Falls off with the square of distance from there." />
+          <Slider label="Height (Y)" value={wireMat.halfY} min={0.05} max={1} step={0.01}
+            onChange={v => setWire('halfY', v)}
+            description="Half the thickness. This is the strongest single control on the whole look: it sets how much material light travels through, so it drives the absorption gradient, and it decides how far refraction throws the word backwards — raise it and Label Depth needs to follow." />
+
+          <Slider label="Depth (Z)" value={wireMat.halfZ} min={0.05} max={1.2} step={0.01}
+            onChange={v => setWire('halfZ', v)}
+            description="Half the front-to-back size. Wider gives the top face more screen area, which is where the upright word is seen." />
+
+          <Slider label="Sink" value={wireMat.sink} min={-0.2} max={0.3} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('sink', v)}
+            description="How far the blob settles into the plane. Negative lifts it clear, which breaks the contact edge and leaves it floating." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+            The wireframe tracks these automatically — it is built from the same
+            half-extents, so the frame follows the box as you resize it.
+          </div>
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — WORD" open={openSection === 'wireWord'} onToggle={() => toggle('wireWord')}>
+          <Slider label="Label Depth (z)" value={wireMat.labelCenterZ} min={-0.9} max={0.4} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('labelCenterZ', v)}
+            description="Slides the word along the floor. Larger moves its refracted image toward the camera and so DOWN the screen; smaller pushes it up and back. 0 sits it physically centred, but refraction still throws the image you see backwards from there." />
+
+          <Slider label="Label Across (x)" value={wireMat.labelCenterX} min={-0.8} max={0.8} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('labelCenterX', v)}
+            description="Slides it sideways. Refraction barely displaces this axis, since the camera looks straight down the centre line, so it moves close to one-for-one." />
+
+          <Slider label="Label Scale" value={wireMat.labelScale} min={0.3} max={3} step={0.01}
+            onChange={v => setWire('labelScale', v)}
+            description="Size of the word. Scales the span of floor the texture is mapped across, so larger values grow the letters. Past the blob's width it runs out from under the glass." />
+
+          <Slider label="Ink" value={wireMat.labelInk} min={0} max={1} step={0.01}
+            onChange={v => setWire('labelInk', v)}
+            description="Darkness of the letters against the lit floor. 0 fades the word out entirely, which is worth trying if you want the box read on its own." />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — STAGE" open={openSection === 'wireStage'} onToggle={() => toggle('wireStage')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            CAMERA
+          </div>
+
+          <Slider label="Height" value={wireStage.camera.height} min={0.3} max={3} step={0.02}
+            onChange={v => setStageCam('height', v)}
+            description="Camera height. With Distance, this sets the viewing angle — the single biggest lever on whether the shape reads as a cuboid. Higher looks down on it and flattens the sides; lower shows the front face but bends the word further back." />
+
+          <Slider label="Distance" value={wireStage.camera.distance} min={0.1} max={3} step={0.02}
+            onChange={v => setStageCam('distance', v)}
+            description="How far in front the camera sits. Raise both this and Height together to keep the angle and just pull back." />
+
+          <Slider label="Look At (y)" value={wireStage.camera.targetY} min={-0.3} max={1} step={0.01}
+            onChange={v => setStageCam('targetY', v)}
+            description="Height of the point the camera aims at. Shifts the blob up or down in frame without changing the angle." />
+
+          <Slider label="Field of View" value={wireStage.camera.fov} min={12} max={90} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setStageCam('fov', v)}
+            description="Vertical FOV in degrees. Narrow flattens perspective toward isometric, which suits a box; wide exaggerates it and needs Distance raised to compensate." />
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
-            SENSITIVITY
+            LIGHT
           </div>
 
-          <Slider label="Travel per Impulse (px)" value={jellyHover.sensitivity} min={4} max={140} step={1}
-            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, sensitivity: v }))}
-            description="Pointer travel needed for a full-scale kick. This is the sensitivity dial and it is inverted — LOW = twitchy, responds to the smallest drift. High = only a fast sweep moves it." />
+          <Slider label="Azimuth" value={wireStage.light.azimuth} min={-180} max={180} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setStageLight('azimuth', v)}
+            description="Sweeps the light around the vertical, in degrees from straight ahead. Moves the specular highlight across the top face and swings which side the scatter glows through." />
 
-          <Slider label="Rock Gain" value={jellyHover.rockGain} min={0} max={6} step={0.1}
-            onChange={v => setJellyHover(h => ({ ...h, rockGain: v }))}
-            description="Sideways lean, driven by horizontal travel only, so it tips the way you swept. This is the one you feel most." />
+          <Slider label="Elevation" value={wireStage.light.elevation} min={-10} max={85} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setStageLight('elevation', v)}
+            description="Degrees above the horizon. Low grazes the body and pushes light through it, which is what the Subsurface Scatter slider needs to show; high lights the top face and kills the glow." />
 
-          <Slider label="Squash Gain" value={jellyHover.squashGain} min={0} max={4} step={0.05}
-            onChange={v => setJellyHover(h => ({ ...h, squashGain: v }))}
-            description="Wobble driven by total travel in both axes, so vertical movement registers here and nowhere else. Raise it if moving up and down the jelly feels dead." />
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            QUALITY
+          </div>
 
-          <Slider label="Throttle (ms)" value={jellyHover.throttleMs} min={16} max={220} step={2}
-            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, throttleMs: v }))}
-            description="Gap between impulses. Low = smoother and more alive, more work per second. High = a stuttery pulse. Also caps how often the button's position is measured." />
+          <Slider label="Supersample" value={wireStage.quality} min={0.5} max={3} step={0.25}
+            onChange={v => setWireStage(s => ({ ...s, quality: v }))}
+            description="Render scale. 2 renders at twice the canvas and downsamples, which is what keeps the silhouette clean against a transparent page — TAA alone cannot resolve a hard alpha edge. Below 1 it visibly aliases; above 2 costs a lot for little. Rebuilds the render targets on change." />
+        </AccordionSection>
 
-          <Slider label="Enter Kick" value={jellyHover.enterImpulse} min={0} max={1} step={0.02}
-            onChange={v => setJellyHover(h => ({ ...h, enterImpulse: v }))}
-            description="One-off jolt the moment the cursor crosses onto the button, on top of the continuous stir. 0 = no distinct arrival." />
+        <AccordionSection title="WIREFRAME — CLICK" open={openSection === 'wireClick'} onToggle={() => toggle('wireClick')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            Impulses fired into the springs on release. Amplitude is roughly the
+            impulse over the spring&apos;s frequency, so these set how hard it is hit
+            and the SPRINGS section decides what happens next.
+          </div>
+
+          <Slider label="Squash X Impulse" value={wireClick.squashX} min={-20} max={20} step={0.5}
+            onChange={v => setClick('squashX', v)}
+            description="Negative narrows the blob on impact before it springs back out. TypeGPU fires -5." />
+
+          <Slider label="Squash Z Impulse" value={wireClick.squashZ} min={-20} max={20} step={0.5}
+            onChange={v => setClick('squashZ', v)}
+            description="The paired depth-wise kick, opposite in sign so the blob spreads as it flattens. TypeGPU fires 5." />
+
+          <Slider label="Rock Impulse" value={wireClick.wiggleX} min={-30} max={30} step={0.5}
+            onChange={v => setClick('wiggleX', v)}
+            description="Sideways tip on landing. TypeGPU fires -10, and it is the most visible of the three." />
+
+          <Slider label="Delay before scroll (ms)" value={wireClick.delayMs} min={0} max={3000} step={50}
+            fmt={v => v.toFixed(0)} onChange={v => setClick('delayMs', v)}
+            description="How long the wobble is left to play before the page moves to the collage. Match it to how long the springs actually ring — past that it is dead air." />
         </AccordionSection>
 
         <AccordionSection title="JELLY — SPRINGS" open={openSection === 'jellySprings'} onToggle={() => toggle('jellySprings')}>
@@ -608,23 +963,7 @@ export default function TunePage() {
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
             TypeGPU&apos;s tuning by default · drives hover and click alike
           </div>
-
-          <SpringRow label="Rock (wiggle X)" value={jellySprings.wiggleX}
-            onChange={v => setJellySprings(s => ({ ...s, wiggleX: v }))}
-            description="The side-to-side tip. Damping 20 is the stock value and dies in about a tenth of a second — drop it toward 5 for a long lazy sway." />
-
-          <SpringRow label="Squash X" value={jellySprings.squashX}
-            onChange={v => setJellySprings(s => ({ ...s, squashX: v }))}
-            description="Widen and flatten. This is the one that carries the click; below about 4 the wobble lasts several seconds." />
-
-          <SpringRow label="Squash Z" value={jellySprings.squashZ}
-            onChange={v => setJellySprings(s => ({ ...s, squashZ: v }))}
-            description="Depth-wise pinch, the quieter partner to squash X." />
-
-          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
-            Retunes live · no scene rebuild. Values above ~200,000 stiffness will
-            outrun the integrator.
-          </div>
+          <SpringControls springs={jellySprings} setSprings={setJellySprings} />
         </AccordionSection>
 
         {/* Footer note */}
