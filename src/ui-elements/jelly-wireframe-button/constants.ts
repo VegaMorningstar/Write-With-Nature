@@ -48,6 +48,18 @@ export const MATERIAL_DEFAULTS = {
   frameGain: 0.1,
   // Edge softness as a fraction of the bar width. 0 is aliased, 1 is a smear.
   frameSoftness: 2,
+  // Shape of the gradient from the line's core outward. Softness sets how wide
+  // the falloff is; this sets its curve. Below 1 the line spreads into a broad
+  // halo, above 1 it pulls into a tight core with a long thin tail.
+  frameFalloff: 1,
+  // Blend: 0 paints the line over the body, 1 adds it as light. Ink sits on top
+  // of the glass; light comes through it, which is the more organic of the two.
+  frameGlow: 0,
+  // Attenuation with distance along the ray. All twelve edges currently draw at
+  // the same weight however deep they sit, which is most of what makes the shape
+  // read as a diagram — the far ones should be dimmer, since you are looking
+  // through more jelly to see them.
+  frameDepthFade: 0,
 
   // Soft inner edge, from horizontal distance to the blob's silhouette rather
   // than from ambient occlusion. Occlusion marched up from the plane sees the

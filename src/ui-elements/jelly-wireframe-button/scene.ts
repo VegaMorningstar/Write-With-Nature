@@ -199,6 +199,7 @@ export async function setupScene(
     let travelled = d.f32(0);
     let previous = d.f32(1e9);
     let closest = d.f32(1e9);
+    let closestAt = d.f32(0);
 
     for (let i = 0; i < FRAME_STEPS; i++) {
       const dist = sdf.sdBoxFrame3d(
@@ -213,7 +214,11 @@ export async function setupScene(
       // than banded. With `previous` seeded huge, the first pass returns `dist`.
       const y = (dist * dist) / (2 * std.max(previous, 0.0001));
       const estimate = std.sqrt(std.max(dist * dist - y * y, 0));
-      closest = std.min(closest, estimate);
+
+      // Keep how far along the ray the nearest edge sat, so it can be faded
+      const isNearer = estimate < closest;
+      closestAt = std.select(closestAt, travelled, isNearer);
+      closest = std.select(closest, estimate, isNearer);
       previous = dist;
 
       if (travelled > FRAME_MARCH_LENGTH) {
@@ -224,9 +229,13 @@ export async function setupScene(
     }
 
     const soft = std.max(m.frameWidth * m.frameSoftness, 0.001);
-    return std.saturate(
-      (1 - std.smoothstep(0, soft, std.max(closest, 0))) * m.frameGain,
-    );
+    const raw = 1 - std.smoothstep(0, soft, std.max(closest, 0));
+
+    // Curve the gradient, then dim edges by how far into the body they sit
+    const shaped = raw ** std.max(m.frameFalloff, 0.01);
+    const depth = 1 / (1 + closestAt * m.frameDepthFade);
+
+    return std.saturate(shaped * m.frameGain * depth);
   };
 
   const getNormal = (position: d.v3f) => {
@@ -531,12 +540,19 @@ export async function setupScene(
         const line = wireframeAccum(hitPosition, traceDir);
 
         const litBody = std.tanh(body.mul(m.exposure));
+        const lineColor = d.vec3f(m.frameBrightness);
 
-        // Lines go into alpha as well as colour, so they stay solid where the
-        // body itself is see-through.
+        // Ink replaces what is behind it; light adds to it. Blending between the
+        // two is what lets the edges stop reading as drawn.
+        const painted = std.mix(litBody, lineColor, line);
+        const added = litBody.add(lineColor.mul(line));
+
+        // Lines go into alpha as well as colour so they stay solid where the body
+        // is see-through — but light passing through glass should not turn it
+        // opaque, so that contribution eases off as the blend moves to glow.
         return d.vec4f(
-          std.mix(litBody, d.vec3f(m.frameBrightness), line),
-          std.saturate(bodyAlpha + line),
+          std.mix(painted, added, m.frameGlow),
+          std.saturate(bodyAlpha + line * (1 - m.frameGlow * 0.7)),
         );
       }
 

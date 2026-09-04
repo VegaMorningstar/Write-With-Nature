@@ -614,6 +614,18 @@ export default function TunePage() {
             onChange={v => setWire('frameBrightness', v)}
             description="0 = near-black ink, like the sketch. 1 = white, which reads as light caught in the edges rather than a drawn line." />
 
+          <Slider label="Line Falloff" value={wireMat.frameFalloff} min={0.15} max={4} step={0.05}
+            onChange={v => setWire('frameFalloff', v)}
+            description="Curve of the gradient out from the line's core — Softness sets how wide the falloff reaches, this sets its shape. Below 1 spreads it into a broad halo with no hard core; above 1 pulls it into a bright thread with a long faint tail. 1 is the plain S-curve." />
+
+          <Slider label="Ink → Light" value={wireMat.frameGlow} min={0} max={1} step={0.01}
+            onChange={v => setWire('frameGlow', v)}
+            description="How the line blends. 0 paints it over the body, so it sits on the glass like ink. 1 adds it as light, so it comes through the glass and brightens whatever it crosses — and stops forcing the body opaque underneath it. This is the one that makes the edges feel organic rather than drawn." />
+
+          <Slider label="Depth Fade" value={wireMat.frameDepthFade} min={0} max={4} step={0.05}
+            onChange={v => setWire('frameDepthFade', v)}
+            description="Dims edges by how deep into the body they sit. At 0 all twelve draw at identical weight however far back they are, which is most of what makes the shape read as a diagram — you are looking through more jelly to see the far ones, so they should be fainter. Raising this separates near from far and is what gives the box its depth." />
+
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
             SHAPE FIT
