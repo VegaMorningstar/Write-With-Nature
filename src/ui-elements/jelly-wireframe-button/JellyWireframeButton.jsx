@@ -1,4 +1,17 @@
-﻿import { useRef, useEffect } from 'react'
+﻿/**
+ * The render button on the compose card.
+ *
+ * Every prop is optional — with none passed it runs the tuned defaults from
+ * constants.ts, which is how App.jsx uses it. The tune page at ?tune passes all
+ * of them from sliders instead. They are read through refs rather than baked
+ * into the effect deps, so retuning is a uniform write and never tears down the
+ * WebGPU device, which is far too expensive to rebuild on a slider drag.
+ *
+ * WebGPU is Chrome and Edge only, so this renders a plain .render-btn wherever
+ * navigator.gpu is missing. GPU init is deferred to requestIdleCallback so a
+ * button can never delay first paint.
+ */
+import { useRef, useEffect } from 'react'
 
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 

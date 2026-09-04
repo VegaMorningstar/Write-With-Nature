@@ -1,3 +1,39 @@
+/**
+ * Ray-marched jelly with its cuboid edges drawn through it, ported from
+ * TypeGPU's jelly-switch example and then taken a fair way past it.
+ *
+ * What happens per pixel:
+ *
+ *   1. Intersect a bounding box; miss it and the ray goes straight to the label
+ *      plane (renderSurface), which paints the word and the contact shadow and
+ *      leaves everything else transparent so the page shows through.
+ *   2. Sphere-trace the blob's SDF. On a hit, refract once and sample the lit
+ *      plane below (refractedSample) three times, at three refractive indices,
+ *      keeping one channel from each — that is the chromatic aberration, and it
+ *      is the liquid-glass example's per-channel trick moved from screen space
+ *      into the march, since we have no background texture to offset.
+ *   3. Trace the wireframe along that same refracted ray, so the box structure
+ *      bends through the glass exactly as the word does, and composite it.
+ *
+ * Three things here are not obvious and cost time if rediscovered:
+ *
+ *   - The word is a texture on a plane *inside* the scene, not DOM behind the
+ *     canvas. That is what lets it refract. Refraction throws its image
+ *     backwards by roughly thickness * tan(asin(sin(view angle) / IOR)), so
+ *     `labelCenterZ` shifts the plane forward to compensate — it depends on the
+ *     IOR, the blob's thickness and the camera angle, all of which are sliders.
+ *   - The soft inset edge comes from horizontal distance to the blob's
+ *     silhouette, not from ambient occlusion. Occlusion marched up from the
+ *     floor sees the blob overhead across its whole footprint and dims
+ *     everything uniformly rather than banding at the contact line.
+ *   - The wireframe is sphere-traced keeping the closest approach, not sampled
+ *     at fixed steps. Fixed steps alias badly, because the step is far larger
+ *     than the bar width and a ray can cross a bar between two samples.
+ *
+ * Everything tunable lives in the JellyMaterial uniform, so the tune page moves
+ * it without recompiling the shader. Camera and light are the exception: a view
+ * matrix is not a per-pixel value, so they stay on the CPU behind setters.
+ */
 import { tgpu, common, d, std, type TgpuRoot } from 'typegpu';
 import * as sdf from '@typegpu/sdf';
 import { randf } from '@typegpu/noise';

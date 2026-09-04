@@ -6,7 +6,7 @@ import Colophon from './components/Colophon'
 import { downloadCollage } from './utils/collage'
 import useLiquidGlass from './hooks/useLiquidGlass'
 import FluidCursor from './components/FluidCursor'
-import JellyRenderButton from './ui-elements/jelly-render-button/JellyRenderButton'
+import JellyWireframeButton from './ui-elements/jelly-wireframe-button/JellyWireframeButton'
 
 function parseLines(rawText) {
   return rawText.split('\n').map((line, lineIdx) => {
@@ -210,7 +210,10 @@ export default function App() {
               style={{ width: '100%' }}
             />
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-              <JellyRenderButton onClick={handleRender} />
+              {/* Falls back to a plain .render-btn where WebGPU is absent.
+                  Every parameter has a default, so the tuned look ships without
+                  props; ?tune drives the same widget through sliders. */}
+              <JellyWireframeButton onClick={handleRender} />
             </div>
             <p className="compose-note">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>

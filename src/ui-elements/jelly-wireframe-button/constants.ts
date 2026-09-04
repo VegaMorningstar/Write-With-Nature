@@ -82,7 +82,7 @@ export const MATERIAL_DEFAULTS = {
   // Where the label plane sits. Larger z moves the word's refracted image toward
   // the camera, and so downward on screen; x slides it sideways.
   labelCenterX: 0,
-  labelCenterZ: -0.05,
+  labelCenterZ: -0.1,
   // Word size. Scales the plane the texture is mapped across, so above 1 the
   // word grows and below 1 it shrinks.
   labelScale: 1,
