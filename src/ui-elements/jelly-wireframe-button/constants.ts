@@ -47,20 +47,22 @@ export const MATERIAL_DEFAULTS = {
   // Edge softness as a fraction of the bar width. 0 is aliased, 1 is a smear.
   frameSoftness: 0.24,
 
-  // Ambient occlusion on the label plane. This is where TypeGPU's soft inner
-  // outline comes from: their getSceneDistForAO unions the jelly into the
-  // occluder set, so the plane darkens in a band directly under the blob, and
-  // refraction shows that band as an inset edge. Nothing is drawn — it is
-  // shading, which is why theirs reads as natural rather than as line work.
-  aoRadius: 0.12,
-  aoIntensity: 0.6,
-  // Floor under the occlusion. At 0.5 it halves the effect above; the word still
-  // needs something lit to contrast against, so it cannot go to 0.
-  aoFloor: 0.25,
+  // Soft inner edge, from horizontal distance to the blob's silhouette rather
+  // than from ambient occlusion. Occlusion marched up from the plane sees the
+  // blob directly overhead across its whole footprint, so it dims the entire
+  // floor uniformly instead of banding at the contact line — which reads as murk
+  // under a body that is supposed to be translucent. The jelly's own SDF
+  // evaluated at the plane is negative inside the footprint and zero at its
+  // boundary, so its absolute value gives a true edge band.
+  edgeWidth: 0.06,
+  edgeDark: 0.55,
+  // Overall brightness of the floor under the blob. 1 leaves it fully lit, which
+  // is what keeps the base reading as translucent.
+  baseBright: 1.0,
 
-  // Where the label plane sits in z. Refraction throws the word backwards, and
-  // this pulls it back under the blob — see the note in the README.
-  labelCenterZ: -0.26,
+  // Where the label plane sits in z. Larger values move the word's refracted
+  // image toward the camera, and so downward on screen.
+  labelCenterZ: -0.1,
 
   // ── Shape, uniform here rather than baked, so the frame can be aligned to
   // the silhouette from the tune page ─────────────────────────────────────────
@@ -80,9 +82,9 @@ export const FRAME_DEFAULTS = {
   frameBrightness: MATERIAL_DEFAULTS.frameBrightness,
   frameGain: MATERIAL_DEFAULTS.frameGain,
   frameSoftness: MATERIAL_DEFAULTS.frameSoftness,
-  aoRadius: MATERIAL_DEFAULTS.aoRadius,
-  aoIntensity: MATERIAL_DEFAULTS.aoIntensity,
-  aoFloor: MATERIAL_DEFAULTS.aoFloor,
+  edgeWidth: MATERIAL_DEFAULTS.edgeWidth,
+  edgeDark: MATERIAL_DEFAULTS.edgeDark,
+  baseBright: MATERIAL_DEFAULTS.baseBright,
   labelCenterZ: MATERIAL_DEFAULTS.labelCenterZ,
   round: MATERIAL_DEFAULTS.round,
   bend: MATERIAL_DEFAULTS.bend,
@@ -127,7 +129,12 @@ export const SPECULAR_INTENSITY = 0.6;
 // Ambient occlusion, marched against the jelly itself so the plane darkens under
 // the blob. Kept at the original's short radius on purpose — widening it turns
 // contact shading into a blanket darkening that swallows the word.
+// Only used for the contact shadow cast on the page outside the blob, where the
+// blob is not directly overhead and occlusion behaves sensibly. The inset edge
+// seen *through* the glass uses the silhouette band instead — see edgeWidth.
 export const AO_STEPS = 3;
+export const AO_RADIUS = 0.12;
+export const AO_INTENSITY = 0.5;
 export const AO_BIAS = SURF_DIST * 5;
 
 

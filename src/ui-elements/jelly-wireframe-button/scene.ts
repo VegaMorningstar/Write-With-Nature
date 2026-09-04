@@ -18,6 +18,8 @@ import {
   AMBIENT_COLOR,
   AMBIENT_INTENSITY,
   AO_BIAS,
+  AO_INTENSITY,
+  AO_RADIUS,
   AO_STEPS,
   FRAME_MARCH_LENGTH,
   FRAME_STEPS,
@@ -271,12 +273,9 @@ export async function setupScene(
   // Seen through the refraction this gradient is what reads as the blob's interior.
   const calculateAO = (position: d.v3f, normal: d.v3f) => {
     'use gpu';
-    const radius = std.max(materialUniform.$.aoRadius, 0.001);
-    const intensity = materialUniform.$.aoIntensity;
-
     let totalOcclusion = d.f32(0.0);
     let sampleWeight = d.f32(1.0);
-    const stepDistance = radius / AO_STEPS;
+    const stepDistance = AO_RADIUS / AO_STEPS;
 
     for (let i = 1; i <= AO_STEPS; i++) {
       const sampleHeight = stepDistance * d.f32(i);
@@ -286,7 +285,7 @@ export async function setupScene(
       sampleWeight *= 0.5;
     }
 
-    return std.saturate(1.0 - (intensity * totalOcclusion) / radius);
+    return std.saturate(1.0 - (AO_INTENSITY * totalOcclusion) / AO_RADIUS);
   };
 
   const surfaceLighting = (hitPosition: d.v3f, normal: d.v3f, rayOrigin: d.v3f) => {
@@ -316,16 +315,20 @@ export async function setupScene(
     const normal = d.vec3f(0, 1, 0);
     const state = switchBehavior.stateUniform.$;
 
+    const m = materialUniform.$;
     const lit = surfaceLighting(p, normal, rayOrigin);
-    // Floored: full occlusion under the blob leaves nothing for the ink to
-    // contrast against, and the word disappears into black. Lowering the floor
-    // is what strengthens the soft inset edge seen through the glass.
-    const ao = std.max(calculateAO(p, normal), materialUniform.$.aoFloor);
+
+    // The blob's own SDF sampled on the plane: negative inside the footprint,
+    // zero at its boundary. Its absolute value is the horizontal distance to the
+    // silhouette, so this darkens a band at the contact line and leaves the rest
+    // of the floor alone — unlike occlusion, which dims the whole footprint.
+    const edge = 1 - std.smoothstep(0, std.max(m.edgeWidth, 0.001), std.abs(getJellyDist(p)));
+
     const bounce = jellyColorUniform.$.rgb.mul(
       (1 / (sqLength(p) * 12 + 1)) * 0.35 * (0.8 + state.glow),
     );
 
-    const ground = lit.mul(ao).add(bounce);
+    const ground = lit.mul(m.baseBright).mul(1 - edge * m.edgeDark).add(bounce);
     const ink = sampleLabel(labelUV(p), lod);
 
     return std.mix(ground, ground.mul(inkColor()), ink);

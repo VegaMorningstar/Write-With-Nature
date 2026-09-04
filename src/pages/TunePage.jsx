@@ -551,32 +551,31 @@ export default function TunePage() {
           </div>
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
-            Not drawn — this is the ambient occlusion band the blob casts on the
-            plane beneath it, seen through the refraction. It is where TypeGPU&apos;s
-            inner edge comes from, and why theirs looks natural rather than ruled.
-            Turn the line sliders to 0 and work with these alone to compare.
+            Not drawn — the floor darkens in a band where the blob meets it, and
+            refraction shows that band as an inset edge. Turn the line sliders to
+            0 and work with these alone to compare against TypeGPU&apos;s look.
           </div>
 
-          <Slider label="AO Floor" value={wireMat.aoFloor} min={0} max={1} step={0.01}
-            onChange={v => setWire('aoFloor', v)}
-            description="Lower bound on the occlusion. This is the strongest of the three — it was pinned at 0.5, which halved the whole effect. Down near 0.15 the inset edge reads clearly; at 0 the word loses the lit surface it contrasts against." />
+          <Slider label="Edge Width" value={wireMat.edgeWidth} min={0.005} max={0.35} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('edgeWidth', v)}
+            description="Width of the band, measured horizontally out from the blob's silhouette. Narrow reads as a crisp seated edge; wide spreads into a soft vignette around the floor." />
 
-          <Slider label="AO Radius" value={wireMat.aoRadius} min={0.02} max={0.5} step={0.005}
-            fmt={v => v.toFixed(3)} onChange={v => setWire('aoRadius', v)}
-            description="How far the darkening reaches from the contact line. Short (TypeGPU runs 0.1) gives a crisp inset edge; long turns it into a broad smudge under the whole blob." />
+          <Slider label="Edge Darkness" value={wireMat.edgeDark} min={0} max={1} step={0.01}
+            onChange={v => setWire('edgeDark', v)}
+            description="How far the band darkens. 0 removes the soft edge entirely and leaves only the drawn lines." />
 
-          <Slider label="AO Strength" value={wireMat.aoIntensity} min={0} max={2} step={0.02}
-            onChange={v => setWire('aoIntensity', v)}
-            description="How dark the band gets within that radius." />
+          <Slider label="Base Brightness" value={wireMat.baseBright} min={0} max={1.4} step={0.01}
+            onChange={v => setWire('baseBright', v)}
+            description="Overall light on the floor under the blob. This was the murk in the base: occlusion marched up from the floor sees the blob overhead across the entire footprint, so it dimmed everything uniformly rather than banding at the contact. 1 keeps the base reading as translucent." />
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
             WORD PLACEMENT
           </div>
 
-          <Slider label="Label Depth (z)" value={wireMat.labelCenterZ} min={-0.9} max={0.3} step={0.005}
+          <Slider label="Label Depth (z)" value={wireMat.labelCenterZ} min={-0.9} max={0.4} step={0.005}
             fmt={v => v.toFixed(3)} onChange={v => setWire('labelCenterZ', v)}
-            description="Slides the plane the word sits on. Refraction throws its image backwards, so the plane is offset forward to compensate — this is the dial for centring it. Raising the IOR increases the throw and needs this moved with it." />
+            description="Slides the plane the word sits on. Larger moves its refracted image toward the camera and so DOWN the screen; smaller pushes it up and back. 0 sits the word physically centred on the floor, but refraction still throws the image you see about a quarter unit backwards from there." />
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
             The second, upside-down RENDER is the front face refracting the same
