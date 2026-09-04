@@ -40,21 +40,36 @@ export const MATERIAL_DEFAULTS = {
   frameWidth: 0.022,
   // How dark or bright the lines sit against the body. 0 = near-black ink,
   // 1 = white; the sketch is at 0.
-  frameBrightness: 0.06,
+  frameBrightness: 0.08,
   // Line opacity. Pushed into the alpha channel too, so the lines stay solid
   // where the jelly itself is see-through.
-  frameGain: 1.0,
+  frameGain: 0.3,
   // Edge softness as a fraction of the bar width. 0 is aliased, 1 is a smear.
-  frameSoftness: 0.55,
+  frameSoftness: 0.24,
+
+  // Ambient occlusion on the label plane. This is where TypeGPU's soft inner
+  // outline comes from: their getSceneDistForAO unions the jelly into the
+  // occluder set, so the plane darkens in a band directly under the blob, and
+  // refraction shows that band as an inset edge. Nothing is drawn — it is
+  // shading, which is why theirs reads as natural rather than as line work.
+  aoRadius: 0.12,
+  aoIntensity: 0.6,
+  // Floor under the occlusion. At 0.5 it halves the effect above; the word still
+  // needs something lit to contrast against, so it cannot go to 0.
+  aoFloor: 0.25,
+
+  // Where the label plane sits in z. Refraction throws the word backwards, and
+  // this pulls it back under the blob — see the note in the README.
+  labelCenterZ: -0.26,
 
   // ── Shape, uniform here rather than baked, so the frame can be aligned to
   // the silhouette from the tune page ─────────────────────────────────────────
   // Corner radius. The render button runs 0.13, but a fillet that large leaves
   // no corner for a frame to sit on, so this starts much tighter.
-  round: 0.05,
+  round: 0.045,
   // Droop across the long axis. The bend is not an affine transform, so the
   // frame cannot follow it — at anything above about 0.15 they visibly diverge.
-  bend: 0.08,
+  bend: 0,
 };
 
 // Just the fields this widget adds. The tune page layers these over the render
@@ -65,13 +80,18 @@ export const FRAME_DEFAULTS = {
   frameBrightness: MATERIAL_DEFAULTS.frameBrightness,
   frameGain: MATERIAL_DEFAULTS.frameGain,
   frameSoftness: MATERIAL_DEFAULTS.frameSoftness,
+  aoRadius: MATERIAL_DEFAULTS.aoRadius,
+  aoIntensity: MATERIAL_DEFAULTS.aoIntensity,
+  aoFloor: MATERIAL_DEFAULTS.aoFloor,
+  labelCenterZ: MATERIAL_DEFAULTS.labelCenterZ,
   round: MATERIAL_DEFAULTS.round,
   bend: MATERIAL_DEFAULTS.bend,
 };
 
-// Fixed-step accumulation along the refracted ray. The box's diagonal is about
-// 1.9 units, so this covers it with room for the back edges beyond.
-export const FRAME_STEPS = 24;
+// Sphere-traced, so these are a step ceiling rather than a fixed count. The
+// box's diagonal is about 1.9 units, so the march length covers it with room for
+// the far edges beyond.
+export const FRAME_STEPS = 32;
 export const FRAME_MARCH_LENGTH = 2.2;
 
 
@@ -87,12 +107,11 @@ export const JELLY_SINK = 0.018;
 // Label plane, in world units.
 export const LABEL_HALF_W = 1.2;
 export const LABEL_HALF_D = 0.45;
-// Refraction displaces what you see through the blob backwards by roughly
-// thickness * tan(asin(sin(view angle) / IOR)) — about a quarter of a unit here,
-// which is three times the word's own height. The plane is shifted by that much so
-// the refracted image of the word lands under the blob instead of behind it.
-// Retune this if the camera angle or the blob's thickness changes.
-export const LABEL_CENTER_Z = -0.26;
+// The plane's z offset is MATERIAL_DEFAULTS.labelCenterZ, a uniform in this
+// variant rather than a constant. Refraction displaces what you see through the
+// blob backwards by roughly thickness * tan(asin(sin(view angle) / IOR)), and
+// that shift depends on the IOR, the blob's thickness and the camera angle — all
+// of which are now sliders, so where the word lands has to be one too.
 // Ink is an albedo multiplier on the lit plane, not a flat colour, so the letters
 // pick up the same lighting and AO as the surface they sit on.
 export const LABEL_INK = d.vec3f(0.12, 0.13, 0.11);
@@ -109,8 +128,6 @@ export const SPECULAR_INTENSITY = 0.6;
 // the blob. Kept at the original's short radius on purpose — widening it turns
 // contact shading into a blanket darkening that swallows the word.
 export const AO_STEPS = 3;
-export const AO_RADIUS = 0.12;
-export const AO_INTENSITY = 0.5;
 export const AO_BIAS = SURF_DIST * 5;
 
 

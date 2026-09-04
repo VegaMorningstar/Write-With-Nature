@@ -545,10 +545,44 @@ export default function TunePage() {
             onChange={v => setWire('bend', v)}
             description="Droop along the long axis. The bend is not an affine transform, so the wireframe cannot follow it — past about 0.15 the lines visibly peel away from the body's edges. 0 keeps them locked." />
 
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            SOFT INNER EDGE
+          </div>
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            Not drawn — this is the ambient occlusion band the blob casts on the
+            plane beneath it, seen through the refraction. It is where TypeGPU&apos;s
+            inner edge comes from, and why theirs looks natural rather than ruled.
+            Turn the line sliders to 0 and work with these alone to compare.
+          </div>
+
+          <Slider label="AO Floor" value={wireMat.aoFloor} min={0} max={1} step={0.01}
+            onChange={v => setWire('aoFloor', v)}
+            description="Lower bound on the occlusion. This is the strongest of the three — it was pinned at 0.5, which halved the whole effect. Down near 0.15 the inset edge reads clearly; at 0 the word loses the lit surface it contrasts against." />
+
+          <Slider label="AO Radius" value={wireMat.aoRadius} min={0.02} max={0.5} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('aoRadius', v)}
+            description="How far the darkening reaches from the contact line. Short (TypeGPU runs 0.1) gives a crisp inset edge; long turns it into a broad smudge under the whole blob." />
+
+          <Slider label="AO Strength" value={wireMat.aoIntensity} min={0} max={2} step={0.02}
+            onChange={v => setWire('aoIntensity', v)}
+            description="How dark the band gets within that radius." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            WORD PLACEMENT
+          </div>
+
+          <Slider label="Label Depth (z)" value={wireMat.labelCenterZ} min={-0.9} max={0.3} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('labelCenterZ', v)}
+            description="Slides the plane the word sits on. Refraction throws its image backwards, so the plane is offset forward to compensate — this is the dial for centring it. Raising the IOR increases the throw and needs this moved with it." />
+
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
-            Lines are traced along the refracted ray, so they bend through the
-            glass with the word. Everything else about this blob is on the JELLY
-            sliders below.
+            The second, upside-down RENDER is the front face refracting the same
+            word — a real double image through a thick faceted body, not a bug.
+            Lowering IOR or thickness weakens it. Everything else about this blob
+            is on the JELLY sliders below.
           </div>
         </AccordionSection>
 

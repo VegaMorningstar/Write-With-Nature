@@ -18,14 +18,11 @@ import {
   AMBIENT_COLOR,
   AMBIENT_INTENSITY,
   AO_BIAS,
-  AO_INTENSITY,
-  AO_RADIUS,
   AO_STEPS,
   FRAME_MARCH_LENGTH,
   FRAME_STEPS,
   JELLY_HALFSIZE,
   JELLY_SINK,
-  LABEL_CENTER_Z,
   LABEL_HALF_D,
   LABEL_HALF_W,
   LABEL_INK,
@@ -178,27 +175,56 @@ export async function setupScene(
   };
 
   /**
-   * Wireframe accumulation. Fixed steps rather than a march, because we want
-   * every edge the ray passes near — the hidden ones behind the blob as much as
-   * the near ones — and a march would stop at the first.
+   * Closest approach of the ray to the wireframe.
+   *
+   * This was fixed-step accumulation, which aliased badly: the step worked out
+   * at four times the bar's half-width, so a ray could cross a bar entirely
+   * between two samples and the lines came out stippled. Sphere-tracing sizes
+   * each step by the distance to the frame, so the march slows down exactly
+   * where it matters and the result varies smoothly between neighbouring pixels.
    */
-  const wireframeAccum = (rayOrigin: d.v3f, direction: d.v3f) => {
+  const wireframeAccum = (worldOrigin: d.v3f, worldDirection: d.v3f) => {
     'use gpu';
     const m = materialUniform.$;
-    const stepSize = d.f32(FRAME_MARCH_LENGTH / FRAME_STEPS);
-    const soft = std.max(m.frameWidth * m.frameSoftness, 0.0005);
 
-    let accum = d.f32(0);
+    // jellyLocal is affine, so transforming two points on the ray and taking the
+    // difference carries the ray into the blob's space, squash and rock included.
+    const origin = jellyLocal(worldOrigin);
+    const direction = std.normalize(
+      jellyLocal(worldOrigin.add(worldDirection)).sub(origin),
+    );
+
+    let travelled = d.f32(0);
+    let previous = d.f32(1e9);
+    let closest = d.f32(1e9);
 
     for (let i = 0; i < FRAME_STEPS; i++) {
-      const p = rayOrigin.add(direction.mul(stepSize * (d.f32(i) + 0.5)));
-      const dist = sdf.sdBoxFrame3d(jellyLocal(p), JELLY_HALFSIZE, m.frameWidth);
-      accum += (1 - std.smoothstep(0, soft, std.max(dist, 0))) * stepSize;
+      const dist = sdf.sdBoxFrame3d(
+        origin.add(direction.mul(travelled)),
+        JELLY_HALFSIZE,
+        m.frameWidth,
+      );
+
+      // A march only samples the field at discrete points and can step straight
+      // past the true closest approach. This estimates where that approach fell
+      // between the last two samples, which is what keeps the line smooth rather
+      // than banded. With `previous` seeded huge, the first pass returns `dist`.
+      const y = (dist * dist) / (2 * std.max(previous, 0.0001));
+      const estimate = std.sqrt(std.max(dist * dist - y * y, 0));
+      closest = std.min(closest, estimate);
+      previous = dist;
+
+      if (travelled > FRAME_MARCH_LENGTH) {
+        break;
+      }
+      // abs, so the march keeps moving while it is inside a bar
+      travelled += std.max(std.abs(dist), 0.004);
     }
 
-    // A ray crossing one bar head-on travels about 2 * frameWidth inside it, so
-    // normalising by that puts a single clean crossing at 1.
-    return std.saturate((accum * m.frameGain) / std.max(m.frameWidth * 2, 0.001));
+    const soft = std.max(m.frameWidth * m.frameSoftness, 0.001);
+    return std.saturate(
+      (1 - std.smoothstep(0, soft, std.max(closest, 0))) * m.frameGain,
+    );
   };
 
   const getNormal = (position: d.v3f) => {
@@ -218,7 +244,7 @@ export async function setupScene(
     'use gpu';
     return d.vec2f(
       position.x / (LABEL_HALF_W * 2) + 0.5,
-      (position.z - LABEL_CENTER_Z) / (LABEL_HALF_D * 2) + 0.5,
+      (position.z - materialUniform.$.labelCenterZ) / (LABEL_HALF_D * 2) + 0.5,
     );
   };
 
@@ -245,9 +271,12 @@ export async function setupScene(
   // Seen through the refraction this gradient is what reads as the blob's interior.
   const calculateAO = (position: d.v3f, normal: d.v3f) => {
     'use gpu';
+    const radius = std.max(materialUniform.$.aoRadius, 0.001);
+    const intensity = materialUniform.$.aoIntensity;
+
     let totalOcclusion = d.f32(0.0);
     let sampleWeight = d.f32(1.0);
-    const stepDistance = AO_RADIUS / AO_STEPS;
+    const stepDistance = radius / AO_STEPS;
 
     for (let i = 1; i <= AO_STEPS; i++) {
       const sampleHeight = stepDistance * d.f32(i);
@@ -257,7 +286,7 @@ export async function setupScene(
       sampleWeight *= 0.5;
     }
 
-    return std.saturate(1.0 - (AO_INTENSITY * totalOcclusion) / AO_RADIUS);
+    return std.saturate(1.0 - (intensity * totalOcclusion) / radius);
   };
 
   const surfaceLighting = (hitPosition: d.v3f, normal: d.v3f, rayOrigin: d.v3f) => {
@@ -289,8 +318,9 @@ export async function setupScene(
 
     const lit = surfaceLighting(p, normal, rayOrigin);
     // Floored: full occlusion under the blob leaves nothing for the ink to
-    // contrast against, and the word disappears into black.
-    const ao = std.max(calculateAO(p, normal), 0.5);
+    // contrast against, and the word disappears into black. Lowering the floor
+    // is what strengthens the soft inset edge seen through the glass.
+    const ao = std.max(calculateAO(p, normal), materialUniform.$.aoFloor);
     const bounce = jellyColorUniform.$.rgb.mul(
       (1 / (sqLength(p) * 12 + 1)) * 0.35 * (0.8 + state.glow),
     );

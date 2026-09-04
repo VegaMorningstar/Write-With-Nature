@@ -41,6 +41,10 @@ export const JellyMaterial = d.struct({
   frameBrightness: d.f32,
   frameGain: d.f32,
   frameSoftness: d.f32,
+  aoRadius: d.f32,
+  aoIntensity: d.f32,
+  aoFloor: d.f32,
+  labelCenterZ: d.f32,
   round: d.f32,
   bend: d.f32,
 });
