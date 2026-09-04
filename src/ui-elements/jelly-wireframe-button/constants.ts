@@ -11,41 +11,43 @@ export const SURF_DIST = 0.001;
 export const MATERIAL_DEFAULTS = {
   // Opacity looking straight through the blob. Fresnel pushes this to 1 at the
   // rim, so lower values let more of the word and the page show through.
-  baseAlpha: 0.58,
-  // How hard Fresnel drives the rim opaque
-  fresnelAlpha: 3.5,
+  baseAlpha: 0.8,
+  // How hard Fresnel drives the rim opaque. Off here — with the wireframe
+  // carrying the edges, a bright Fresnel rim competes with the lines.
+  fresnelAlpha: 0,
   // Refractive index. Higher bends harder and displaces the word further.
   ior: 1.42,
   // Spread between the red and blue refractive indices. Red bends least, blue
   // most, so a larger spread widens the colour fringe at the rim.
-  dispersion: 0.075,
+  dispersion: 0.095,
   // Frosting. Scatters the refracted ray; the TAA resolves it into a blur.
   blur: 0,
   // Overall colour strength. TypeGPU's liquid-glass example runs a tintStrength
   // of 0.05 — glass reads as glass when the tint is a suggestion, not a filter.
-  tint: 0.55,
+  tint: 0.61,
   // Beer-Lambert absorption density
-  absorbDensity: 20,
+  absorbDensity: 19.5,
   // Forward subsurface scattering
-  scatter: 3,
+  scatter: 2.2,
   // Blinn-Phong highlight on the blob
   specular: 0.35,
-  exposure: 2,
+  exposure: 2.2,
   shadowStrength: 0.34,
   // Emission from residual wobble energy
-  glowGain: 0.55,
+  glowGain: 0.38,
 
   // ── Wireframe ───────────────────────────────────────────────────────────────
-  // Half-thickness of the frame bars, in world units
-  frameWidth: 0.022,
+  // Half-thickness of the frame bars, in world units. Thin, and paired with a
+  // softness well above 1, so the edges read as caught light rather than ink.
+  frameWidth: 0.006,
   // How dark or bright the lines sit against the body. 0 = near-black ink,
-  // 1 = white; the sketch is at 0.
-  frameBrightness: 0.08,
+  // 1 = white.
+  frameBrightness: 1,
   // Line opacity. Pushed into the alpha channel too, so the lines stay solid
   // where the jelly itself is see-through.
-  frameGain: 0.3,
+  frameGain: 0.1,
   // Edge softness as a fraction of the bar width. 0 is aliased, 1 is a smear.
-  frameSoftness: 0.24,
+  frameSoftness: 2,
 
   // Soft inner edge, from horizontal distance to the blob's silhouette rather
   // than from ambient occlusion. Occlusion marched up from the plane sees the
@@ -54,40 +56,24 @@ export const MATERIAL_DEFAULTS = {
   // under a body that is supposed to be translucent. The jelly's own SDF
   // evaluated at the plane is negative inside the footprint and zero at its
   // boundary, so its absolute value gives a true edge band.
-  edgeWidth: 0.06,
-  edgeDark: 0.55,
+  edgeWidth: 0.075,
+  edgeDark: 0.36,
   // Overall brightness of the floor under the blob. 1 leaves it fully lit, which
   // is what keeps the base reading as translucent.
-  baseBright: 1.0,
+  baseBright: 0.74,
 
   // Where the label plane sits in z. Larger values move the word's refracted
   // image toward the camera, and so downward on screen.
-  labelCenterZ: -0.1,
+  labelCenterZ: -0.05,
 
   // ── Shape, uniform here rather than baked, so the frame can be aligned to
   // the silhouette from the tune page ─────────────────────────────────────────
   // Corner radius. The render button runs 0.13, but a fillet that large leaves
   // no corner for a frame to sit on, so this starts much tighter.
-  round: 0.045,
+  round: 0.04,
   // Droop across the long axis. The bend is not an affine transform, so the
   // frame cannot follow it — at anything above about 0.15 they visibly diverge.
   bend: 0,
-};
-
-// Just the fields this widget adds. The tune page layers these over the render
-// button's material so both blobs run the same glass and the only difference on
-// screen is the edges.
-export const FRAME_DEFAULTS = {
-  frameWidth: MATERIAL_DEFAULTS.frameWidth,
-  frameBrightness: MATERIAL_DEFAULTS.frameBrightness,
-  frameGain: MATERIAL_DEFAULTS.frameGain,
-  frameSoftness: MATERIAL_DEFAULTS.frameSoftness,
-  edgeWidth: MATERIAL_DEFAULTS.edgeWidth,
-  edgeDark: MATERIAL_DEFAULTS.edgeDark,
-  baseBright: MATERIAL_DEFAULTS.baseBright,
-  labelCenterZ: MATERIAL_DEFAULTS.labelCenterZ,
-  round: MATERIAL_DEFAULTS.round,
-  bend: MATERIAL_DEFAULTS.bend,
 };
 
 // Sphere-traced, so these are a step ceiling rather than a fixed count. The
