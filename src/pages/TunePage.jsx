@@ -7,6 +7,8 @@ import {
   squashZProperties,
   wiggleXProperties,
 } from '../ui-elements/jelly-render-button/constants.ts'
+import JellyWireframeButton from '../ui-elements/jelly-wireframe-button/JellyWireframeButton'
+import { FRAME_DEFAULTS } from '../ui-elements/jelly-wireframe-button/constants.ts'
 
 // Rebuilds the glass effect whenever opts change (slider-reactive)
 function useLiveGlass(ref, opts) {
@@ -161,6 +163,7 @@ const GLASS_DEF = {
 
 const JELLY_HOVER_DEF = { ...HOVER_DEFAULTS }
 const JELLY_MATERIAL_DEF = { ...MATERIAL_DEFAULTS }
+const WIRE_MATERIAL_DEF = { ...FRAME_DEFAULTS }
 const JELLY_SPRING_DEF = {
   squashX: { ...squashXProperties },
   squashZ: { ...squashZProperties },
@@ -214,6 +217,10 @@ export default function TunePage() {
   const [jellyMat,     setJellyMat]     = useState(JELLY_MATERIAL_DEF)
   const setMat = (k, v) => setJellyMat(m => ({ ...m, [k]: v }))
 
+  // Wireframe variant — separate widget, separate material
+  const [wireMat, setWireMat] = useState(WIRE_MATERIAL_DEF)
+  const setWire = (k, v) => setWireMat(m => ({ ...m, [k]: v }))
+
   // Accordion open state
   const [openSection, setOpenSection] = useState('fluid')
   const toggle = (name) => setOpenSection(s => s === name ? null : name)
@@ -240,6 +247,7 @@ export default function TunePage() {
       fluid:   { ...appliedFluid, blendMode },
       glass:   { compose: composeG, board: boardG, colophon: colophonG },
       jelly:   { hover: jellyHover, springs: jellySprings, material: jellyMat },
+      jellyWireframe: { material: wireMat },
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -251,6 +259,7 @@ export default function TunePage() {
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
     setJellyHover({ ...JELLY_HOVER_DEF })
     setJellyMat({ ...JELLY_MATERIAL_DEF })
+    setWireMat({ ...WIRE_MATERIAL_DEF })
     setJellySprings({
       squashX: { ...JELLY_SPRING_DEF.squashX },
       squashZ: { ...JELLY_SPRING_DEF.squashZ },
@@ -315,8 +324,20 @@ export default function TunePage() {
                 style={{ width: '100%' }}
                 defaultValue={'Rivers, glaciers & coastlines — shaped into letters from orbit.\nEach line becomes its own row of satellite tiles.'}
               />
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-                <JellyRenderButton hover={jellyHover} springs={jellySprings} material={jellyMat} onClick={() => {}} />
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 340px', maxWidth: 480 }}>
+                  <div style={{ ...mono, fontSize: 9, letterSpacing: '0.12em', opacity: 0.4, textAlign: 'center', marginBottom: 4 }}>
+                    CURRENT
+                  </div>
+                  <JellyRenderButton hover={jellyHover} springs={jellySprings} material={jellyMat} onClick={() => {}} />
+                </div>
+                <div style={{ flex: '1 1 340px', maxWidth: 480 }}>
+                  <div style={{ ...mono, fontSize: 9, letterSpacing: '0.12em', opacity: 0.4, textAlign: 'center', marginBottom: 4 }}>
+                    WIREFRAME
+                  </div>
+                  {/* Same glass as the left-hand blob, plus the frame fields */}
+                  <JellyWireframeButton hover={jellyHover} springs={jellySprings} material={{ ...jellyMat, ...wireMat }} onClick={() => {}} />
+                </div>
               </div>
               <p className="compose-note">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
@@ -487,6 +508,49 @@ export default function TunePage() {
         <GlassSection title="GLASS — COLOPHON" opts={colophonG} onChange={setColophonG} open={openSection === 'colophon'} onToggle={() => toggle('colophon')} />
 
         <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
+
+        {/* ── Wireframe variant ── */}
+        <AccordionSection title="WIREFRAME — EDGES" open={openSection === 'wire'} onToggle={() => toggle('wire')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            Second widget · own files · drives the right-hand blob only
+          </div>
+
+          <Slider label="Line Width" value={wireMat.frameWidth} min={0} max={0.08} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('frameWidth', v)}
+            description="Half-thickness of the bars in world units, against a blob 1.6 wide. 0 removes the wireframe entirely and leaves the plain jelly." />
+
+          <Slider label="Line Opacity" value={wireMat.frameGain} min={0} max={3} step={0.05}
+            onChange={v => setWire('frameGain', v)}
+            description="How solid the lines read. Goes into the alpha channel as well as the colour, so above 1 the edges stay opaque even where the body is see-through." />
+
+          <Slider label="Line Softness" value={wireMat.frameSoftness} min={0} max={2} step={0.02}
+            onChange={v => setWire('frameSoftness', v)}
+            description="Edge falloff as a fraction of the bar width. Near 0 aliases badly; around 0.5 is a clean drawn line; high smears it into a glow." />
+
+          <Slider label="Line Brightness" value={wireMat.frameBrightness} min={0} max={1} step={0.01}
+            onChange={v => setWire('frameBrightness', v)}
+            description="0 = near-black ink, like the sketch. 1 = white, which reads as light caught in the edges rather than a drawn line." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            SHAPE FIT
+          </div>
+
+          <Slider label="Corner Radius" value={wireMat.round} min={0.01} max={0.2} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('round', v)}
+            description="The render button runs 0.13, but a fillet that large leaves no corner for a frame to sit on and the lines float clear of the silhouette. Low keeps them aligned at the cost of some softness." />
+
+          <Slider label="Bend" value={wireMat.bend} min={0} max={0.4} step={0.01}
+            onChange={v => setWire('bend', v)}
+            description="Droop along the long axis. The bend is not an affine transform, so the wireframe cannot follow it — past about 0.15 the lines visibly peel away from the body's edges. 0 keeps them locked." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+            Lines are traced along the refracted ray, so they bend through the
+            glass with the word. Everything else about this blob is on the JELLY
+            sliders below.
+          </div>
+        </AccordionSection>
 
         {/* ── Jelly render button ── */}
         <AccordionSection title="JELLY — GLASS" open={openSection === 'jellyMat'} onToggle={() => toggle('jellyMat')}>
