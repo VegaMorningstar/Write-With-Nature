@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import typegpu from 'unplugin-typegpu/vite'
 import path from 'path'
 import fs from 'fs'
 
@@ -27,7 +28,7 @@ function serveLocalImages() {
 }
 
 export default defineConfig({
-  plugins: [react(), serveLocalImages()],
+  plugins: [typegpu({ include: [/\.m?[jt]sx?/] }), react(), serveLocalImages()],
   base: '/Write-With-Nature/',
   publicDir: 'public',
   build: {
