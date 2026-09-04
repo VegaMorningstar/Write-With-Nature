@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { liquidGlass } from '../lib/liquid-glass'
+import JellyRenderButton, { HOVER_DEFAULTS } from '../ui-elements/jelly-render-button/JellyRenderButton'
+import {
+  MATERIAL_DEFAULTS,
+  squashXProperties,
+  squashZProperties,
+  wiggleXProperties,
+} from '../ui-elements/jelly-render-button/constants.ts'
 
 // Rebuilds the glass effect whenever opts change (slider-reactive)
 function useLiveGlass(ref, opts) {
@@ -152,6 +159,37 @@ const GLASS_DEF = {
   colophon: { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, aberrationIntensity: 5, elasticity: 0, mode: 'polar'     },
 }
 
+const JELLY_HOVER_DEF = { ...HOVER_DEFAULTS }
+const JELLY_MATERIAL_DEF = { ...MATERIAL_DEFAULTS }
+const JELLY_SPRING_DEF = {
+  squashX: { ...squashXProperties },
+  squashZ: { ...squashZProperties },
+  wiggleX: { ...wiggleXProperties },
+}
+
+// Stiffness sets the wobble frequency, damping sets how fast it dies. The pair
+// that matters is the damping ratio, damping / (2 * sqrt(stiffness * mass)):
+// below 1 it oscillates, and the lower it goes the longer the wobble carries.
+function SpringRow({ label, value, onChange, description }) {
+  const omega = Math.sqrt(value.stiffness / value.mass)
+  const ratio = value.damping / (2 * omega)
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ ...mono, fontSize: 10, color: '#3a4a2a', letterSpacing: '0.05em', marginBottom: 4 }}>
+        {label}
+        <span style={{ color: 'rgba(0,0,0,0.34)', letterSpacing: 0 }}>
+          {` · ${(omega / (2 * Math.PI)).toFixed(1)} Hz · ζ ${ratio.toFixed(2)}${ratio >= 1 ? ' (no wobble)' : ''}`}
+        </span>
+      </div>
+      <Slider label="Stiffness" value={value.stiffness} min={100} max={2500} step={10}
+        fmt={v => v.toFixed(0)} onChange={v => onChange({ ...value, stiffness: v })} />
+      <Slider label="Damping" value={value.damping} min={0.5} max={40} step={0.1}
+        fmt={v => v.toFixed(1)} onChange={v => onChange({ ...value, damping: v })}
+        description={description} />
+    </div>
+  )
+}
+
 const TILE_COLORS = [
   '#6e9e7e','#5a8a62','#7aac72','#4a8e7e','#8aba88',
   '#6a9e6a','#5a7e8a','#7aaa98','#8ab08a','#6e8a5a',
@@ -169,6 +207,12 @@ export default function TunePage() {
   const [composeG,  setComposeG]  = useState(GLASS_DEF.compose)
   const [boardG,    setBoardG]    = useState(GLASS_DEF.board)
   const [colophonG, setColophonG] = useState(GLASS_DEF.colophon)
+
+  // Jelly render button state
+  const [jellyHover,   setJellyHover]   = useState(JELLY_HOVER_DEF)
+  const [jellySprings, setJellySprings] = useState(JELLY_SPRING_DEF)
+  const [jellyMat,     setJellyMat]     = useState(JELLY_MATERIAL_DEF)
+  const setMat = (k, v) => setJellyMat(m => ({ ...m, [k]: v }))
 
   // Accordion open state
   const [openSection, setOpenSection] = useState('fluid')
@@ -195,6 +239,7 @@ export default function TunePage() {
     const cfg = {
       fluid:   { ...appliedFluid, blendMode },
       glass:   { compose: composeG, board: boardG, colophon: colophonG },
+      jelly:   { hover: jellyHover, springs: jellySprings, material: jellyMat },
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -204,6 +249,13 @@ export default function TunePage() {
     setPendingFluid({ ...FLUID_DEF }); setAppliedFluid({ ...FLUID_DEF })
     setBlendMode(BLEND_DEF)
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
+    setJellyHover({ ...JELLY_HOVER_DEF })
+    setJellyMat({ ...JELLY_MATERIAL_DEF })
+    setJellySprings({
+      squashX: { ...JELLY_SPRING_DEF.squashX },
+      squashZ: { ...JELLY_SPRING_DEF.squashZ },
+      wiggleX: { ...JELLY_SPRING_DEF.wiggleX },
+    })
     setFluidKey(k => k + 1)
   }
 
@@ -258,12 +310,13 @@ export default function TunePage() {
           <section className="section">
             <div className="section-label">Compose · standard mode</div>
             <div className="compose-card" ref={composeRef}>
-              <div className="textarea-row">
-                <textarea
-                  rows={4}
-                  defaultValue={'Rivers, glaciers & coastlines — shaped into letters from orbit.\nEach line becomes its own row of satellite tiles.'}
-                />
-                <button className="render-btn">Render<small>⌘ ↵</small></button>
+              <textarea
+                rows={4}
+                style={{ width: '100%' }}
+                defaultValue={'Rivers, glaciers & coastlines — shaped into letters from orbit.\nEach line becomes its own row of satellite tiles.'}
+              />
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+                <JellyRenderButton hover={jellyHover} springs={jellySprings} material={jellyMat} onClick={() => {}} />
               </div>
               <p className="compose-note">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
@@ -432,6 +485,147 @@ export default function TunePage() {
         <GlassSection title="GLASS — COMPOSE"  opts={composeG}  onChange={setComposeG}  open={openSection === 'compose'}  onToggle={() => toggle('compose')}  />
         <GlassSection title="GLASS — BOARD"    opts={boardG}    onChange={setBoardG}    open={openSection === 'board'}    onToggle={() => toggle('board')}    />
         <GlassSection title="GLASS — COLOPHON" opts={colophonG} onChange={setColophonG} open={openSection === 'colophon'} onToggle={() => toggle('colophon')} />
+
+        <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
+
+        {/* ── Jelly render button ── */}
+        <AccordionSection title="JELLY — GLASS" open={openSection === 'jellyMat'} onToggle={() => toggle('jellyMat')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            TRANSPARENCY
+          </div>
+
+          <Slider label="Base Transparency" value={1 - jellyMat.baseAlpha} min={0} max={1} step={0.01}
+            onChange={v => setMat('baseAlpha', 1 - v)}
+            description="How much of the page and the word show through the middle of the blob. High = clear glass, but the interior shading washes out. Low = solid gummy." />
+
+          <Slider label="Edge Opacity" value={jellyMat.fresnelAlpha} min={0} max={10} step={0.1}
+            onChange={v => setMat('fresnelAlpha', v)}
+            description="How hard Fresnel drives the rim opaque at grazing angles. This is what gives glass its dense bright edge against a clear centre. 0 = uniform transparency, looks like tinted film." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            REFRACTION
+          </div>
+
+          <Slider label="Refractive Index" value={jellyMat.ior} min={1.01} max={2.4} step={0.01}
+            onChange={v => setMat('ior', v)}
+            description="How hard light bends entering the jelly. 1.0 = no bend, invisible. 1.33 water, 1.42 stock, 1.5 glass, 2.4 diamond. Raising it displaces the word further back — past about 1.6 it slides out from under the blob and LABEL_CENTER_Z needs retuning." />
+
+          <Slider label="Chromatic Aberration" value={jellyMat.dispersion} min={0} max={0.35} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setMat('dispersion', v)}
+            description="Splits red, green and blue onto their own refractive indices. Widens the colour fringe at the rim and along the letter edges. 0 = achromatic." />
+
+          <Slider label="Frost / Blur" value={jellyMat.blur} min={0} max={0.6} step={0.01}
+            onChange={v => setMat('blur', v)}
+            description="Scatters the refracted ray. The TAA averages it across frames into a real blur, so it settles about a third of a second after you stop dragging. Past ~0.35 the noise outruns what the TAA can resolve and it starts to sparkle." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            COLOUR &amp; ABSORPTION
+          </div>
+
+          <Slider label="Tint Strength" value={jellyMat.tint} min={0} max={1.5} step={0.01}
+            onChange={v => setMat('tint', v)}
+            description="Overall colour saturation. TypeGPU's liquid-glass example runs 0.05 — glass reads as glass when the tint is a suggestion rather than a filter." />
+
+          <Slider label="Absorption Density" value={jellyMat.absorbDensity} min={0} max={60} step={0.5}
+            fmt={v => v.toFixed(1)} onChange={v => setMat('absorbDensity', v)}
+            description="Beer-Lambert density. Sets how fast colour deepens with depth through the body, so it darkens the bottom far more than the top. High values swallow the word." />
+
+          <Slider label="Subsurface Scatter" value={jellyMat.scatter} min={0} max={10} step={0.1}
+            onChange={v => setMat('scatter', v)}
+            description="Forward scattering toward the light — the glow you get holding a gummy up to a lamp. Only shows where the refracted ray points at the light." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            LIGHT &amp; SHADOW
+          </div>
+
+          <Slider label="Specular" value={jellyMat.specular} min={0} max={1.5} step={0.01}
+            onChange={v => setMat('specular', v)}
+            description="Hard highlight on the top face. Refraction alone gives a wide shape almost no gradient, which is most of what makes it read flat — this is the cue that says the surface has form." />
+
+          <Slider label="Exposure" value={jellyMat.exposure} min={0.5} max={5} step={0.05}
+            onChange={v => setMat('exposure', v)}
+            description="Tonemap gain before the tanh curve. Raises overall brightness and rolls off into the highlights rather than clipping." />
+
+          <Slider label="Contact Shadow" value={jellyMat.shadowStrength} min={0} max={1} step={0.01}
+            onChange={v => setMat('shadowStrength', v)}
+            description="Darkness of the pool under the blob. This is what seats it on the page rather than floating over it." />
+
+          <Slider label="Wobble Glow" value={jellyMat.glowGain} min={0} max={2} step={0.02}
+            onChange={v => setMat('glowGain', v)}
+            description="Emission driven by leftover wobble energy, so the jelly lights from inside as it lands and fades as it settles. Click it to see this one." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+            All live — these are a uniform, not baked shader constants.
+          </div>
+        </AccordionSection>
+
+        <AccordionSection title="JELLY — POINTER" open={openSection === 'jellyHover'} onToggle={() => toggle('jellyHover')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            REACH
+          </div>
+
+          <Slider label="Hover Radius (px)" value={jellyHover.radius} min={0} max={700} step={10}
+            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, radius: v }))}
+            description="How far from the button the jelly still notices the cursor. 0 = only reacts once you are on it. Large = stirs from across the card." />
+
+          <Slider label="Strength" value={jellyHover.strength} min={0} max={2} step={0.05}
+            onChange={v => setJellyHover(h => ({ ...h, strength: v }))}
+            description="Ceiling on the hover impulse, reached when the cursor is directly over the blob. Falls off with the square of distance from there." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            SENSITIVITY
+          </div>
+
+          <Slider label="Travel per Impulse (px)" value={jellyHover.sensitivity} min={4} max={140} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, sensitivity: v }))}
+            description="Pointer travel needed for a full-scale kick. This is the sensitivity dial and it is inverted — LOW = twitchy, responds to the smallest drift. High = only a fast sweep moves it." />
+
+          <Slider label="Rock Gain" value={jellyHover.rockGain} min={0} max={6} step={0.1}
+            onChange={v => setJellyHover(h => ({ ...h, rockGain: v }))}
+            description="Sideways lean, driven by horizontal travel only, so it tips the way you swept. This is the one you feel most." />
+
+          <Slider label="Squash Gain" value={jellyHover.squashGain} min={0} max={4} step={0.05}
+            onChange={v => setJellyHover(h => ({ ...h, squashGain: v }))}
+            description="Wobble driven by total travel in both axes, so vertical movement registers here and nowhere else. Raise it if moving up and down the jelly feels dead." />
+
+          <Slider label="Throttle (ms)" value={jellyHover.throttleMs} min={16} max={220} step={2}
+            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, throttleMs: v }))}
+            description="Gap between impulses. Low = smoother and more alive, more work per second. High = a stuttery pulse. Also caps how often the button's position is measured." />
+
+          <Slider label="Enter Kick" value={jellyHover.enterImpulse} min={0} max={1} step={0.02}
+            onChange={v => setJellyHover(h => ({ ...h, enterImpulse: v }))}
+            description="One-off jolt the moment the cursor crosses onto the button, on top of the continuous stir. 0 = no distinct arrival." />
+        </AccordionSection>
+
+        <AccordionSection title="JELLY — SPRINGS" open={openSection === 'jellySprings'} onToggle={() => toggle('jellySprings')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            TypeGPU&apos;s tuning by default · drives hover and click alike
+          </div>
+
+          <SpringRow label="Rock (wiggle X)" value={jellySprings.wiggleX}
+            onChange={v => setJellySprings(s => ({ ...s, wiggleX: v }))}
+            description="The side-to-side tip. Damping 20 is the stock value and dies in about a tenth of a second — drop it toward 5 for a long lazy sway." />
+
+          <SpringRow label="Squash X" value={jellySprings.squashX}
+            onChange={v => setJellySprings(s => ({ ...s, squashX: v }))}
+            description="Widen and flatten. This is the one that carries the click; below about 4 the wobble lasts several seconds." />
+
+          <SpringRow label="Squash Z" value={jellySprings.squashZ}
+            onChange={v => setJellySprings(s => ({ ...s, squashZ: v }))}
+            description="Depth-wise pinch, the quieter partner to squash X." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+            Retunes live · no scene rebuild. Values above ~200,000 stiffness will
+            outrun the integrator.
+          </div>
+        </AccordionSection>
 
         {/* Footer note */}
         <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid rgba(74,124,63,0.08)' }}>

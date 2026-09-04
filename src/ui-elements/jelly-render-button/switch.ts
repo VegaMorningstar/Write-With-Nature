@@ -8,7 +8,7 @@ import {
   wiggleXProperties,
 } from './constants.ts';
 import { SwitchState } from './dataTypes.ts';
-import { Spring } from './spring.ts';
+import { Spring, type SpringProperties } from './spring.ts';
 
 function clamp(value: number, min: number, max: number) {
   return Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : 0;
@@ -43,13 +43,41 @@ export class SwitchBehavior {
   }
 
   /**
-   * Light jostle from pointer movement. Same springs, far smaller impulses, with
-   * the rock following the direction the pointer travelled.
+   * Light jostle from pointer movement. Same springs, far smaller impulses.
+   *
+   * Horizontal travel is signed and rocks the blob the way the pointer went;
+   * total travel is unsigned and squashes it. Taking both axes matters — with
+   * only deltaX, moving straight up or down across the jelly did nothing at all.
+   *
+   * `strength` scales the whole thing down with distance so the blob barely
+   * stirs at the edge of its hover radius. `sensitivity` is the travel in pixels
+   * that produces a full-scale impulse, so lower is twitchier.
    */
-  nudge(deltaX: number) {
-    const amount = Math.max(-1, Math.min(1, deltaX / 45));
-    this.#wiggleXSpring.velocity += amount * 1.8;
-    this.#squashZSpring.velocity += Math.abs(amount) * 0.9;
+  nudge(
+    deltaX: number,
+    deltaY: number,
+    opts: { strength: number; sensitivity: number; rockGain: number; squashGain: number },
+  ) {
+    const { strength, sensitivity, rockGain, squashGain } = opts;
+    if (strength <= 0 || sensitivity <= 0) return;
+
+    const rock = Math.max(-1, Math.min(1, deltaX / sensitivity)) * strength;
+    const speed = Math.min(Math.hypot(deltaX, deltaY) / sensitivity, 1) * strength;
+
+    this.#wiggleXSpring.velocity += rock * rockGain;
+    this.#squashZSpring.velocity += speed * squashGain;
+    this.#squashXSpring.velocity -= speed * squashGain * 0.5;
+  }
+
+  /** Live spring retuning, for the tune page. Values are merged, not replaced. */
+  setSpringProperties(next: {
+    squashX?: Partial<SpringProperties>;
+    squashZ?: Partial<SpringProperties>;
+    wiggleX?: Partial<SpringProperties>;
+  }) {
+    if (next.squashX) Object.assign(this.#squashXSpring.properties, next.squashX);
+    if (next.squashZ) Object.assign(this.#squashZSpring.properties, next.squashZ);
+    if (next.wiggleX) Object.assign(this.#wiggleXSpring.properties, next.wiggleX);
   }
 
   update(dt: number) {

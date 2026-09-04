@@ -5,20 +5,37 @@ import type { SpringProperties } from './spring.ts';
 export const MAX_STEPS = 96;
 export const MAX_DIST = 10;
 export const SURF_DIST = 0.001;
-export const EXPOSURE = 2.0;
 
-// Jelly material constants
-export const JELLY_IOR = 1.42;
-// Spread between the red and blue refractive indices. Red bends least, blue most,
-// so a larger spread widens the colour fringe at the rim.
-export const JELLY_DISPERSION = 0.075;
-export const JELLY_SCATTER_STRENGTH = 3;
-// Opacity looking straight through the blob. Fresnel pushes this to 1 at the rim,
-// so lower values let more of the word and the page show through the middle.
-export const JELLY_BASE_ALPHA = 0.58;
-// Overall colour strength. TypeGPU's liquid-glass example runs a tintStrength of
-// 0.05 — glass reads as glass when the tint is a suggestion, not a filter.
-export const JELLY_TINT = 0.55;
+// Jelly material. These live in a uniform rather than being baked into the WGSL,
+// so the tune page can drive them without recompiling the shader.
+export const MATERIAL_DEFAULTS = {
+  // Opacity looking straight through the blob. Fresnel pushes this to 1 at the
+  // rim, so lower values let more of the word and the page show through.
+  baseAlpha: 0.58,
+  // How hard Fresnel drives the rim opaque
+  fresnelAlpha: 3.5,
+  // Refractive index. Higher bends harder and displaces the word further.
+  ior: 1.42,
+  // Spread between the red and blue refractive indices. Red bends least, blue
+  // most, so a larger spread widens the colour fringe at the rim.
+  dispersion: 0.075,
+  // Frosting. Scatters the refracted ray; the TAA resolves it into a blur.
+  blur: 0,
+  // Overall colour strength. TypeGPU's liquid-glass example runs a tintStrength
+  // of 0.05 — glass reads as glass when the tint is a suggestion, not a filter.
+  tint: 0.55,
+  // Beer-Lambert absorption density
+  absorbDensity: 20,
+  // Forward subsurface scattering
+  scatter: 3,
+  // Blinn-Phong highlight on the blob
+  specular: 0.35,
+  exposure: 2,
+  shadowStrength: 0.34,
+  // Emission from residual wobble energy
+  glowGain: 0.55,
+};
+
 
 // Jelly geometry — a chunky cuboid, not a pane. Depth in y and z is what gives it
 // visible side faces; a shallow slab reads as flat glass no matter how it is lit.
@@ -30,8 +47,6 @@ export const JELLY_SINK = 0.018;
 // Droop across the long axis. Low on purpose: at this width the original's 0.8
 // bends the whole shape into a banana.
 export const JELLY_BEND = 0.12;
-// Highlight strength. Refraction alone leaves the top face reading flat.
-export const JELLY_SPECULAR = 0.35;
 
 // Label plane, in world units.
 export const LABEL_HALF_W = 1.2;
@@ -62,11 +77,9 @@ export const AO_RADIUS = 0.12;
 export const AO_INTENSITY = 0.5;
 export const AO_BIAS = SURF_DIST * 5;
 
-// Contact shadow
-export const SHADOW_STRENGTH = 0.34;
 
-// Spring dynamics, exactly as tuned in TypeGPU's jelly-switch. The wobble
-// envelope these give is e^(-5t) on squashX, so it settles in roughly 0.8s.
+// Spring dynamics. The squash pair is TypeGPU's tuning untouched, giving an
+// e^(-5t) envelope on squashX so it settles in roughly 0.8s.
 export const squashXProperties: SpringProperties = {
   mass: 1,
   stiffness: 1000,
@@ -77,9 +90,12 @@ export const squashZProperties: SpringProperties = {
   stiffness: 900,
   damping: 12,
 };
+// Softened from TypeGPU's 1000 to slow the rock from 5.0 Hz to 3.5 Hz. The decay
+// rate is unchanged — that is damping / 2m, which stiffness does not touch — so
+// this is a slower sway over the same span, not a longer one.
 export const wiggleXProperties: SpringProperties = {
   mass: 1,
-  stiffness: 1000,
+  stiffness: 480,
   damping: 20,
 };
 

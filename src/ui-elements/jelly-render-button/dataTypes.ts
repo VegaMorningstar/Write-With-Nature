@@ -22,6 +22,23 @@ export const BoundingBox = d.struct({
   max: d.vec3f,
 });
 
+// Everything about the glass that the tune page can move. Held in a uniform so
+// changing it is a buffer write rather than a shader recompile.
+export const JellyMaterial = d.struct({
+  baseAlpha: d.f32,
+  fresnelAlpha: d.f32,
+  ior: d.f32,
+  dispersion: d.f32,
+  blur: d.f32,
+  tint: d.f32,
+  absorbDensity: d.f32,
+  scatter: d.f32,
+  specular: d.f32,
+  exposure: d.f32,
+  shadowStrength: d.f32,
+  glowGain: d.f32,
+});
+
 // glow tracks how much wobble energy is left, so the click reads as landing
 // without needing a separate on/off state to reward.
 export const SwitchState = d.struct({
