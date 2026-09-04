@@ -10,7 +10,7 @@ const JELLY_COLOR = [0.55, 0.83, 0.14]
 // TypeGPU's spring tuning settles in ~0.8s, so anything much longer is dead air.
 const JIGGLE_MS = 1100
 
-export default function JellySlider({ onClick, color = JELLY_COLOR, label = 'RENDER' }) {
+export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label = 'RENDER' }) {
   const canvasRef  = useRef(null)
   const sceneRef   = useRef(null)
   const cleanupRef = useRef(null)
@@ -44,7 +44,7 @@ export default function JellySlider({ onClick, color = JELLY_COLOR, label = 'REN
     async function init() {
       try {
         const { tgpu, d }    = await import('typegpu')
-        const { setupScene } = await import('./jelly-switch/scene.ts')
+        const { setupScene } = await import('./scene.ts')
         if (cancelled) return
 
         const root    = await tgpu.init({ device: { optionalFeatures: ['timestamp-query'] } })
