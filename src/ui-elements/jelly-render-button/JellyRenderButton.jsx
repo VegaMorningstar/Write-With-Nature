@@ -10,19 +10,52 @@ const JELLY_COLOR = [0.55, 0.83, 0.14]
 // TypeGPU's spring tuning settles in ~0.8s, so anything much longer is dead air.
 const JIGGLE_MS = 1100
 
-// How far from the canvas the jelly still reacts to the pointer, in CSS pixels
-const HOVER_RADIUS = 220
-// Ceiling on the hover impulse, as a fraction of a full nudge
-const HOVER_STRENGTH = 0.55
-// Long enough that a fast sweep does not stack impulses, short enough that the
-// wobble stays continuous while the pointer is moving
-const HOVER_THROTTLE_MS = 70
+// Pointer-response tuning. Exported so the tune page can drive it live — pass a
+// partial `hover` prop and anything missing falls back to these.
+export const HOVER_DEFAULTS = {
+  // How far from the canvas the jelly still reacts, in CSS pixels
+  radius: 220,
+  // Ceiling on the hover impulse, as a fraction of a full nudge
+  strength: 0.6,
+  // Pointer travel in pixels that produces a full-scale impulse. Lower is
+  // twitchier; this is the sensitivity dial.
+  sensitivity: 26,
+  // Impulse into the rocking spring, from horizontal travel
+  rockGain: 1.8,
+  // Impulse into the squash springs, from total travel
+  squashGain: 0.9,
+  // Long enough that a fast sweep does not stack impulses, short enough that the
+  // wobble stays continuous while the pointer is moving
+  throttleMs: 70,
+  // One-off kick when the cursor crosses onto the canvas
+  enterImpulse: 0.18,
+}
 
-export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label = 'RENDER' }) {
+export default function JellyRenderButton({
+  onClick,
+  color = JELLY_COLOR,
+  label = 'RENDER',
+  hover,
+  springs,
+}) {
   const canvasRef  = useRef(null)
   const sceneRef   = useRef(null)
   const cleanupRef = useRef(null)
   const timersRef  = useRef([])
+
+  // Read through refs so the tune page can retune live without tearing down the
+  // WebGPU scene, which is expensive to rebuild.
+  const hoverRef   = useRef({ ...HOVER_DEFAULTS })
+  const springsRef = useRef(springs)
+
+  useEffect(() => {
+    hoverRef.current = { ...HOVER_DEFAULTS, ...hover }
+  }, [hover])
+
+  useEffect(() => {
+    springsRef.current = springs
+    if (springs) sceneRef.current?.switchBehavior.setSpringProperties(springs)
+  }, [springs])
 
   // Pointer proximity: the blob stirs as the cursor comes near, not only once it
   // is over the canvas, so it reads as aware of the pointer before you arrive.
@@ -30,17 +63,19 @@ export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label 
     if (!gpuSupported) return
 
     let lastX = null
+    let lastY = null
     let lastAt = 0
 
     const onPointerMove = e => {
       const scene = sceneRef.current
       const canvas = canvasRef.current
       if (!scene || !canvas) return
+      const h = hoverRef.current
 
       // Throttle before measuring, so a fast sweep neither stacks impulses nor
       // forces a layout read on every single move event.
       const now = performance.now()
-      if (now - lastAt < HOVER_THROTTLE_MS) return
+      if (now - lastAt < h.throttleMs) return
       lastAt = now
 
       const rect = canvas.getBoundingClientRect()
@@ -49,15 +84,22 @@ export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label 
       const gapY = Math.max(rect.top - e.clientY, 0, e.clientY - rect.bottom)
       const distance = Math.hypot(gapX, gapY)
 
-      const travelled = lastX === null ? 0 : e.clientX - lastX
+      const dx = lastX === null ? 0 : e.clientX - lastX
+      const dy = lastY === null ? 0 : e.clientY - lastY
       lastX = e.clientX
+      lastY = e.clientY
 
-      if (distance > HOVER_RADIUS) return
+      if (distance > h.radius) return
 
       // Squared falloff: barely a stir at the edge of the radius, a real jostle
       // once the cursor is over the blob.
-      const proximity = 1 - distance / HOVER_RADIUS
-      scene.switchBehavior.nudge(travelled, proximity * proximity * HOVER_STRENGTH)
+      const proximity = 1 - distance / h.radius
+      scene.switchBehavior.nudge(dx, dy, {
+        strength: proximity * proximity * h.strength,
+        sensitivity: h.sensitivity,
+        rockGain: h.rockGain,
+        squashGain: h.squashGain,
+      })
     }
 
     window.addEventListener('pointermove', onPointerMove, { passive: true })
@@ -100,6 +142,8 @@ export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label 
 
         scene.jellyColor = d.vec4f(color[0], color[1], color[2], 1.0)
         scene.darkMode   = false
+
+        if (springsRef.current) scene.switchBehavior.setSpringProperties(springsRef.current)
 
         sceneRef.current   = scene
         cleanupRef.current = () => { scene.onCleanup(); root.destroy() }
@@ -171,7 +215,7 @@ export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label 
         height={220}
         onMouseDown={press}
         onMouseUp={() => release(true)}
-        onMouseEnter={() => sceneRef.current?.switchBehavior.jiggle(0.18)}
+        onMouseEnter={() => sceneRef.current?.switchBehavior.jiggle(hoverRef.current.enterImpulse)}
         onMouseLeave={() => {
           if (sceneRef.current) sceneRef.current.switchBehavior.pressed = false
         }}
