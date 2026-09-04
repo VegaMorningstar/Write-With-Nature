@@ -7,8 +7,13 @@ import {
   squashZProperties,
   wiggleXProperties,
 } from '../ui-elements/jelly-render-button/constants.ts'
-import JellyWireframeButton from '../ui-elements/jelly-wireframe-button/JellyWireframeButton'
-import { MATERIAL_DEFAULTS as WIRE_MATERIAL_DEFAULTS } from '../ui-elements/jelly-wireframe-button/constants.ts'
+import JellyWireframeButton, { HOVER_DEFAULTS as WIRE_HOVER_DEFAULTS } from '../ui-elements/jelly-wireframe-button/JellyWireframeButton'
+import {
+  MATERIAL_DEFAULTS as WIRE_MATERIAL_DEFAULTS,
+  squashXProperties as wireSquashX,
+  squashZProperties as wireSquashZ,
+  wiggleXProperties as wireWiggleX,
+} from '../ui-elements/jelly-wireframe-button/constants.ts'
 
 // Rebuilds the glass effect whenever opts change (slider-reactive)
 function useLiveGlass(ref, opts) {
@@ -167,6 +172,12 @@ const JELLY_MATERIAL_DEF = { ...MATERIAL_DEFAULTS }
 // from the render button's far enough (no Fresnel rim, much less transparent)
 // that inheriting would misrepresent it.
 const WIRE_MATERIAL_DEF = { ...WIRE_MATERIAL_DEFAULTS }
+const WIRE_HOVER_DEF = { ...WIRE_HOVER_DEFAULTS }
+const WIRE_SPRING_DEF = {
+  squashX: { ...wireSquashX },
+  squashZ: { ...wireSquashZ },
+  wiggleX: { ...wireWiggleX },
+}
 const JELLY_SPRING_DEF = {
   squashX: { ...squashXProperties },
   squashZ: { ...squashZProperties },
@@ -193,6 +204,75 @@ function SpringRow({ label, value, onChange, description }) {
         fmt={v => v.toFixed(1)} onChange={v => onChange({ ...value, damping: v })}
         description={description} />
     </div>
+  )
+}
+
+function HoverControls({ hover, setHover }) {
+  const set = (k, v) => setHover(h => ({ ...h, [k]: v }))
+  return (
+    <>
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+        padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+        REACH
+      </div>
+
+      <Slider label="Hover Radius (px)" value={hover.radius} min={0} max={700} step={10}
+        fmt={v => v.toFixed(0)} onChange={v => set('radius', v)}
+        description="How far from the button the jelly still notices the cursor. 0 = only reacts once you are on it. Large = stirs from across the card." />
+
+      <Slider label="Strength" value={hover.strength} min={0} max={2} step={0.05}
+        onChange={v => set('strength', v)}
+        description="Ceiling on the hover impulse, reached when the cursor is directly over the blob. Falls off with the square of distance from there." />
+
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+        padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+        SENSITIVITY
+      </div>
+
+      <Slider label="Travel per Impulse (px)" value={hover.sensitivity} min={4} max={140} step={1}
+        fmt={v => v.toFixed(0)} onChange={v => set('sensitivity', v)}
+        description="Pointer travel needed for a full-scale kick. This is the sensitivity dial and it is inverted — LOW = twitchy, responds to the smallest drift. High = only a fast sweep moves it." />
+
+      <Slider label="Rock Gain" value={hover.rockGain} min={0} max={6} step={0.1}
+        onChange={v => set('rockGain', v)}
+        description="Sideways lean, driven by horizontal travel only, so it tips the way you swept. This is the one you feel most." />
+
+      <Slider label="Squash Gain" value={hover.squashGain} min={0} max={4} step={0.05}
+        onChange={v => set('squashGain', v)}
+        description="Wobble driven by total travel in both axes, so vertical movement registers here and nowhere else. Raise it if moving up and down the jelly feels dead." />
+
+      <Slider label="Throttle (ms)" value={hover.throttleMs} min={16} max={220} step={2}
+        fmt={v => v.toFixed(0)} onChange={v => set('throttleMs', v)}
+        description="Gap between impulses. Low = smoother and more alive, more work per second. High = a stuttery pulse. Also caps how often the button's position is measured." />
+
+      <Slider label="Enter Kick" value={hover.enterImpulse} min={0} max={1} step={0.02}
+        onChange={v => set('enterImpulse', v)}
+        description="One-off jolt the moment the cursor crosses onto the button, on top of the continuous stir. 0 = no distinct arrival." />
+    </>
+  )
+}
+
+function SpringControls({ springs, setSprings }) {
+  const set = (k, v) => setSprings(s => ({ ...s, [k]: v }))
+  return (
+    <>
+      <SpringRow label="Rock (wiggle X)" value={springs.wiggleX}
+        onChange={v => set('wiggleX', v)}
+        description="The side-to-side tip. Damping sets the decay and stiffness sets the pitch, so a stiff, lightly damped rock is a fast sway that carries — which is where most of the motion goes once the squash pair is damped down." />
+
+      <SpringRow label="Squash X" value={springs.squashX}
+        onChange={v => set('squashX', v)}
+        description="Widen and flatten. This is the one that carries the click; below about 4 damping the wobble lasts several seconds, above about 25 the body barely deforms at all." />
+
+      <SpringRow label="Squash Z" value={springs.squashZ}
+        onChange={v => set('squashZ', v)}
+        description="Depth-wise pinch, the quieter partner to squash X." />
+
+      <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+        Retunes live · no scene rebuild. Values above ~200,000 stiffness will
+        outrun the integrator.
+      </div>
+    </>
   )
 }
 
@@ -300,9 +380,11 @@ export default function TunePage() {
   const [jellyMat,     setJellyMat]     = useState(JELLY_MATERIAL_DEF)
   const setMat = (k, v) => setJellyMat(m => ({ ...m, [k]: v }))
 
-  // Wireframe variant — separate widget, separate material
+  // Wireframe variant — separate widget, and now separate everything
   const [wireMat, setWireMat] = useState(WIRE_MATERIAL_DEF)
   const setWire = (k, v) => setWireMat(m => ({ ...m, [k]: v }))
+  const [wireHover,   setWireHover]   = useState(WIRE_HOVER_DEF)
+  const [wireSprings, setWireSprings] = useState(WIRE_SPRING_DEF)
 
   // Accordion open state
   const [openSection, setOpenSection] = useState('fluid')
@@ -330,7 +412,7 @@ export default function TunePage() {
       fluid:   { ...appliedFluid, blendMode },
       glass:   { compose: composeG, board: boardG, colophon: colophonG },
       jelly:   { hover: jellyHover, springs: jellySprings, material: jellyMat },
-      jellyWireframe: { material: wireMat },
+      jellyWireframe: { hover: wireHover, springs: wireSprings, material: wireMat },
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -343,6 +425,12 @@ export default function TunePage() {
     setJellyHover({ ...JELLY_HOVER_DEF })
     setJellyMat({ ...JELLY_MATERIAL_DEF })
     setWireMat({ ...WIRE_MATERIAL_DEF })
+    setWireHover({ ...WIRE_HOVER_DEF })
+    setWireSprings({
+      squashX: { ...WIRE_SPRING_DEF.squashX },
+      squashZ: { ...WIRE_SPRING_DEF.squashZ },
+      wiggleX: { ...WIRE_SPRING_DEF.wiggleX },
+    })
     setJellySprings({
       squashX: { ...JELLY_SPRING_DEF.squashX },
       squashZ: { ...JELLY_SPRING_DEF.squashZ },
@@ -418,7 +506,7 @@ export default function TunePage() {
                   <div style={{ ...mono, fontSize: 9, letterSpacing: '0.12em', opacity: 0.4, textAlign: 'center', marginBottom: 4 }}>
                     WIREFRAME
                   </div>
-                  <JellyWireframeButton hover={jellyHover} springs={jellySprings} material={wireMat} onClick={() => {}} />
+                  <JellyWireframeButton hover={wireHover} springs={wireSprings} material={wireMat} onClick={() => {}} />
                 </div>
               </div>
               <p className="compose-note">
@@ -622,6 +710,10 @@ export default function TunePage() {
             onChange={v => setWire('frameGlow', v)}
             description="How the line blends. 0 paints it over the body, so it sits on the glass like ink. 1 adds it as light, so it comes through the glass and brightens whatever it crosses — and stops forcing the body opaque underneath it. This is the one that makes the edges feel organic rather than drawn." />
 
+          <Slider label="Line Dispersion" value={wireMat.frameDispersion} min={0} max={3} step={0.05}
+            onChange={v => setWire('frameDispersion', v)}
+            description="Chromatic aberration on the edges themselves. The body splits the environment across three refractive indices, but the frame was traced once and monochrome, so the lines stayed achromatic however much dispersion the glass had — this is why you could not see it on them. Multiplies the glass's own Chromatic Aberration, so 1 matches the body. Costs two extra marches above 0, the most expensive thing in this shader." />
+
           <Slider label="Depth Fade" value={wireMat.frameDepthFade} min={0} max={4} step={0.05}
             onChange={v => setWire('frameDepthFade', v)}
             description="Dims edges by how deep into the body they sit. At 0 all twelve draw at identical weight however far back they are, which is most of what makes the shape read as a diagram — you are looking through more jelly to see the far ones, so they should be fainter. Raising this separates near from far and is what gives the box its depth." />
@@ -693,43 +785,19 @@ export default function TunePage() {
         </AccordionSection>
 
         <AccordionSection title="JELLY — POINTER" open={openSection === 'jellyHover'} onToggle={() => toggle('jellyHover')}>
+          <HoverControls hover={jellyHover} setHover={setJellyHover} />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — POINTER" open={openSection === 'wireHover'} onToggle={() => toggle('wireHover')}>
+          <HoverControls hover={wireHover} setHover={setWireHover} />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — SPRINGS" open={openSection === 'wireSprings'} onToggle={() => toggle('wireSprings')}>
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
-            REACH
+            Own values · drives the right-hand blob
           </div>
-
-          <Slider label="Hover Radius (px)" value={jellyHover.radius} min={0} max={700} step={10}
-            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, radius: v }))}
-            description="How far from the button the jelly still notices the cursor. 0 = only reacts once you are on it. Large = stirs from across the card." />
-
-          <Slider label="Strength" value={jellyHover.strength} min={0} max={2} step={0.05}
-            onChange={v => setJellyHover(h => ({ ...h, strength: v }))}
-            description="Ceiling on the hover impulse, reached when the cursor is directly over the blob. Falls off with the square of distance from there." />
-
-          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
-            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
-            SENSITIVITY
-          </div>
-
-          <Slider label="Travel per Impulse (px)" value={jellyHover.sensitivity} min={4} max={140} step={1}
-            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, sensitivity: v }))}
-            description="Pointer travel needed for a full-scale kick. This is the sensitivity dial and it is inverted — LOW = twitchy, responds to the smallest drift. High = only a fast sweep moves it." />
-
-          <Slider label="Rock Gain" value={jellyHover.rockGain} min={0} max={6} step={0.1}
-            onChange={v => setJellyHover(h => ({ ...h, rockGain: v }))}
-            description="Sideways lean, driven by horizontal travel only, so it tips the way you swept. This is the one you feel most." />
-
-          <Slider label="Squash Gain" value={jellyHover.squashGain} min={0} max={4} step={0.05}
-            onChange={v => setJellyHover(h => ({ ...h, squashGain: v }))}
-            description="Wobble driven by total travel in both axes, so vertical movement registers here and nowhere else. Raise it if moving up and down the jelly feels dead." />
-
-          <Slider label="Throttle (ms)" value={jellyHover.throttleMs} min={16} max={220} step={2}
-            fmt={v => v.toFixed(0)} onChange={v => setJellyHover(h => ({ ...h, throttleMs: v }))}
-            description="Gap between impulses. Low = smoother and more alive, more work per second. High = a stuttery pulse. Also caps how often the button's position is measured." />
-
-          <Slider label="Enter Kick" value={jellyHover.enterImpulse} min={0} max={1} step={0.02}
-            onChange={v => setJellyHover(h => ({ ...h, enterImpulse: v }))}
-            description="One-off jolt the moment the cursor crosses onto the button, on top of the continuous stir. 0 = no distinct arrival." />
+          <SpringControls springs={wireSprings} setSprings={setWireSprings} />
         </AccordionSection>
 
         <AccordionSection title="JELLY — SPRINGS" open={openSection === 'jellySprings'} onToggle={() => toggle('jellySprings')}>
@@ -737,23 +805,7 @@ export default function TunePage() {
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
             TypeGPU&apos;s tuning by default · drives hover and click alike
           </div>
-
-          <SpringRow label="Rock (wiggle X)" value={jellySprings.wiggleX}
-            onChange={v => setJellySprings(s => ({ ...s, wiggleX: v }))}
-            description="The side-to-side tip. Damping 20 is the stock value and dies in about a tenth of a second — drop it toward 5 for a long lazy sway." />
-
-          <SpringRow label="Squash X" value={jellySprings.squashX}
-            onChange={v => setJellySprings(s => ({ ...s, squashX: v }))}
-            description="Widen and flatten. This is the one that carries the click; below about 4 the wobble lasts several seconds." />
-
-          <SpringRow label="Squash Z" value={jellySprings.squashZ}
-            onChange={v => setJellySprings(s => ({ ...s, squashZ: v }))}
-            description="Depth-wise pinch, the quieter partner to squash X." />
-
-          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
-            Retunes live · no scene rebuild. Values above ~200,000 stiffness will
-            outrun the integrator.
-          </div>
+          <SpringControls springs={jellySprings} setSprings={setJellySprings} />
         </AccordionSection>
 
         {/* Footer note */}

@@ -28,7 +28,7 @@ export const MATERIAL_DEFAULTS = {
   // Beer-Lambert absorption density
   absorbDensity: 19.5,
   // Forward subsurface scattering
-  scatter: 2.2,
+  scatter: 7.9,
   // Blinn-Phong highlight on the blob
   specular: 0.35,
   exposure: 2.2,
@@ -39,27 +39,32 @@ export const MATERIAL_DEFAULTS = {
   // ── Wireframe ───────────────────────────────────────────────────────────────
   // Half-thickness of the frame bars, in world units. Thin, and paired with a
   // softness well above 1, so the edges read as caught light rather than ink.
-  frameWidth: 0.006,
+  frameWidth: 0.01,
   // How dark or bright the lines sit against the body. 0 = near-black ink,
   // 1 = white.
   frameBrightness: 1,
   // Line opacity. Pushed into the alpha channel too, so the lines stay solid
   // where the jelly itself is see-through.
-  frameGain: 0.1,
+  frameGain: 0.15,
   // Edge softness as a fraction of the bar width. 0 is aliased, 1 is a smear.
   frameSoftness: 2,
   // Shape of the gradient from the line's core outward. Softness sets how wide
   // the falloff is; this sets its curve. Below 1 the line spreads into a broad
   // halo, above 1 it pulls into a tight core with a long thin tail.
-  frameFalloff: 1,
+  frameFalloff: 4,
   // Blend: 0 paints the line over the body, 1 adds it as light. Ink sits on top
   // of the glass; light comes through it, which is the more organic of the two.
-  frameGlow: 0,
+  frameGlow: 1,
+  // Splits the frame across three refractive indices the way the body already
+  // splits the environment. The lines are traced once and monochrome without
+  // this, so they stay achromatic no matter how much dispersion the glass has.
+  // Costs two extra marches when above zero, so it branches on the uniform.
+  frameDispersion: 0,
   // Attenuation with distance along the ray. All twelve edges currently draw at
   // the same weight however deep they sit, which is most of what makes the shape
   // read as a diagram — the far ones should be dimmer, since you are looking
   // through more jelly to see them.
-  frameDepthFade: 0,
+  frameDepthFade: 4,
 
   // Soft inner edge, from horizontal distance to the blob's silhouette rather
   // than from ambient occlusion. Occlusion marched up from the plane sees the
@@ -82,7 +87,7 @@ export const MATERIAL_DEFAULTS = {
   // the silhouette from the tune page ─────────────────────────────────────────
   // Corner radius. The render button runs 0.13, but a fillet that large leaves
   // no corner for a frame to sit on, so this starts much tighter.
-  round: 0.04,
+  round: 0.06,
   // Droop across the long axis. The bend is not an affine transform, so the
   // frame cannot follow it — at anything above about 0.15 they visibly diverge.
   bend: 0,
@@ -138,23 +143,27 @@ export const AO_BIAS = SURF_DIST * 5;
 
 // Spring dynamics. The squash pair is TypeGPU's tuning untouched, giving an
 // e^(-5t) envelope on squashX so it settles in roughly 0.8s.
+// Diverged from the render button's: the squash pair is heavily damped so the
+// body barely deforms, and the rock is stiff and lightly damped instead, which
+// puts the motion into a fast sway that carries. Damping / 2m sets the decay, so
+// wiggleX at 6.3 rings for roughly three times as long as the render button's.
 export const squashXProperties: SpringProperties = {
   mass: 1,
   stiffness: 1000,
-  damping: 10,
+  damping: 28,
 };
 export const squashZProperties: SpringProperties = {
   mass: 1,
-  stiffness: 900,
-  damping: 12,
+  stiffness: 1460,
+  damping: 25.6,
 };
 // Softened from TypeGPU's 1000 to slow the rock from 5.0 Hz to 3.5 Hz. The decay
 // rate is unchanged — that is damping / 2m, which stiffness does not touch — so
 // this is a slower sway over the same span, not a longer one.
 export const wiggleXProperties: SpringProperties = {
   mass: 1,
-  stiffness: 480,
-  damping: 20,
+  stiffness: 2000,
+  damping: 6.3,
 };
 
 // Impact impulses, matching the ones the original fires when the switch lands at

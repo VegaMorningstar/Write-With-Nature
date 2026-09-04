@@ -44,6 +44,7 @@ export const JellyMaterial = d.struct({
   frameFalloff: d.f32,
   frameGlow: d.f32,
   frameDepthFade: d.f32,
+  frameDispersion: d.f32,
   edgeWidth: d.f32,
   edgeDark: d.f32,
   baseBright: d.f32,

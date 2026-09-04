@@ -537,7 +537,23 @@ export async function setupScene(
         // internal reflection there is no refracted ray, so fall back to the
         // view ray rather than collapsing every sample onto the hit point.
         const traceDir = std.select(rayDirection, refrDir, std.dot(refrDir, refrDir) > 0.5);
-        const line = wireframeAccum(hitPosition, traceDir);
+        const lineG = wireframeAccum(hitPosition, traceDir);
+
+        // Splitting the frame across the three refractive indices, the same way
+        // the body already splits the environment. Costs two more marches, which
+        // is the most expensive thing in this shader, so it branches on the
+        // uniform — a branch every invocation agrees on, so it stays coherent.
+        let line = d.vec3f(lineG);
+        if (m.frameDispersion > 0.001) {
+          const spread = m.dispersion * m.frameDispersion;
+          const dirR = refractDirection(I, N, cosi, m.ior - spread);
+          const dirB = refractDirection(I, N, cosi, m.ior + spread);
+          line = d.vec3f(
+            wireframeAccum(hitPosition, std.select(traceDir, dirR, std.dot(dirR, dirR) > 0.5)),
+            lineG,
+            wireframeAccum(hitPosition, std.select(traceDir, dirB, std.dot(dirB, dirB) > 0.5)),
+          );
+        }
 
         const litBody = std.tanh(body.mul(m.exposure));
         const lineColor = d.vec3f(m.frameBrightness);
@@ -550,9 +566,13 @@ export async function setupScene(
         // Lines go into alpha as well as colour so they stay solid where the body
         // is see-through — but light passing through glass should not turn it
         // opaque, so that contribution eases off as the blend moves to glow.
+        // Alpha takes the strongest channel, so a dispersed line stays as solid
+        // as an achromatic one instead of thinning where the channels separate.
+        const lineAlpha = std.max(line.x, line.y, line.z);
+
         return d.vec4f(
           std.mix(painted, added, m.frameGlow),
-          std.saturate(bodyAlpha + line * (1 - m.frameGlow * 0.7)),
+          std.saturate(bodyAlpha + lineAlpha * (1 - m.frameGlow * 0.7)),
         );
       }
 
