@@ -48,9 +48,18 @@ export const JellyMaterial = d.struct({
   edgeWidth: d.f32,
   edgeDark: d.f32,
   baseBright: d.f32,
+  labelCenterX: d.f32,
   labelCenterZ: d.f32,
+  labelScale: d.f32,
+  labelInk: d.f32,
   round: d.f32,
   bend: d.f32,
+  // Blob half-extents and how far it settles into the plane. Uniforms here so
+  // the shape can be dialled against the wireframe, which has to track it.
+  halfX: d.f32,
+  halfY: d.f32,
+  halfZ: d.f32,
+  sink: d.f32,
 });
 
 // glow tracks how much wobble energy is left, so the click reads as landing

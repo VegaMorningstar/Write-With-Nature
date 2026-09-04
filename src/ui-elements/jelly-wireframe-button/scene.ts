@@ -21,10 +21,10 @@ import {
   AO_INTENSITY,
   AO_RADIUS,
   AO_STEPS,
+  CAMERA_DEFAULTS,
   FRAME_MARCH_LENGTH,
   FRAME_STEPS,
-  JELLY_HALFSIZE,
-  JELLY_SINK,
+  LIGHT_DEFAULTS,
   LABEL_HALF_D,
   LABEL_HALF_W,
   LABEL_INK,
@@ -35,6 +35,19 @@ import {
   SPECULAR_POWER,
   SURF_DIST,
 } from './constants.ts';
+
+/**
+ * Direction light travels, from azimuth and elevation in degrees. Elevation is
+ * measured above the horizon, and the light points downward, hence the negation.
+ */
+function directionFromAngles({ azimuth, elevation }: typeof LIGHT_DEFAULTS) {
+  const az = (azimuth * Math.PI) / 180;
+  const el = (elevation * Math.PI) / 180;
+  const horizontal = Math.cos(el);
+  return std.normalize(
+    d.vec3f(Math.sin(az) * horizontal, -Math.sin(el), Math.cos(az) * horizontal),
+  );
+}
 
 export async function setupScene(
   root: TgpuRoot,
@@ -67,21 +80,25 @@ export async function setupScene(
   const labelTexture = await createLabelTexture(root, options.label ?? 'RENDER');
   const labelView = labelTexture.createView();
 
+  // Camera rig, kept on the CPU — the view matrix is not a per-pixel value, so
+  // moving it is a uniform patch rather than anything the shader knows about.
+  const rig = { ...CAMERA_DEFAULTS };
+
   const camera = new CameraController(
     root,
-    // ~39 degrees off vertical. Lower shows the cuboid better but bends the
-    // refracted word further back, and LABEL_CENTER_Z has to follow it.
-    d.vec3f(0, 1.32, 0.92),
-    d.vec3f(0, 0.18, 0),
+    d.vec3f(0, rig.height, rig.distance),
+    d.vec3f(0, rig.targetY, 0),
     d.vec3f(0, 1, 0),
-    Math.PI / 4,
+    (rig.fov * Math.PI) / 180,
     width,
     height,
   );
   const cameraUniform = camera.cameraUniform;
 
+  const lightAngles = { ...LIGHT_DEFAULTS };
+
   const lightUniform = root.createUniform(DirectionalLight, {
-    direction: std.normalize(d.vec3f(0.19, -0.24, 0.75)),
+    direction: directionFromAngles(lightAngles),
     color: d.vec3f(1, 1, 1),
   });
 
@@ -118,8 +135,10 @@ export async function setupScene(
   const getJellyBounds = () => {
     'use gpu';
     return BoundingBox({
-      min: d.vec3f(-1.4, -0.3, -0.8),
-      max: d.vec3f(1.4, 1.2, 0.8),
+      // Fixed and generous rather than derived, so it still contains the blob at
+      // the top of the shape sliders' range plus a full wobble.
+      min: d.vec3f(-2.6, -0.6, -1.6),
+      max: d.vec3f(2.6, 2.6, 1.6),
     });
   };
 
@@ -145,10 +164,18 @@ export async function setupScene(
    * it, because the bend is not an affine transform and the wireframe therefore
    * cannot follow it — they diverge as `bend` rises.
    */
+  /** Blob half-extents, clamped so a corner radius larger than the box cannot
+   * invert the SDF. */
+  const jellyHalf = () => {
+    'use gpu';
+    const m = materialUniform.$;
+    return std.max(d.vec3f(m.halfX, m.halfY, m.halfZ), d.vec3f(0.02));
+  };
+
   const jellyLocal = (position: d.v3f) => {
     'use gpu';
     const state = switchBehavior.stateUniform.$;
-    const origin = d.vec3f(0, JELLY_HALFSIZE.y - JELLY_SINK, 0);
+    const origin = d.vec3f(0, materialUniform.$.halfY - materialUniform.$.sink, 0);
 
     // Scaling the *local coordinate* shrinks the shape, so a positive squash on x
     // widens the blob; the counter-scale on y flattens it at the same time, which
@@ -168,10 +195,12 @@ export async function setupScene(
 
   const getJellyDist = (position: d.v3f) => {
     'use gpu';
-    const round = materialUniform.$.round;
+    const half = jellyHalf();
+    // Radius cannot exceed the smallest half-extent or the rounded box inverts
+    const round = std.min(materialUniform.$.round, std.min(half.x, std.min(half.y, half.z)) * 0.9);
     return sdf.sdRoundedBox3d(
       opCheapBend(jellyLocal(position), materialUniform.$.bend),
-      JELLY_HALFSIZE.sub(round),
+      half.sub(round),
       round,
     );
   };
@@ -204,7 +233,7 @@ export async function setupScene(
     for (let i = 0; i < FRAME_STEPS; i++) {
       const dist = sdf.sdBoxFrame3d(
         origin.add(direction.mul(travelled)),
-        JELLY_HALFSIZE,
+        jellyHalf(),
         m.frameWidth,
       );
 
@@ -253,9 +282,13 @@ export async function setupScene(
 
   const labelUV = (position: d.v3f) => {
     'use gpu';
+    const m = materialUniform.$;
+    // Scaling the plane the texture spans is what resizes the word: a wider span
+    // for the same texture means bigger letters.
+    const scale = std.max(m.labelScale, 0.05);
     return d.vec2f(
-      position.x / (LABEL_HALF_W * 2) + 0.5,
-      (position.z - materialUniform.$.labelCenterZ) / (LABEL_HALF_D * 2) + 0.5,
+      (position.x - m.labelCenterX) / (LABEL_HALF_W * 2 * scale) + 0.5,
+      (position.z - m.labelCenterZ) / (LABEL_HALF_D * 2 * scale) + 0.5,
     );
   };
 
@@ -270,7 +303,10 @@ export async function setupScene(
 
   const inkColor = () => {
     'use gpu';
-    return std.select(LABEL_INK, LABEL_INK_DARK, darkModeUniform.$ === 1);
+    const base = std.select(LABEL_INK, LABEL_INK_DARK, darkModeUniform.$ === 1);
+    // Fades toward the unmarked surface as labelInk falls, so 1 is full ink and
+    // 0 leaves the word invisible.
+    return std.mix(d.vec3f(1), base, std.saturate(materialUniform.$.labelInk));
   };
 
   const sqLength = (a: d.v3f) => {
@@ -348,7 +384,8 @@ export async function setupScene(
     'use gpu';
     const state = switchBehavior.stateUniform.$;
     const spread = 1 + state.squashX * 0.6;
-    const half = d.vec2f(JELLY_HALFSIZE.x * 0.82 * spread, JELLY_HALFSIZE.z * 0.7 * spread);
+    const blob = jellyHalf();
+    const half = d.vec2f(blob.x * 0.82 * spread, blob.z * 0.7 * spread);
 
     // Rounded-box falloff rather than a radial one, so it follows a slab
     const q = std.abs(xz.sub(d.vec2f(0.015, 0.045))).sub(half);
@@ -502,7 +539,7 @@ export async function setupScene(
           // Deeper parts of the blob absorb more, giving the vertical colour ramp
           const depth =
             std.saturate(
-              std.mix(1, 0.6, hitPosition.y * (1 / (JELLY_HALFSIZE.y * 2)) + 0.25),
+              std.mix(1, 0.6, hitPosition.y / std.max(m.halfY * 2, 0.01) + 0.25),
             ) * m.tint;
 
           const T = beerLambert(absorb.mul(depth ** 2), 0.08);
@@ -702,6 +739,24 @@ export async function setupScene(
     set qualityScale(v: number) {
       qualityScale = v;
       handleResize();
+    },
+    /** Partial camera rig override; merged over whatever is already set. */
+    set camera(v: Partial<typeof CAMERA_DEFAULTS>) {
+      Object.assign(rig, v);
+      camera.updateView(
+        d.vec3f(0, rig.height, rig.distance),
+        d.vec3f(0, rig.targetY, 0),
+        d.vec3f(0, 1, 0),
+      );
+      camera.updateProjection((rig.fov * Math.PI) / 180, width, height);
+    },
+    /** Light direction, in degrees. Azimuth sweeps around, elevation lifts. */
+    set light(v: Partial<typeof LIGHT_DEFAULTS>) {
+      Object.assign(lightAngles, v);
+      lightUniform.write({
+        direction: directionFromAngles(lightAngles),
+        color: d.vec3f(1, 1, 1),
+      });
     },
     onCleanup() {
       cancelAnimationFrame(animationFrameHandle);

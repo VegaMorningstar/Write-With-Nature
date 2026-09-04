@@ -38,6 +38,11 @@ export default function JellyWireframeButton({
   hover,
   springs,
   material,
+  camera,
+  light,
+  impulses,
+  quality,
+  jiggleMs = JIGGLE_MS,
 }) {
   const canvasRef  = useRef(null)
   const sceneRef   = useRef(null)
@@ -58,11 +63,40 @@ export default function JellyWireframeButton({
     if (springs) sceneRef.current?.switchBehavior.setSpringProperties(springs)
   }, [springs])
 
+  // Everything the scene exposes as a live setter, applied the same way: kept in
+  // a ref so init can replay it, and pushed straight through on change.
   const materialRef = useRef(material)
   useEffect(() => {
     materialRef.current = material
     if (material && sceneRef.current) sceneRef.current.material = material
   }, [material])
+
+  const cameraRef = useRef(camera)
+  useEffect(() => {
+    cameraRef.current = camera
+    if (camera && sceneRef.current) sceneRef.current.camera = camera
+  }, [camera])
+
+  const lightRef = useRef(light)
+  useEffect(() => {
+    lightRef.current = light
+    if (light && sceneRef.current) sceneRef.current.light = light
+  }, [light])
+
+  const impulsesRef = useRef(impulses)
+  useEffect(() => {
+    impulsesRef.current = impulses
+    if (impulses) sceneRef.current?.switchBehavior.setImpulses(impulses)
+  }, [impulses])
+
+  const qualityRef = useRef(quality)
+  useEffect(() => {
+    qualityRef.current = quality
+    if (quality && sceneRef.current) sceneRef.current.qualityScale = quality
+  }, [quality])
+
+  const jiggleMsRef = useRef(jiggleMs)
+  useEffect(() => { jiggleMsRef.current = jiggleMs }, [jiggleMs])
 
   // Pointer proximity: the blob stirs as the cursor comes near, not only once it
   // is over the canvas, so it reads as aware of the pointer before you arrive.
@@ -151,7 +185,11 @@ export default function JellyWireframeButton({
         scene.darkMode   = false
 
         if (springsRef.current) scene.switchBehavior.setSpringProperties(springsRef.current)
+        if (impulsesRef.current) scene.switchBehavior.setImpulses(impulsesRef.current)
         if (materialRef.current) scene.material = materialRef.current
+        if (cameraRef.current) scene.camera = cameraRef.current
+        if (lightRef.current) scene.light = lightRef.current
+        if (qualityRef.current) scene.qualityScale = qualityRef.current
 
         sceneRef.current   = scene
         cleanupRef.current = () => { scene.onCleanup(); root.destroy() }
@@ -202,7 +240,7 @@ export default function JellyWireframeButton({
     if (!triggerClick) return
 
     clearTimers()
-    timersRef.current = [setTimeout(() => onClick?.(), JIGGLE_MS)]
+    timersRef.current = [setTimeout(() => onClick?.(), jiggleMsRef.current)]
   }
 
   if (!gpuSupported) {

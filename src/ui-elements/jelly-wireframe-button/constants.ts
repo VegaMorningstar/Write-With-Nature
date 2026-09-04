@@ -79,18 +79,47 @@ export const MATERIAL_DEFAULTS = {
   // is what keeps the base reading as translucent.
   baseBright: 0.74,
 
-  // Where the label plane sits in z. Larger values move the word's refracted
-  // image toward the camera, and so downward on screen.
+  // Where the label plane sits. Larger z moves the word's refracted image toward
+  // the camera, and so downward on screen; x slides it sideways.
+  labelCenterX: 0,
   labelCenterZ: -0.05,
+  // Word size. Scales the plane the texture is mapped across, so above 1 the
+  // word grows and below 1 it shrinks.
+  labelScale: 1,
+  // Ink darkness. 1 is full ink, 0 fades the word out entirely.
+  labelInk: 1,
 
   // ── Shape, uniform here rather than baked, so the frame can be aligned to
   // the silhouette from the tune page ─────────────────────────────────────────
   // Corner radius. The render button runs 0.13, but a fillet that large leaves
   // no corner for a frame to sit on, so this starts much tighter.
   round: 0.06,
+  // Blob half-extents and how far it settles into the plane. Literals, not a
+  // reference to JELLY_HALFSIZE below — that is declared after this object.
+  halfX: 0.8,
+  halfY: 0.28,
+  halfZ: 0.4,
+  sink: 0.018,
   // Droop across the long axis. The bend is not an affine transform, so the
   // frame cannot follow it — at anything above about 0.15 they visibly diverge.
   bend: 0,
+};
+
+// Camera rig. ~39 degrees off vertical by default: lower shows the cuboid better
+// but bends the refracted word further back, and labelCenterZ has to follow it.
+export const CAMERA_DEFAULTS = {
+  height: 1.32,
+  distance: 0.92,
+  targetY: 0.18,
+  fov: 45,
+};
+
+// Light, as angles rather than a vector so it can be swept sensibly. Azimuth is
+// degrees around the vertical from straight ahead; elevation is degrees above
+// the horizon.
+export const LIGHT_DEFAULTS = {
+  azimuth: 14,
+  elevation: 17,
 };
 
 // Sphere-traced, so these are a step ceiling rather than a fixed count. The

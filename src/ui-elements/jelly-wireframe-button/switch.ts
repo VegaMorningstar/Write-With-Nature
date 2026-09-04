@@ -35,11 +35,22 @@ export class SwitchBehavior {
     this.stateUniform = this.#root.createUniform(SwitchState);
   }
 
+  #impulses = {
+    squashX: JIGGLE_SQUASH_X,
+    squashZ: JIGGLE_SQUASH_Z,
+    wiggleX: JIGGLE_WIGGLE_X,
+  };
+
   /** Kick all three springs at once — the whole click response. */
   jiggle(strength = 1) {
-    this.#squashXSpring.velocity += JIGGLE_SQUASH_X * strength;
-    this.#squashZSpring.velocity += JIGGLE_SQUASH_Z * strength;
-    this.#wiggleXSpring.velocity += JIGGLE_WIGGLE_X * strength;
+    this.#squashXSpring.velocity += this.#impulses.squashX * strength;
+    this.#squashZSpring.velocity += this.#impulses.squashZ * strength;
+    this.#wiggleXSpring.velocity += this.#impulses.wiggleX * strength;
+  }
+
+  /** Live retuning of the click impulses. Values are merged, not replaced. */
+  setImpulses(next: Partial<{ squashX: number; squashZ: number; wiggleX: number }>) {
+    Object.assign(this.#impulses, next);
   }
 
   /**

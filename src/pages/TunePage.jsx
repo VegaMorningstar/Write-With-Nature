@@ -9,6 +9,11 @@ import {
 } from '../ui-elements/jelly-render-button/constants.ts'
 import JellyWireframeButton, { HOVER_DEFAULTS as WIRE_HOVER_DEFAULTS } from '../ui-elements/jelly-wireframe-button/JellyWireframeButton'
 import {
+  CAMERA_DEFAULTS as WIRE_CAMERA_DEFAULTS,
+  JIGGLE_SQUASH_X as WIRE_JIGGLE_X,
+  JIGGLE_SQUASH_Z as WIRE_JIGGLE_Z,
+  JIGGLE_WIGGLE_X as WIRE_JIGGLE_W,
+  LIGHT_DEFAULTS as WIRE_LIGHT_DEFAULTS,
   MATERIAL_DEFAULTS as WIRE_MATERIAL_DEFAULTS,
   squashXProperties as wireSquashX,
   squashZProperties as wireSquashZ,
@@ -177,6 +182,17 @@ const WIRE_SPRING_DEF = {
   squashX: { ...wireSquashX },
   squashZ: { ...wireSquashZ },
   wiggleX: { ...wireWiggleX },
+}
+const WIRE_STAGE_DEF = {
+  camera: { ...WIRE_CAMERA_DEFAULTS },
+  light: { ...WIRE_LIGHT_DEFAULTS },
+  quality: 2.0,
+}
+const WIRE_CLICK_DEF = {
+  squashX: WIRE_JIGGLE_X,
+  squashZ: WIRE_JIGGLE_Z,
+  wiggleX: WIRE_JIGGLE_W,
+  delayMs: 1100,
 }
 const JELLY_SPRING_DEF = {
   squashX: { ...squashXProperties },
@@ -385,6 +401,11 @@ export default function TunePage() {
   const setWire = (k, v) => setWireMat(m => ({ ...m, [k]: v }))
   const [wireHover,   setWireHover]   = useState(WIRE_HOVER_DEF)
   const [wireSprings, setWireSprings] = useState(WIRE_SPRING_DEF)
+  const [wireStage,   setWireStage]   = useState(WIRE_STAGE_DEF)
+  const [wireClick,   setWireClick]   = useState(WIRE_CLICK_DEF)
+  const setStageCam   = (k, v) => setWireStage(s => ({ ...s, camera: { ...s.camera, [k]: v } }))
+  const setStageLight = (k, v) => setWireStage(s => ({ ...s, light:  { ...s.light,  [k]: v } }))
+  const setClick      = (k, v) => setWireClick(c => ({ ...c, [k]: v }))
 
   // Accordion open state
   const [openSection, setOpenSection] = useState('fluid')
@@ -412,7 +433,13 @@ export default function TunePage() {
       fluid:   { ...appliedFluid, blendMode },
       glass:   { compose: composeG, board: boardG, colophon: colophonG },
       jelly:   { hover: jellyHover, springs: jellySprings, material: jellyMat },
-      jellyWireframe: { hover: wireHover, springs: wireSprings, material: wireMat },
+      jellyWireframe: {
+        hover: wireHover,
+        springs: wireSprings,
+        material: wireMat,
+        stage: wireStage,
+        click: wireClick,
+      },
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -431,6 +458,12 @@ export default function TunePage() {
       squashZ: { ...WIRE_SPRING_DEF.squashZ },
       wiggleX: { ...WIRE_SPRING_DEF.wiggleX },
     })
+    setWireStage({
+      camera: { ...WIRE_STAGE_DEF.camera },
+      light: { ...WIRE_STAGE_DEF.light },
+      quality: WIRE_STAGE_DEF.quality,
+    })
+    setWireClick({ ...WIRE_CLICK_DEF })
     setJellySprings({
       squashX: { ...JELLY_SPRING_DEF.squashX },
       squashZ: { ...JELLY_SPRING_DEF.squashZ },
@@ -506,7 +539,17 @@ export default function TunePage() {
                   <div style={{ ...mono, fontSize: 9, letterSpacing: '0.12em', opacity: 0.4, textAlign: 'center', marginBottom: 4 }}>
                     WIREFRAME
                   </div>
-                  <JellyWireframeButton hover={wireHover} springs={wireSprings} material={wireMat} onClick={() => {}} />
+                  <JellyWireframeButton
+                    hover={wireHover}
+                    springs={wireSprings}
+                    material={wireMat}
+                    camera={wireStage.camera}
+                    light={wireStage.light}
+                    quality={wireStage.quality}
+                    impulses={wireClick}
+                    jiggleMs={wireClick.delayMs}
+                    onClick={() => {}}
+                  />
                 </div>
               </div>
               <p className="compose-note">
@@ -798,6 +841,121 @@ export default function TunePage() {
             Own values · drives the right-hand blob
           </div>
           <SpringControls springs={wireSprings} setSprings={setWireSprings} />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — SHAPE" open={openSection === 'wireShape'} onToggle={() => toggle('wireShape')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            Half-extents · the blob is twice these across
+          </div>
+
+          <Slider label="Width (X)" value={wireMat.halfX} min={0.1} max={1.8} step={0.01}
+            onChange={v => setWire('halfX', v)}
+            description="Half the blob's length. The word has to stay inside this or it pokes out from under the glass — Label Scale is the other half of that balance." />
+
+          <Slider label="Height (Y)" value={wireMat.halfY} min={0.05} max={1} step={0.01}
+            onChange={v => setWire('halfY', v)}
+            description="Half the thickness. This is the strongest single control on the whole look: it sets how much material light travels through, so it drives the absorption gradient, and it decides how far refraction throws the word backwards — raise it and Label Depth needs to follow." />
+
+          <Slider label="Depth (Z)" value={wireMat.halfZ} min={0.05} max={1.2} step={0.01}
+            onChange={v => setWire('halfZ', v)}
+            description="Half the front-to-back size. Wider gives the top face more screen area, which is where the upright word is seen." />
+
+          <Slider label="Sink" value={wireMat.sink} min={-0.2} max={0.3} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('sink', v)}
+            description="How far the blob settles into the plane. Negative lifts it clear, which breaks the contact edge and leaves it floating." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+            The wireframe tracks these automatically — it is built from the same
+            half-extents, so the frame follows the box as you resize it.
+          </div>
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — WORD" open={openSection === 'wireWord'} onToggle={() => toggle('wireWord')}>
+          <Slider label="Label Depth (z)" value={wireMat.labelCenterZ} min={-0.9} max={0.4} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('labelCenterZ', v)}
+            description="Slides the word along the floor. Larger moves its refracted image toward the camera and so DOWN the screen; smaller pushes it up and back. 0 sits it physically centred, but refraction still throws the image you see backwards from there." />
+
+          <Slider label="Label Across (x)" value={wireMat.labelCenterX} min={-0.8} max={0.8} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setWire('labelCenterX', v)}
+            description="Slides it sideways. Refraction barely displaces this axis, since the camera looks straight down the centre line, so it moves close to one-for-one." />
+
+          <Slider label="Label Scale" value={wireMat.labelScale} min={0.3} max={3} step={0.01}
+            onChange={v => setWire('labelScale', v)}
+            description="Size of the word. Scales the span of floor the texture is mapped across, so larger values grow the letters. Past the blob's width it runs out from under the glass." />
+
+          <Slider label="Ink" value={wireMat.labelInk} min={0} max={1} step={0.01}
+            onChange={v => setWire('labelInk', v)}
+            description="Darkness of the letters against the lit floor. 0 fades the word out entirely, which is worth trying if you want the box read on its own." />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — STAGE" open={openSection === 'wireStage'} onToggle={() => toggle('wireStage')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            CAMERA
+          </div>
+
+          <Slider label="Height" value={wireStage.camera.height} min={0.3} max={3} step={0.02}
+            onChange={v => setStageCam('height', v)}
+            description="Camera height. With Distance, this sets the viewing angle — the single biggest lever on whether the shape reads as a cuboid. Higher looks down on it and flattens the sides; lower shows the front face but bends the word further back." />
+
+          <Slider label="Distance" value={wireStage.camera.distance} min={0.1} max={3} step={0.02}
+            onChange={v => setStageCam('distance', v)}
+            description="How far in front the camera sits. Raise both this and Height together to keep the angle and just pull back." />
+
+          <Slider label="Look At (y)" value={wireStage.camera.targetY} min={-0.3} max={1} step={0.01}
+            onChange={v => setStageCam('targetY', v)}
+            description="Height of the point the camera aims at. Shifts the blob up or down in frame without changing the angle." />
+
+          <Slider label="Field of View" value={wireStage.camera.fov} min={12} max={90} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setStageCam('fov', v)}
+            description="Vertical FOV in degrees. Narrow flattens perspective toward isometric, which suits a box; wide exaggerates it and needs Distance raised to compensate." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            LIGHT
+          </div>
+
+          <Slider label="Azimuth" value={wireStage.light.azimuth} min={-180} max={180} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setStageLight('azimuth', v)}
+            description="Sweeps the light around the vertical, in degrees from straight ahead. Moves the specular highlight across the top face and swings which side the scatter glows through." />
+
+          <Slider label="Elevation" value={wireStage.light.elevation} min={-10} max={85} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setStageLight('elevation', v)}
+            description="Degrees above the horizon. Low grazes the body and pushes light through it, which is what the Subsurface Scatter slider needs to show; high lights the top face and kills the glow." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            QUALITY
+          </div>
+
+          <Slider label="Supersample" value={wireStage.quality} min={0.5} max={3} step={0.25}
+            onChange={v => setWireStage(s => ({ ...s, quality: v }))}
+            description="Render scale. 2 renders at twice the canvas and downsamples, which is what keeps the silhouette clean against a transparent page — TAA alone cannot resolve a hard alpha edge. Below 1 it visibly aliases; above 2 costs a lot for little. Rebuilds the render targets on change." />
+        </AccordionSection>
+
+        <AccordionSection title="WIREFRAME — CLICK" open={openSection === 'wireClick'} onToggle={() => toggle('wireClick')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            Impulses fired into the springs on release. Amplitude is roughly the
+            impulse over the spring&apos;s frequency, so these set how hard it is hit
+            and the SPRINGS section decides what happens next.
+          </div>
+
+          <Slider label="Squash X Impulse" value={wireClick.squashX} min={-20} max={20} step={0.5}
+            onChange={v => setClick('squashX', v)}
+            description="Negative narrows the blob on impact before it springs back out. TypeGPU fires -5." />
+
+          <Slider label="Squash Z Impulse" value={wireClick.squashZ} min={-20} max={20} step={0.5}
+            onChange={v => setClick('squashZ', v)}
+            description="The paired depth-wise kick, opposite in sign so the blob spreads as it flattens. TypeGPU fires 5." />
+
+          <Slider label="Rock Impulse" value={wireClick.wiggleX} min={-30} max={30} step={0.5}
+            onChange={v => setClick('wiggleX', v)}
+            description="Sideways tip on landing. TypeGPU fires -10, and it is the most visible of the three." />
+
+          <Slider label="Delay before scroll (ms)" value={wireClick.delayMs} min={0} max={3000} step={50}
+            fmt={v => v.toFixed(0)} onChange={v => setClick('delayMs', v)}
+            description="How long the wobble is left to play before the page moves to the collage. Match it to how long the springs actually ring — past that it is dead air." />
         </AccordionSection>
 
         <AccordionSection title="JELLY — SPRINGS" open={openSection === 'jellySprings'} onToggle={() => toggle('jellySprings')}>
