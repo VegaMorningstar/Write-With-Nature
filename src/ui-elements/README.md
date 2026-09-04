@@ -39,6 +39,10 @@ defers GPU init to `requestIdleCallback` so it never blocks page load.
 | `LABEL_CENTER_Z` | See below — retune whenever the camera or blob thickness moves |
 | `squash*/wiggle*Properties` | Spring tuning, currently TypeGPU's verbatim |
 
+Hover response is tuned in `JellyRenderButton.jsx` instead, since it is pointer
+handling rather than rendering: `HOVER_RADIUS` (how far away the blob still
+reacts), `HOVER_STRENGTH` (ceiling on the impulse) and `HOVER_THROTTLE_MS`.
+
 **`LABEL_CENTER_Z` is the fragile one.** The word is a texture on a plane inside
 the scene, not DOM behind the canvas, which is what lets it refract and pick up
 the chromatic fringe. But refraction displaces it backwards by roughly

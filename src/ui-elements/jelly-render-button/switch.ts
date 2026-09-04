@@ -44,10 +44,11 @@ export class SwitchBehavior {
 
   /**
    * Light jostle from pointer movement. Same springs, far smaller impulses, with
-   * the rock following the direction the pointer travelled.
+   * the rock following the direction the pointer travelled. `strength` scales it
+   * down with distance so the blob barely stirs at the edge of its hover radius.
    */
-  nudge(deltaX: number) {
-    const amount = Math.max(-1, Math.min(1, deltaX / 45));
+  nudge(deltaX: number, strength = 1) {
+    const amount = Math.max(-1, Math.min(1, deltaX / 45)) * strength;
     this.#wiggleXSpring.velocity += amount * 1.8;
     this.#squashZSpring.velocity += Math.abs(amount) * 0.9;
   }

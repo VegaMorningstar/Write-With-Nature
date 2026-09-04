@@ -10,13 +10,59 @@ const JELLY_COLOR = [0.55, 0.83, 0.14]
 // TypeGPU's spring tuning settles in ~0.8s, so anything much longer is dead air.
 const JIGGLE_MS = 1100
 
+// How far from the canvas the jelly still reacts to the pointer, in CSS pixels
+const HOVER_RADIUS = 220
+// Ceiling on the hover impulse, as a fraction of a full nudge
+const HOVER_STRENGTH = 0.55
+// Long enough that a fast sweep does not stack impulses, short enough that the
+// wobble stays continuous while the pointer is moving
+const HOVER_THROTTLE_MS = 70
+
 export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label = 'RENDER' }) {
   const canvasRef  = useRef(null)
   const sceneRef   = useRef(null)
   const cleanupRef = useRef(null)
   const timersRef  = useRef([])
-  const lastNudge  = useRef(0)
-  const lastPointerX = useRef(0)
+
+  // Pointer proximity: the blob stirs as the cursor comes near, not only once it
+  // is over the canvas, so it reads as aware of the pointer before you arrive.
+  useEffect(() => {
+    if (!gpuSupported) return
+
+    let lastX = null
+    let lastAt = 0
+
+    const onPointerMove = e => {
+      const scene = sceneRef.current
+      const canvas = canvasRef.current
+      if (!scene || !canvas) return
+
+      // Throttle before measuring, so a fast sweep neither stacks impulses nor
+      // forces a layout read on every single move event.
+      const now = performance.now()
+      if (now - lastAt < HOVER_THROTTLE_MS) return
+      lastAt = now
+
+      const rect = canvas.getBoundingClientRect()
+      // Distance from the pointer to the canvas rect — zero anywhere inside it
+      const gapX = Math.max(rect.left - e.clientX, 0, e.clientX - rect.right)
+      const gapY = Math.max(rect.top - e.clientY, 0, e.clientY - rect.bottom)
+      const distance = Math.hypot(gapX, gapY)
+
+      const travelled = lastX === null ? 0 : e.clientX - lastX
+      lastX = e.clientX
+
+      if (distance > HOVER_RADIUS) return
+
+      // Squared falloff: barely a stir at the edge of the radius, a real jostle
+      // once the cursor is over the blob.
+      const proximity = 1 - distance / HOVER_RADIUS
+      scene.switchBehavior.nudge(travelled, proximity * proximity * HOVER_STRENGTH)
+    }
+
+    window.addEventListener('pointermove', onPointerMove, { passive: true })
+    return () => window.removeEventListener('pointermove', onPointerMove)
+  }, [])
 
   // Releasing outside the canvas must still clear the press, or the anticipation
   // impulse keeps charging every frame and the blob stays squashed.
@@ -82,23 +128,6 @@ export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label 
     }
   }, []) // eslint-disable-line
 
-  // Hover jostle: throttled so a fast sweep does not stack dozens of impulses
-  function hoverMove(e) {
-    const scene = sceneRef.current
-    if (!scene) return
-    const now = performance.now()
-    const dx = e.clientX - lastPointerX.current
-    lastPointerX.current = e.clientX
-    if (now - lastNudge.current < 80) return
-    lastNudge.current = now
-    scene.switchBehavior.nudge(dx)
-  }
-
-  function hoverEnter(e) {
-    lastPointerX.current = e.clientX
-    sceneRef.current?.switchBehavior.jiggle(0.25)
-  }
-
   function clearTimers() {
     timersRef.current.forEach(clearTimeout)
     timersRef.current = []
@@ -142,8 +171,7 @@ export default function JellyRenderButton({ onClick, color = JELLY_COLOR, label 
         height={220}
         onMouseDown={press}
         onMouseUp={() => release(true)}
-        onMouseEnter={hoverEnter}
-        onMouseMove={hoverMove}
+        onMouseEnter={() => sceneRef.current?.switchBehavior.jiggle(0.18)}
         onMouseLeave={() => {
           if (sceneRef.current) sceneRef.current.switchBehavior.pressed = false
         }}
