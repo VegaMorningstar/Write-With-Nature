@@ -72,22 +72,20 @@ export async function setupOverlay(
   context: GPUCanvasContext,
   backdropCanvas: HTMLCanvasElement,
 ) {
-  let texWidth = Math.max(2, backdropCanvas.width);
-  let texHeight = Math.max(2, backdropCanvas.height);
-
-  function makeTexture(w: number, h: number) {
-    return root
-      .createTexture({
-        size: [w, h, 1],
-        // 6 levels, because textureSampleBias needs a mip chain for the blur
-        format: 'rgba8unorm',
-        mipLevelCount: 6,
-      })
-      .$usage('sampled', 'render');
-  }
-
-  let backdropTexture = makeTexture(texWidth, texHeight);
-  let sampledView = backdropTexture.createView();
+  // Fixed size, written with fit: 'stretch' whatever the backdrop canvas is.
+  // Recreating it on resize would leave the already-compiled pipeline holding a
+  // view of a destroyed texture — the shader captures the view when it is built,
+  // not on every frame. Sampling is in uv space, so the stretch undoes itself.
+  const TEX_SIZE = 1024;
+  const backdropTexture = root
+    .createTexture({
+      size: [TEX_SIZE, TEX_SIZE, 1],
+      // 6 levels, because textureSampleBias needs a mip chain for the blur
+      format: 'rgba8unorm',
+      mipLevelCount: 6,
+    })
+    .$usage('sampled', 'render');
+  const sampledView = backdropTexture.createView();
 
   const sampler = root.createSampler({
     magFilter: 'linear',
@@ -97,6 +95,13 @@ export async function setupOverlay(
 
   // OURS: static, rather than following the pointer
   const centerUniform = root.createUniform(d.vec2f, d.vec2f(0.5, 0.5));
+
+  // OURS: the backdrop covers the whole viewport, but this canvas may only
+  // occupy part of it. These map the canvas's own uv onto the slice of the
+  // backdrop sitting behind it, so the glass refracts what is genuinely there
+  // rather than a squashed copy of the entire page.
+  const uvScaleUniform = root.createUniform(d.vec2f, d.vec2f(1, 1));
+  const uvOffsetUniform = root.createUniform(d.vec2f, d.vec2f(0, 0));
   const paramsUniform = root.createUniform(Params, {
     rectDims: d.vec2f(overlayDefaults.rectW, overlayDefaults.rectH),
     radius: overlayDefaults.radius,
@@ -157,11 +162,16 @@ export async function setupOverlay(
     const featherUV = paramsUniform.$.edgeFeather / std.max(texDim.x, texDim.y);
     const weights = calculateWeights(sdfDist, paramsUniform.$.start, paramsUniform.$.end, featherUV);
 
-    const blurSample = std.textureSampleBias(sampledView.$, sampler.$, uv, paramsUniform.$.blur);
+    // OURS: sample the backdrop through the canvas-to-viewport mapping. The SDF
+    // above still works in the canvas's own uv, so the lens sits where it is
+    // placed regardless of where the canvas is on the page.
+    const bgUv = uv.mul(uvScaleUniform.$).add(uvOffsetUniform.$);
+
+    const blurSample = std.textureSampleBias(sampledView.$, sampler.$, bgUv, paramsUniform.$.blur);
     const refractedSample = sampleWithChromaticAberration(
       sampledView.$,
       sampler.$,
-      uv.add(dir.mul(paramsUniform.$.refractionStrength * normalizedDist)),
+      bgUv.add(dir.mul(paramsUniform.$.refractionStrength * normalizedDist)),
       paramsUniform.$.chromaticStrength * normalizedDist,
       dir,
       paramsUniform.$.blur * paramsUniform.$.edgeBlurMultiplier,
@@ -211,14 +221,13 @@ export async function setupOverlay(
     set beforeFrame(fn: (() => void) | null) {
       onFrame = fn;
     },
-    resizeBackdrop(w: number, h: number) {
-      if (w === texWidth && h === texHeight) return;
-      texWidth = Math.max(2, w);
-      texHeight = Math.max(2, h);
-      backdropTexture.destroy?.();
-      backdropTexture = makeTexture(texWidth, texHeight);
-      sampledView = backdropTexture.createView();
+    /** Which slice of the viewport-sized backdrop sits behind this canvas. */
+    setViewportRect(rect: { x: number; y: number; w: number; h: number }, vw: number, vh: number) {
+      uvScaleUniform.write(d.vec2f(rect.w / vw, rect.h / vh));
+      uvOffsetUniform.write(d.vec2f(rect.x / vw, rect.y / vh));
     },
+    /** Kept for callers; the texture is a fixed size and stretches to fit. */
+    resizeBackdrop(_w: number, _h: number) {},
     setParams(p: typeof overlayDefaults) {
       centerUniform.write(d.vec2f(p.centerX, p.centerY));
       paramsUniform.write({

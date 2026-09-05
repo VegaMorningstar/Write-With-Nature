@@ -40,7 +40,9 @@ export default function LiquidGlassDemo({
     paramsRef.current = params
     if (!params || !sceneRef.current) return
     sceneRef.current.setParams(params)
-    if (!followRef.current) sceneRef.current.setCenter(params.centerX, params.centerY)
+    // The overlay build takes the centre through setParams; the verbatim one
+    // keeps it in the mouse uniform and needs telling separately.
+    if (!followRef.current) sceneRef.current.setCenter?.(params.centerX, params.centerY)
   }, [params, follow])
 
   useEffect(() => {
@@ -56,22 +58,52 @@ export default function LiquidGlassDemo({
         const { tgpu } = await import('typegpu')
         const { setupLiquidGlass } = await import('./scene.ts')
 
+        // 'page' uses the overlay build of the shader, whose only difference is
+        // that the outside weight becomes transparency. Their version returns
+        // the untouched background there, which against a photo is right and
+        // over a page paints an opaque rectangle across it — which is exactly
+        // what the washed-out slab was.
+        if (mode === 'page') {
+          const { setupOverlay } = await import('./overlay.ts')
+          const { createBackdrop } = await import('./backdrop.js')
+
+          backdrop = createBackdrop({ scale: 0.5 })
+          const syncRect = scene => {
+            const vw = window.innerWidth
+            const vh = window.innerHeight
+            backdrop.resize(vw, vh)
+            scene?.resizeBackdrop(backdrop.width, backdrop.height)
+            const r = canvas.getBoundingClientRect()
+            scene?.setViewportRect({ x: r.left, y: r.top, w: r.width, h: r.height }, vw, vh)
+          }
+          syncRect(null)
+          backdrop.update()
+          if (cancelled) return
+
+          const root = await tgpu.init()
+          const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
+          const scene = await setupOverlay(root, context, backdrop.canvas)
+          if (cancelled) { scene.onCleanup(); root.destroy(); return }
+
+          // The canvas scrolls with the page, so its slice of the backdrop has
+          // to be recomputed every frame, not just on resize.
+          scene.beforeFrame = () => { backdrop.update(); syncRect(scene) }
+          syncRect(scene)
+
+          if (paramsRef.current) scene.setParams(paramsRef.current)
+          sceneRef.current = scene
+          cleanupRef.current = () => { scene.onCleanup(); root.destroy() }
+          return
+        }
+
         let source
-        let animated = false
-        let beforeFrame
+        const animated = false
+        const beforeFrame = undefined
 
         if (mode === 'image') {
           const response = await fetch(image)
           if (!response.ok) throw new Error(`image ${response.status}`)
           source = await createImageBitmap(await response.blob())
-        } else if (mode === 'page') {
-          const { createBackdrop } = await import('./backdrop.js')
-          backdrop = createBackdrop({ scale: 0.5 })
-          backdrop.resize(width, height)
-          backdrop.update()
-          source = backdrop.canvas
-          animated = true
-          beforeFrame = () => backdrop.update()
         } else {
           // Deliberately empty — a texture with nothing in it
           const blank = document.createElement('canvas')
@@ -89,7 +121,7 @@ export default function LiquidGlassDemo({
         if (paramsRef.current) {
           scene.setParams(paramsRef.current)
           if (!followRef.current) {
-            scene.setCenter(paramsRef.current.centerX, paramsRef.current.centerY)
+            scene.setCenter?.(paramsRef.current.centerX, paramsRef.current.centerY)
           }
         }
 
@@ -135,7 +167,7 @@ export default function LiquidGlassDemo({
       ref={canvasRef}
       width={width}
       height={height}
-      onClick={e => follow && sceneRef.current?.toggleFixed(e.clientX, e.clientY)}
+      onClick={e => follow && sceneRef.current?.toggleFixed?.(e.clientX, e.clientY)}
       style={{
         width: '100%', height: 'auto', display: 'block',
         aspectRatio: `${width} / ${height}`,

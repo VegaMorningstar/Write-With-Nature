@@ -85,7 +85,9 @@ export function createBackdrop({ scale = 0.5 } = {}) {
     ctx.globalCompositeOperation = 'source-over'
     ctx.drawImage(paper, 0, 0)
 
-    const fluid = document.getElementById('fluid-cursor-canvas')
+    // The tune page runs its own instance under a different id
+    const fluid = document.getElementById('fluid-cursor-canvas') ||
+      document.getElementById('tune-fluid-canvas')
     if (fluid && fluid.width > 0 && fluid.height > 0) {
       try {
         // Same blend the real canvas uses, so the glass refracts what is

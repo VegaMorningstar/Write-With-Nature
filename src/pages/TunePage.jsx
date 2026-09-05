@@ -66,10 +66,20 @@ function TuneFluid({ opts, blendMode }) {
         }
         return originalAdd.call(this, type, listener, options)
       }
+      // See FluidCursor.jsx — without preserveDrawingBuffer the canvas reads
+      // back empty, so the glass has no fluid to refract.
+      const originalGetContext = HTMLCanvasElement.prototype.getContext
+      HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          attrs = { ...(attrs || {}), preserveDrawingBuffer: true }
+        }
+        return originalGetContext.call(this, type, attrs)
+      }
       try {
         initFluid({ transparent: true, id: 'tune-fluid-canvas', ...opts })
       } finally {
         window.addEventListener = originalAdd
+        HTMLCanvasElement.prototype.getContext = originalGetContext
       }
     })
   }, []) // eslint-disable-line

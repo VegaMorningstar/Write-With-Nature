@@ -33,6 +33,21 @@ export default function FluidCursor() {
         return originalAdd.call(this, type, listener, options)
       }
 
+      // The library asks for preserveDrawingBuffer: false, which lets the
+      // browser throw the WebGL buffer away as soon as it has been composited.
+      // Anything that later reads this canvas — drawImage into the collage
+      // export, or into the backdrop the liquid glass refracts — then gets an
+      // empty frame. Forcing it true keeps the pixels readable. It costs the
+      // driver an optimisation, which is the price of the canvas being legible
+      // to the rest of the app.
+      const originalGetContext = HTMLCanvasElement.prototype.getContext
+      HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          attrs = { ...(attrs || {}), preserveDrawingBuffer: true }
+        }
+        return originalGetContext.call(this, type, attrs)
+      }
+
       try {
         initFluid({
           transparent: true,
@@ -48,6 +63,7 @@ export default function FluidCursor() {
         })
       } finally {
         window.addEventListener = originalAdd
+        HTMLCanvasElement.prototype.getContext = originalGetContext
       }
     })
   }, [])
