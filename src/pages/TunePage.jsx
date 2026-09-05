@@ -213,11 +213,26 @@ const RADII_DEF = {
 const FROST_DEF = {
   blur: 26,
   saturate: 170,
-  brightness: 1.08,
+  brightness: 0.91,
   bgAlpha: 0.22,
   borderAlpha: 0.4,
   svgFilter: true,
+  // Grain. Real frosted glass is a roughened surface, so it does two things at
+  // once: it scatters what is behind it at a fine scale, and the roughness
+  // itself catches light as speckle. Blur alone gives neither.
+  grain: 0.3,        // speckle painted onto the surface
+  grainScale: 0.85,  // turbulence frequency — high is fine dust, low is mottling
+  scatter: 2,        // micro-displacement of the backdrop, the refractive half
 }
+
+/** Tileable turbulence, painted over the fill as the surface's own texture. */
+const grainTexture = (frequency, opacity) =>
+  'data:image/svg+xml,' + encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'>" +
+    `<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='${frequency}' ` +
+    "numOctaves='4' stitchTiles='stitch'/></filter>" +
+    `<rect width='140' height='140' filter='url(#n)' opacity='${opacity}'/></svg>`,
+  )
 
 const TILE_COLORS = [
   '#6e9e7e','#5a8a62','#7aac72','#4a8e7e','#8aba88',
@@ -267,14 +282,21 @@ export default function TunePage() {
   const [frost, setFrost] = useState(FROST_DEF)
   const setFrostParam = (k, v) => setFrost(f => ({ ...f, [k]: v }))
 
+  // Scatter goes last so it roughens the blurred backdrop rather than being
+  // smoothed away by the blur that follows it.
   const frostFilter =
     `${frost.svgFilter ? 'url(#glass-element) ' : ''}` +
-    `blur(${frost.blur}px) saturate(${frost.saturate}%) brightness(${frost.brightness})`
+    `blur(${frost.blur}px) saturate(${frost.saturate}%) brightness(${frost.brightness})` +
+    `${frost.scatter > 0 ? ' url(#frost-scatter)' : ''}`
 
   const inputStyle = {
     width: '100%',
     borderRadius: radii.input,
-    background: `rgba(255,255,255,${frost.bgAlpha})`,
+    // Speckle over the wash: background-image paints above background-color
+    backgroundColor: `rgba(255,255,255,${frost.bgAlpha})`,
+    backgroundImage: frost.grain > 0
+      ? `url("${grainTexture(frost.grainScale, frost.grain)}")`
+      : 'none',
     borderColor: `rgba(255,255,255,${frost.borderAlpha})`,
     backdropFilter: frostFilter,
     WebkitBackdropFilter: frostFilter,
@@ -355,6 +377,16 @@ export default function TunePage() {
           <feComposite in="specLight" in2="SourceAlpha" operator="in" result="specClipped"/>
           <feComposite in="SourceGraphic" in2="specClipped" operator="arithmetic" k1="0" k2="1" k3="0.5" k4="0" result="litSrc"/>
           <feDisplacementMap in="litSrc" in2="softMap" scale="28" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+
+        {/* Micro-roughness: fine turbulence displacing the backdrop by a couple
+            of pixels. This is the refractive half of frost — the surface
+            scattering what is behind it, as distinct from the speckle painted
+            on top of it. Kept separate from #glass-element, whose scale of 28
+            is a glassy warp rather than a roughness. */}
+        <filter id="frost-scatter" x="-8%" y="-8%" width="116%" height="116%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency={frost.grainScale} numOctaves="3" seed="9" result="rough"/>
+          <feDisplacementMap in="SourceGraphic" in2="rough" scale={frost.scatter} xChannelSelector="R" yChannelSelector="G"/>
         </filter>
       </svg>
 
@@ -633,7 +665,32 @@ export default function TunePage() {
             description="Keeps the colour behind it alive through the blur rather than washing to grey." />
 
           <Slider label="Brightness" value={frost.brightness} min={0.7} max={1.5} step={0.01}
-            onChange={v => setFrostParam('brightness', v)} />
+            onChange={v => setFrostParam('brightness', v)}
+            description="Below 1 the input sits back from the panel instead of glowing off it." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            GRAIN
+          </div>
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            Real frosted glass is a roughened surface, and roughness does two
+            separate things: it scatters what is behind it, and it catches light
+            as speckle. Blur gives neither, which is why smooth blur reads as
+            plastic. The two sliders below are those two halves.
+          </div>
+
+          <Slider label="Speckle" value={frost.grain} min={0} max={1} step={0.01}
+            onChange={v => setFrostParam('grain', v)}
+            description="Turbulence painted over the fill as the surface's own texture. This is the half you see directly." />
+
+          <Slider label="Scatter" value={frost.scatter} min={0} max={12} step={0.5}
+            fmt={v => v.toFixed(1)} onChange={v => setFrostParam('scatter', v)}
+            description="Micro-displacement of the backdrop, in pixels — the refractive half. Applied after the blur, so it roughens the blurred image rather than being smoothed away by it. Past about 6 it stops reading as frost and starts to look like a warp." />
+
+          <Slider label="Grain Scale" value={frost.grainScale} min={0.1} max={2} step={0.01}
+            onChange={v => setFrostParam('grainScale', v)}
+            description="Turbulence frequency, shared by both. High is fine dust; low mottles into visible clouds. Drives the speckle and the scatter together so they read as one surface." />
 
           <Slider label="Fill Opacity" value={frost.bgAlpha} min={0} max={0.6} step={0.01}
             onChange={v => setFrostParam('bgAlpha', v)}
