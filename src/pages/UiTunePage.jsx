@@ -44,6 +44,11 @@ import {
 
 import LiquidGlassDemo from '../ui-elements/liquid-glass/LiquidGlassDemo'
 import { overlayDefaults } from '../ui-elements/liquid-glass/overlay.ts'
+import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
+import {
+  MATERIAL_DEFAULTS as ALPHA_MATERIAL,
+  POINTER_DEFAULTS as ALPHA_POINTER,
+} from '../ui-elements/glass-alphabet/constants.ts'
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 const RENDER_DEF = {
@@ -71,6 +76,11 @@ const WIRE_DEF = {
     wiggleX: WIRE_JIGGLE_W,
     delayMs: 1100,
   },
+}
+
+const ALPHA_DEF = {
+  material: { ...ALPHA_MATERIAL },
+  pointer: { ...ALPHA_POINTER },
 }
 
 const GLASS_DEF = {
@@ -114,7 +124,7 @@ function Bench({ name, summary, children, wide = false }) {
 }
 
 export default function UiTunePage() {
-  const [openSection, setOpenSection] = useState('glass')
+  const [openSection, setOpenSection] = useState('alphaGlass')
   const toggle = name => setOpenSection(s => (s === name ? null : name))
 
   // Jelly render button
@@ -128,6 +138,12 @@ export default function UiTunePage() {
   const setWireLight = (k, v) => setWire(s => ({ ...s, stage: { ...s.stage, light: { ...s.stage.light, [k]: v } } }))
   const setWireClick = (k, v) => setWire(s => ({ ...s, click: { ...s.click, [k]: v } }))
 
+  // Glass alphabet
+  const [alpha, setAlpha] = useState(ALPHA_DEF)
+  const setAlphaMat = (k, v) => setAlpha(s => ({ ...s, material: { ...s.material, [k]: v } }))
+  const setAlphaPtr = (k, v) => setAlpha(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
+  const [lastLetter, setLastLetter] = useState(null)
+
   // Liquid glass
   const [glass, setGlass] = useState(GLASS_DEF)
   const [glassMode, setGlassMode] = useState('page')
@@ -140,6 +156,7 @@ export default function UiTunePage() {
       jellyRenderButton: render,
       jellyWireframeButton: wire,
       liquidGlass: { mode: glassMode, follow: glassFollow, params: glass },
+      glassAlphabet: alpha,
     }, null, 2))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -148,6 +165,7 @@ export default function UiTunePage() {
   const resetAll = () => {
     setRender(structuredClone(RENDER_DEF))
     setWire(structuredClone(WIRE_DEF))
+    setAlpha(structuredClone(ALPHA_DEF))
     setGlass({ ...GLASS_DEF })
     setGlassMode('page')
     setGlassFollow(false)
@@ -171,6 +189,23 @@ export default function UiTunePage() {
               then wire it in.
             </p>
           </div>
+
+          <Bench
+            name="Glass Alphabet"
+            summary="Twenty-six real buttons — click handlers, keyboard focus, the letter as DOM text — with one canvas behind them drawing all the glass. Each tile is a rounded box in a shared SDF, given the same ring refraction the liquid glass panels use, plus frost and a glow field that blooms through the middle of the grid. Moving the cursor across it nudges the tiles it passes; clicking kicks one and its neighbours."
+            wide
+          >
+            <div style={{ width: '100%', maxWidth: 560 }}>
+              <GlassAlphabet
+                material={alpha.material}
+                pointer={alpha.pointer}
+                onSelect={setLastLetter}
+              />
+              <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.4)', textAlign: 'center', marginTop: 10 }}>
+                {lastLetter ? `onSelect fired: ${lastLetter}` : 'click a letter — onSelect is where the Landsat grid would open'}
+              </div>
+            </div>
+          </Bench>
 
           <Bench
             name="Liquid Glass"
@@ -240,6 +275,113 @@ export default function UiTunePage() {
           </>
         }
       >
+        {/* ── Glass alphabet ── */}
+        <AccordionSection title="ALPHABET — GLASS" open={openSection === 'alphaGlass'} onToggle={() => toggle('alphaGlass')}>
+          <GroupLabel first>SHAPE &amp; EDGE</GroupLabel>
+          <Note>
+            Distances are in tile heights, so a value means the same thing
+            whatever size the tiles end up. The visible tile is the box inflated
+            by Edge End, as with the panels.
+          </Note>
+
+          <Slider label="Corner Radius" value={alpha.material.radius} min={0} max={0.5} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('radius', v)}
+            description="0.5 is a circle at these proportions; the reference squares sit around 0.25." />
+          <Slider label="Edge Start" value={alpha.material.start} min={0} max={0.3} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('start', v)}
+            description="Where the frosted middle gives way to the refracting ring." />
+          <Slider label="Edge End" value={alpha.material.end} min={0.01} max={0.5} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('end', v)}
+            description="The tile's outer boundary. Larger inflates each tile past its button, so they start to merge into each other." />
+          <Slider label="Refraction" value={alpha.material.refractionStrength} min={0} max={0.5} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('refractionStrength', v)} />
+          <Slider label="Chromatic Aberration" value={alpha.material.chromaticStrength} min={0} max={0.2} step={0.002}
+            fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('chromaticStrength', v)} />
+          <Slider label="Aberration Edge Bias" value={alpha.material.chromaticFalloff} min={0.2} max={4} step={0.05}
+            onChange={v => setAlphaMat('chromaticFalloff', v)} />
+
+          <GroupLabel>FROST</GroupLabel>
+          <Slider label="Blur" value={alpha.material.blur} min={0} max={6} step={0.1}
+            onChange={v => setAlphaMat('blur', v)} />
+          <Slider label="Edge Blur ×" value={alpha.material.edgeBlurMultiplier} min={0} max={2} step={0.05}
+            onChange={v => setAlphaMat('edgeBlurMultiplier', v)} />
+          <Slider label="Frost Fill" value={alpha.material.frostFill} min={0} max={0.6} step={0.01}
+            onChange={v => setAlphaMat('frostFill', v)}
+            description="The white wash. This is what reads as frosted — blur alone keeps the backdrop's brightness and looks like plastic." />
+          <Slider label="Frost Grain" value={alpha.material.frostGrain} min={0} max={1} step={0.01}
+            onChange={v => setAlphaMat('frostGrain', v)}
+            description="Speckle, the roughness of the surface catching light." />
+
+          <GroupLabel>TINT</GroupLabel>
+          <Note>
+            Deliberately lighter than the panels&apos;. Twenty-six small tiles stack
+            their tint into something much heavier than one sheet of the same
+            glass would read as.
+          </Note>
+          <Slider label="Strength" value={alpha.material.tintStrength} min={0} max={0.4} step={0.002}
+            fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('tintStrength', v)} />
+          <Slider label="R" value={alpha.material.tintR} min={0} max={1} step={0.01} onChange={v => setAlphaMat('tintR', v)} />
+          <Slider label="G" value={alpha.material.tintG} min={0} max={1} step={0.01} onChange={v => setAlphaMat('tintG', v)} />
+          <Slider label="B" value={alpha.material.tintB} min={0} max={1} step={0.01} onChange={v => setAlphaMat('tintB', v)} />
+        </AccordionSection>
+
+        <AccordionSection title="ALPHABET — GLOW" open={openSection === 'alphaGlow'} onToggle={() => toggle('alphaGlow')}>
+          <Note>
+            A field behind the whole grid rather than per-tile lighting, so tiles
+            pick it up according to where they sit — which is what gives the
+            reference its bloom through the middle instead of 26 identical
+            squares. Concentrated at the rim, where a real edge catches light.
+          </Note>
+
+          <Slider label="Strength" value={alpha.material.glowStrength} min={0} max={3} step={0.02}
+            onChange={v => setAlphaMat('glowStrength', v)} />
+          <Slider label="Spread" value={alpha.material.glowSpread} min={0.05} max={3} step={0.01}
+            onChange={v => setAlphaMat('glowSpread', v)}
+            description="How far the field reaches from the grid's centre. Small keeps the bloom to a few tiles; large lights them all evenly and loses the effect." />
+          <Slider label="Edge Concentration" value={alpha.material.glowEdge} min={0.2} max={6} step={0.05}
+            onChange={v => setAlphaMat('glowEdge', v)}
+            description="How hard the glow is pushed into the rim. Low spills it across the whole tile face." />
+          <Slider label="Hover Glow" value={alpha.material.hoverGlow} min={0} max={3} step={0.02}
+            onChange={v => setAlphaMat('hoverGlow', v)}
+            description="Extra light on whatever the pointer is over." />
+
+          <GroupLabel>NEAR COLOUR — the centre of the bloom</GroupLabel>
+          <Slider label="R" value={alpha.material.glowR} min={0} max={1} step={0.01} onChange={v => setAlphaMat('glowR', v)} />
+          <Slider label="G" value={alpha.material.glowG} min={0} max={1} step={0.01} onChange={v => setAlphaMat('glowG', v)} />
+          <Slider label="B" value={alpha.material.glowB} min={0} max={1} step={0.01} onChange={v => setAlphaMat('glowB', v)} />
+
+          <GroupLabel>FAR COLOUR — the edges of the grid</GroupLabel>
+          <Slider label="R" value={alpha.material.glowFarR} min={0} max={1} step={0.01} onChange={v => setAlphaMat('glowFarR', v)} />
+          <Slider label="G" value={alpha.material.glowFarG} min={0} max={1} step={0.01} onChange={v => setAlphaMat('glowFarG', v)} />
+          <Slider label="B" value={alpha.material.glowFarB} min={0} max={1} step={0.01} onChange={v => setAlphaMat('glowFarB', v)} />
+        </AccordionSection>
+
+        <AccordionSection title="ALPHABET — WOBBLE" open={openSection === 'alphaWobble'} onToggle={() => toggle('alphaWobble')}>
+          <Note>
+            Per-tile springs, same model as the jelly. The values drive the
+            shader and a CSS transform on the button together, so a tile and its
+            letter never drift apart.
+          </Note>
+
+          <Slider label="Reach (tiles)" value={alpha.pointer.radius} min={0.5} max={8} step={0.1}
+            onChange={v => setAlphaPtr('radius', v)}
+            description="How far the disturbance spreads from the cursor, in tile widths. Large makes the whole grid breathe as one; small picks out individual tiles." />
+          <Slider label="Strength" value={alpha.pointer.strength} min={0} max={3} step={0.05}
+            onChange={v => setAlphaPtr('strength', v)} />
+          <Slider label="Travel per Impulse (px)" value={alpha.pointer.sensitivity} min={4} max={160} step={2}
+            fmt={v => v.toFixed(0)} onChange={v => setAlphaPtr('sensitivity', v)}
+            description="Inverted, as on the jelly: low is twitchy." />
+          <Slider label="Gain" value={alpha.pointer.gain} min={0} max={5} step={0.05}
+            onChange={v => setAlphaPtr('gain', v)} />
+          <Slider label="Throttle (ms)" value={alpha.pointer.throttleMs} min={16} max={160} step={2}
+            fmt={v => v.toFixed(0)} onChange={v => setAlphaPtr('throttleMs', v)} />
+          <Slider label="Click Impulse" value={alpha.pointer.clickImpulse} min={0} max={20} step={0.5}
+            onChange={v => setAlphaPtr('clickImpulse', v)}
+            description="Kicks the clicked tile and its neighbours, so a press lands on the grid rather than on one square." />
+        </AccordionSection>
+
+        <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
+
         {/* ── Liquid glass ── */}
         <AccordionSection title="GLASS — LIQUID GLASS" open={openSection === 'glass'} onToggle={() => toggle('glass')}>
           <LiquidGlassControls
