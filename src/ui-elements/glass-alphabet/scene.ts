@@ -45,6 +45,8 @@ const Params = d.struct({
   edgeDarken: d.f32,
   lightAngle: d.f32,
   gap: d.f32,
+  rimLight: d.f32,
+  rimWidth: d.f32,
 });
 
 /**
@@ -85,6 +87,13 @@ export async function setupGlassAlphabet(
 
   const paramsUniform = root.createUniform(Params);
   const tilesUniform = root.createUniform(Tiles);
+
+  // Kept on the CPU and written whole. A uniform has no per-element write —
+  // writePartial belongs to buffers — and 52 vec4s a frame is nothing.
+  const rectValues = Array.from({ length: TILE_COUNT }, () => d.vec4f(0, 0, 0.001, 0.001));
+  const stateValues = Array.from({ length: TILE_COUNT }, () => d.vec4f(0, 0, 0, 0));
+  const writeTiles = () => tilesUniform.write({ rect: rectValues, state: stateValues });
+  writeTiles();
   // x = aspect, so the shape space is isotropic; y unused
   const shapeUniform = root.createUniform(d.vec2f, d.vec2f(1, 1));
   // Which slice of the viewport-sized backdrop sits behind this canvas
@@ -234,6 +243,13 @@ export async function setupGlassAlphabet(
     const facing = std.dot(std.normalize(local + d.vec2f(0.0001, 0.0001)), lightDir);
     const bevel = facing * rim * p.bevel;
 
+    // A bright band hugging the tile's edge, mostly even the whole way round.
+    // This is the single most identifying feature of the reference — each tile
+    // outlined in light — and it is what reads as a distinct pane rather than a
+    // patch of a larger surface. The bevel above only tilts it toward the light.
+    const rimBand = std.exp(-((nearest / std.max(p.rimWidth * nearestScale, 0.0005)) ** 2));
+    const rimLight = rimBand * p.rimLight;
+
     // Darkening into the rim, so tiles do not bleed into their neighbours
     const edgeShade = 1 - rim * p.edgeDarken;
 
@@ -244,9 +260,17 @@ export async function setupGlassAlphabet(
       (field * p.glowStrength + nearestGlow + pointerLift) * face * (1 - rim * 0.35 * p.glowEdge),
     );
 
-    const shaded = colour.mul(edgeShade).add(d.vec3f(bevel)).add(glow);
+    const shaded = colour
+      .mul(edgeShade)
+      .add(d.vec3f(bevel))
+      .add(glow)
+      .add(d.vec3f(rimLight));
 
-    return d.vec4f(shaded.mul(cover), cover);
+    // The rim also lifts alpha, so the outline survives on a tile that is
+    // otherwise nearly clear
+    const alpha = std.saturate(cover + rimBand * p.rimLight * 0.5);
+
+    return d.vec4f(shaded.mul(alpha), alpha);
   });
 
   const pipeline = root.createRenderPipeline({
@@ -286,15 +310,19 @@ export async function setupGlassAlphabet(
     },
     /** rect = [cx, cy, hx, hy] per tile, in shape space. */
     setTileRects(rects: number[][]) {
-      tilesUniform.writePartial({
-        rect: rects.map((r, i) => ({ idx: i, value: d.vec4f(r[0], r[1], r[2], r[3]) })),
-      });
+      for (let i = 0; i < TILE_COUNT; i++) {
+        const r = rects[i];
+        if (r) rectValues[i] = d.vec4f(r[0], r[1], r[2], r[3]);
+      }
+      writeTiles();
     },
     /** state = [squashX, squashY, glow, pressed] per tile. */
     setTileStates(states: number[][]) {
-      tilesUniform.writePartial({
-        state: states.map((s, i) => ({ idx: i, value: d.vec4f(s[0], s[1], s[2], s[3]) })),
-      });
+      for (let i = 0; i < TILE_COUNT; i++) {
+        const s = states[i];
+        if (s) stateValues[i] = d.vec4f(s[0], s[1], s[2], s[3]);
+      }
+      writeTiles();
     },
     setParams(o: Record<string, number>) {
       paramsUniform.write({
@@ -322,6 +350,8 @@ export async function setupGlassAlphabet(
         edgeDarken: o.edgeDarken,
         lightAngle: o.lightAngle,
         gap: o.gap,
+        rimLight: o.rimLight,
+        rimWidth: o.rimWidth,
       });
     },
     onCleanup() {

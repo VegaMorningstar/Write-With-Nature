@@ -64,6 +64,10 @@ export const MATERIAL_DEFAULTS = {
   bevel: 0.16,
   edgeDarken: 0.3,
   lightAngle: 130,
+  // The bright outline hugging every tile. The clearest single cue that a
+  // tile is its own pane rather than a patch of a larger surface.
+  rimLight: 0.55,
+  rimWidth: 0.09,
 };
 
 /** How the grid responds to the pointer. */

@@ -323,6 +323,14 @@ export default function UiTunePage() {
             onChange={v => setAlphaMat('edgeDarken', v)}
             description="Shading into the rim, which stops a tile bleeding into the one beside it." />
 
+          <Slider label="Rim Light" value={alpha.material.rimLight} min={0} max={2} step={0.02}
+            onChange={v => setAlphaMat('rimLight', v)}
+            description="A bright band hugging each tile's edge, even the whole way round. This is the clearest single cue that a tile is its own pane — the reference outlines every square in light." />
+
+          <Slider label="Rim Width" value={alpha.material.rimWidth} min={0.01} max={0.5} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('rimWidth', v)}
+            description="How tight that band is, as a fraction of the tile's half-height. Narrow reads as a drawn outline; wide bleeds into a halo." />
+
           <Slider label="Light Angle" value={alpha.material.lightAngle} min={0} max={360} step={1}
             fmt={v => v.toFixed(0)} onChange={v => setAlphaMat('lightAngle', v)}
             description="Degrees. Drives the bevel on every tile, so they are all lit from the same direction." />
