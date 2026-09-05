@@ -62,9 +62,13 @@ export function LiquidGlassControls({ params, set, mode, setMode, follow, setFol
         fmt={v => v.toFixed(3)} onChange={v => set('refractionStrength', v)}
         description="How far the ring samples outward, in element fractions. Ramps from 0 at Edge Start to full at Edge End. Theirs is about twice the ring's width, which is why the backdrop smears so hard at the rim." />
 
-      <Slider label="Chromatic Strength" value={params.chromaticStrength} min={0} max={0.1} step={0.001}
+      <Slider label="Chromatic Aberration" value={params.chromaticStrength} min={0} max={0.1} step={0.001}
         fmt={v => v.toFixed(3)} onChange={v => set('chromaticStrength', v)}
-        description="Separation between the red, green and blue samples across the ring. Red lands furthest out, blue least." />
+        description="Colour fringing at the edge. Separates the red, green and blue samples across the ring — red lands furthest out, blue least — and the separation grows toward the outer rim, so this is the edge fringe dial." />
+
+      <Slider label="Aberration Edge Bias" value={params.chromaticFalloff ?? 1} min={0.2} max={6} step={0.05}
+        onChange={v => set('chromaticFalloff', v)}
+        description="How the fringing is distributed across the ring. 1 is their linear ramp. Above 1 it collapses toward the outer rim, giving a thin bright fringe on the silhouette rather than colour smeared through the whole band; below 1 it spreads inward. Applies in 'page' mode — 'image' and 'none' run the untouched reference shader, which has no such dial." />
 
       <Slider label="Edge Feather" value={params.edgeFeather} min={0} max={20} step={0.5}
         onChange={v => set('edgeFeather', v)}

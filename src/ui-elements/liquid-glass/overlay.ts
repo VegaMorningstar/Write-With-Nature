@@ -35,6 +35,10 @@ const Params = d.struct({
   edgeBlurMultiplier: d.f32,
   tintStrength: d.f32,
   tintColor: d.vec3f,
+  // OURS: their chromatic offset is chromaticStrength * normalizedDist, linear
+  // across the ring. This is an exponent on that ramp, so the fringing can be
+  // pushed into the outer rim instead of spread evenly through the band.
+  chromaticFalloff: d.f32,
 });
 
 export const overlayDefaults = {
@@ -54,6 +58,8 @@ export const overlayDefaults = {
   tintR: 0.58,
   tintG: 0.44,
   tintB: 0.96,
+  // 1 is their linear ramp
+  chromaticFalloff: 1,
 };
 
 const Weights = d.struct({
@@ -114,6 +120,7 @@ export async function setupOverlay(
     edgeBlurMultiplier: overlayDefaults.edgeBlurMultiplier,
     tintStrength: overlayDefaults.tintStrength,
     tintColor: d.vec3f(overlayDefaults.tintR, overlayDefaults.tintG, overlayDefaults.tintB),
+    chromaticFalloff: overlayDefaults.chromaticFalloff,
   });
 
   // ── theirs, unchanged ───────────────────────────────────────────────────────
@@ -172,7 +179,11 @@ export async function setupOverlay(
       sampledView.$,
       sampler.$,
       bgUv.add(dir.mul(paramsUniform.$.refractionStrength * normalizedDist)),
-      paramsUniform.$.chromaticStrength * normalizedDist,
+      // OURS: saturate before the power — normalizedDist runs negative inside
+      // the ring and past 1 outside it, and a fractional exponent on a negative
+      // base is not a number. The weights discard those regions anyway.
+      paramsUniform.$.chromaticStrength *
+        std.saturate(normalizedDist) ** paramsUniform.$.chromaticFalloff,
       dir,
       paramsUniform.$.blur * paramsUniform.$.edgeBlurMultiplier,
     );
@@ -242,6 +253,7 @@ export async function setupOverlay(
         edgeBlurMultiplier: p.edgeBlurMultiplier,
         tintStrength: p.tintStrength,
         tintColor: d.vec3f(p.tintR, p.tintG, p.tintB),
+        chromaticFalloff: Math.max(p.chromaticFalloff ?? 1, 0.05),
       });
     },
     onCleanup() {
