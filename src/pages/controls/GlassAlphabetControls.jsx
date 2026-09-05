@@ -12,13 +12,29 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr }) {
     <>
       <GroupLabel first>SHAPE</GroupLabel>
 
-      <Slider label="Tile Size (px)" value={material.size} min={36} max={140} step={1}
-        fmt={v => v.toFixed(0)} onChange={v => setMat('size', v)} />
+      <Slider label="Tile Size (px)" value={material.size} min={20} max={140} step={1}
+        fmt={v => v.toFixed(0)} onChange={v => setMat('size', v)}
+        description="30 matches the colophon's alphabet grid in the app." />
       <Slider label="Corner Radius (px)" value={material.radius} min={0} max={60} step={1}
-        fmt={v => v.toFixed(0)} onChange={v => setMat('radius', v)}
-        description="The reference sits near a third of the tile's size." />
+        fmt={v => v.toFixed(0)} onChange={v => setMat('radius', v)} />
       <Slider label="Gap (px)" value={material.gap} min={0} max={48} step={1}
         fmt={v => v.toFixed(0)} onChange={v => setMat('gap', v)} />
+
+      <GroupLabel>REFRACTION — the lens</GroupLabel>
+      <Note>
+        The same construction as the app&apos;s glass panels: fractal noise,
+        blurred into a displacement map, bending the backdrop behind the tile.
+      </Note>
+
+      <Slider label="Refraction (px)" value={material.refraction} min={0} max={60} step={1}
+        fmt={v => v.toFixed(0)} onChange={v => setMat('refraction', v)}
+        description="How far the backdrop is pushed. Past roughly the tile's own width it stops reading as glass and starts reading as smear." />
+      <Slider label="Lens Scale" value={material.refractionScale} min={0.002} max={0.08} step={0.001}
+        fmt={v => v.toFixed(3)} onChange={v => setMat('refractionScale', v)}
+        description="Noise frequency. Low is one broad warp across the tile; high is many small ones." />
+      <Slider label="Chromatic Aberration" value={material.chromatic} min={0} max={1} step={0.01}
+        onChange={v => setMat('chromatic', v)}
+        description="Refracts three times at three scales and takes red, green and blue from each — the same trick the WebGPU liquid glass plays with three refractive indices. Needs some Refraction above zero to show." />
 
       <GroupLabel>FROST</GroupLabel>
 
@@ -28,6 +44,12 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr }) {
       <Slider label="Fill" value={material.fill} min={0} max={1} step={0.01}
         onChange={v => setMat('fill', v)}
         description="The white wash over that blur. This is what reads as frosted — blur alone keeps the backdrop's brightness and looks like plastic." />
+      <Slider label="Grain" value={material.grain} min={0} max={1} step={0.01}
+        onChange={v => setMat('grain', v)}
+        description="Speckle painted over the fill. The dust half of frost." />
+      <Slider label="Roughness (px)" value={material.roughness} min={0} max={6} step={0.1}
+        onChange={v => setMat('roughness', v)}
+        description="Fine displacement on the refracted backdrop — the other half. Pits the surface rather than warping it, so it stays legible where Refraction would not." />
       <Slider label="Saturate (%)" value={material.saturate} min={50} max={320} step={5}
         fmt={v => v.toFixed(0)} onChange={v => setMat('saturate', v)} />
       <Slider label="Brightness" value={material.brightness} min={0.7} max={1.5} step={0.01}
@@ -114,6 +136,12 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr }) {
         description="Inverted, as on the jelly: low is twitchy." />
       <Slider label="Throttle (ms)" value={pointer.throttleMs} min={16} max={160} step={2}
         fmt={v => v.toFixed(0)} onChange={v => setPtr('throttleMs', v)} />
+      <Slider label="Hover Impulse" value={pointer.hoverImpulse} min={0} max={2} step={0.02}
+        onChange={v => setPtr('hoverImpulse', v)}
+        description="Fires when the cursor crosses into a tile, so a slow approach still gets a wobble — the sliders above only respond to travel." />
+      <Slider label="Hover Lift (px)" value={pointer.hoverLift} min={0} max={20} step={0.5}
+        onChange={v => setPtr('hoverLift', v)}
+        description="How far a hovered tile holds itself above the grid until the cursor leaves." />
       <Slider label="Click Impulse" value={pointer.clickImpulse} min={0} max={2} step={0.02}
         onChange={v => setPtr('clickImpulse', v)}
         description="Kicks the clicked tile and its neighbours." />
