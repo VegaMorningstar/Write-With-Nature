@@ -6,7 +6,15 @@
     <title>Write with Nature</title>
 
     <!-- PWA -->
-    <link rel="manifest" href="manifest.json" />
+    <!--
+      Must not be a relative href. Vite treats a relative one as a bundled asset
+      and emits it hashed under assets/, and a manifest's start_url resolves
+      against wherever the manifest itself is served from - so it pointed at
+      /Write-With-Nature/assets/, which is not a page, and launching from the
+      iOS home screen gave a 404. The base-url token below keeps it pointing at
+      the untouched copy in public/ at the site root.
+    -->
+    <link rel="manifest" href="%BASE_URL%manifest.json" />
     <meta name="theme-color" content="#2d4a1e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -16,7 +24,8 @@
     <meta name="description" content="Compose text as NASA Landsat satellite imagery — rivers, glaciers and coastlines shaped into letters from orbit." />
     <meta property="og:title" content="Write with Nature" />
     <meta property="og:description" content="Compose words in NASA Landsat satellite imagery." />
-    <meta property="og:image" content="icon-512.png" />
+    <!-- Absolute: link previews are fetched by scrapers with no page context -->
+    <meta property="og:image" content="https://vegamorningstar.github.io/Write-With-Nature/icon-512.png" />
 
     <!-- Fonts (Phase 3 will replace with self-hosted) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
