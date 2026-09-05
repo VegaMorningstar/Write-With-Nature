@@ -4,17 +4,21 @@
  * The lens stays put; the fluid cursor keeps moving underneath it, and the
  * backdrop texture is rebuilt every frame so the refraction tracks it.
  *
- * z-index sits above the fluid canvas (5) and below the glass panels (20) by
- * default, so it refracts the background without covering any content. `onTop`
- * lifts it over everything, which is the only way to see it against a busy part
- * of the page — at the cost of covering whatever is under the lens, since the
- * backdrop texture holds the page's background but not its DOM.
+ * On z-index: `.page` in index.css is `z-index: 20`, so anything below that is
+ * painted under the whole page — which is where this sat at first, and most of
+ * why it could not be seen. 30 puts it over page content; `under` drops it to
+ * 8, beneath the panels, where it refracts background only.
+ *
+ * Worth knowing either way: a lens over a smooth gradient is very nearly
+ * invisible, because a blurred, displaced copy of a smooth gradient is the same
+ * smooth gradient. The fluid cursor trails are the only high-frequency thing in
+ * the backdrop, so they are what the refraction actually has to show.
  */
 import { useRef, useEffect } from 'react'
 
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
-export default function LiquidGlassOverlay({ params, onTop = false, backdropScale = 0.5 }) {
+export default function LiquidGlassOverlay({ params, under = false, backdropScale = 0.5 }) {
   const canvasRef = useRef(null)
   const sceneRef = useRef(null)
   const cleanupRef = useRef(null)
@@ -92,7 +96,8 @@ export default function LiquidGlassOverlay({ params, onTop = false, backdropScal
         position: 'fixed', top: 0, left: 0,
         width: '100%', height: '100%',
         pointerEvents: 'none',
-        zIndex: onTop ? 9998 : 8,
+        // 30 clears .page's z-index: 20; 8 puts it back under the panels
+        zIndex: under ? 8 : 30,
       }}
     />
   )

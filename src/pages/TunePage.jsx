@@ -564,7 +564,7 @@ export default function TunePage() {
   return (
     <>
       <TuneFluid key={fluidKey} opts={appliedFluid} blendMode={blendMode} />
-      {ovOn && <LiquidGlassOverlay params={ov} onTop={ovTop} />}
+      {ovOn && <LiquidGlassOverlay params={ov} under={ovTop} />}
 
       {/* SVG glass filter for inline elements (textarea, buttons, alpha-cells) */}
       <svg style={{ display: 'none', position: 'absolute' }} xmlns="http://www.w3.org/2000/svg">
@@ -824,8 +824,16 @@ export default function TunePage() {
           </div>
 
           <Toggle label="Show" value={ovOn} onChange={setOvOn} />
-          <Toggle label="Above content" value={ovTop} onChange={setOvTop}
-            description="Off keeps it under the panels, so it bends only the background. On lifts it over everything, which is the only way to see it against a busy area — but it will cover what is under it, because the backdrop texture holds the page's background and not its DOM." />
+          <Toggle label="Under panels" value={ovTop} onChange={setOvTop}
+            description="Off puts the lens over page content, which is where you can actually see it — .page is z-index 20, so anything below that is painted under the entire page. On drops it to 8, beneath the panels, where it bends background only and is hidden wherever content sits on top." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px', lineHeight: 1.6 }}>
+            If it still looks like nothing is there: a lens over a smooth
+            gradient is invisible by construction — a blurred, displaced copy of
+            a smooth gradient is the same gradient. Sweep the cursor under it to
+            lay down fluid, which is the only high-frequency thing in the
+            backdrop, or push Tint Strength to 1 to find the lens first.
+          </div>
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
