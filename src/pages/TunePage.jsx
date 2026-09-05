@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { liquidGlass } from '../lib/liquid-glass'
 import { liquidGlass3d, GLASS_3D_DEFAULTS } from '../lib/liquid-glass-3d'
+import LiquidGlassDemo from '../ui-elements/liquid-glass/LiquidGlassDemo'
 import JellyRenderButton, { HOVER_DEFAULTS } from '../ui-elements/jelly-render-button/JellyRenderButton'
 import {
   MATERIAL_DEFAULTS,
@@ -193,6 +194,26 @@ const GLASS_DEF = {
 }
 
 const GLASS_3D_DEF = { ...GLASS_3D_DEFAULTS }
+
+// TypeGPU's own defaults for their liquid-glass example, unchanged. Kept as
+// plain numbers here; the component turns them back into the vectors the
+// uniform wants.
+const TGPU_GLASS_DEF = {
+  rectW: 0.13,
+  rectH: 0.01,
+  radius: 0.003,
+  start: 0.05,
+  end: 0.1,
+  chromaticStrength: 0.02,
+  refractionStrength: 0.1,
+  blur: 1.2,
+  edgeFeather: 2.0,
+  edgeBlurMultiplier: 0.7,
+  tintStrength: 0.05,
+  tintR: 0.58,
+  tintG: 0.44,
+  tintB: 0.96,
+}
 const JELLY_HOVER_DEF = { ...HOVER_DEFAULTS }
 const JELLY_MATERIAL_DEF = { ...MATERIAL_DEFAULTS }
 // The wireframe carries its own complete material now — its glass has diverged
@@ -444,6 +465,10 @@ export default function TunePage() {
   const [use3d,   setUse3d]   = useState(true)
   const setG3 = (k, v) => setGlass3d(g => ({ ...g, [k]: v }))
 
+  // Their shader, their parameters
+  const [tg, setTg] = useState(TGPU_GLASS_DEF)
+  const setTgParam = (k, v) => setTg(p => ({ ...p, [k]: v }))
+
   const legacyCompose  = use3d ? null : composeG
   const legacyBoard    = use3d ? null : boardG
   const legacyColophon = use3d ? null : colophonG
@@ -488,6 +513,7 @@ export default function TunePage() {
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
     setGlass3d({ ...GLASS_3D_DEF })
     setUse3d(true)
+    setTg({ ...TGPU_GLASS_DEF })
     setJellyHover({ ...JELLY_HOVER_DEF })
     setJellyMat({ ...JELLY_MATERIAL_DEF })
     setWireMat({ ...WIRE_MATERIAL_DEF })
@@ -557,6 +583,15 @@ export default function TunePage() {
             {[160,320,480,640,800].map(x => <ellipse key={x} cx={x} cy={x % 320 === 0 ? 18 : 6} rx="6" ry="3" fill="rgba(74,124,63,0.16)" transform={`rotate(${x % 320 === 0 ? 25 : -25} ${x} ${x % 320 === 0 ? 18 : 6})`}/>)}
             {[80,240,400,560,720,880].map(x => <circle key={x} cx={x} cy="12" r="2" fill="rgba(74,124,63,0.2)"/>)}
           </svg>
+
+          {/* TypeGPU's liquid-glass example, running unchanged */}
+          <section className="section">
+            <div className="section-label">
+              TypeGPU liquid-glass · their shader verbatim
+              &nbsp;<span style={{ opacity: 0.4, fontWeight: 300 }}>move the cursor · click to pin</span>
+            </div>
+            <LiquidGlassDemo params={tg} />
+          </section>
 
           {/* Compose card */}
           <section className="section">
@@ -755,7 +790,67 @@ export default function TunePage() {
         <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
 
         {/* ── Glass sections ── */}
-        <AccordionSection title="LIQUID GLASS 3D" open={openSection === 'glass3d'} onToggle={() => toggle('glass3d')}>
+        <AccordionSection title="TYPEGPU LIQUID GLASS" open={openSection === 'tgpuGlass'} onToggle={() => toggle('tgpuGlass')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            Their shader, their parameters, their ranges. Drives the panel at the
+            top of the page.
+          </div>
+
+          <Slider label="Rect Width" value={tg.rectW} min={0.01} max={0.5} step={0.01}
+            onChange={v => setTgParam('rectW', v)}
+            description="Half-width of the lozenge in UV, before the edge band inflates it. Their rectDims.x." />
+
+          <Slider label="Rect Height" value={tg.rectH} min={0.01} max={0.5} step={0.01}
+            onChange={v => setTgParam('rectH', v)}
+            description="Half-height. Their default is 0.01 — almost a line, so nearly the whole visible lens is the inflated edge band rather than the box itself." />
+
+          <Slider label="Corner Radius" value={tg.radius} min={0} max={0.05} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setTgParam('radius', v)}
+            description="Rounding on the box the SDF measures from." />
+
+          <Slider label="Edge Start" value={tg.start} min={0} max={0.1} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setTgParam('start', v)}
+            description="SDF distance where the frosted middle ends and the refracting ring begins." />
+
+          <Slider label="Edge End" value={tg.end} min={0} max={0.2} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setTgParam('end', v)}
+            description="Where the ring ends and the untouched background resumes. This is the lens's actual outer boundary — the visible shape is the box inflated by this much, which is why the lozenge is so much bigger than rectDims suggests." />
+
+          <Slider label="Refraction Strength" value={tg.refractionStrength} min={0} max={0.2} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setTgParam('refractionStrength', v)}
+            description="How far the ring samples outward, in UV. At their 0.1 against a 0.05-wide ring, the displacement is twice the band — which is the whole reason the background smears so hard at the rim." />
+
+          <Slider label="Chromatic Strength" value={tg.chromaticStrength} min={0} max={0.1} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setTgParam('chromaticStrength', v)}
+            description="Separation between the red, green and blue samples across the ring." />
+
+          <Slider label="Blur" value={tg.blur} min={0} max={6} step={0.1}
+            onChange={v => setTgParam('blur', v)}
+            description="Mip bias on the frosted middle. Needs the texture's mip chain, which is why it is generated on load." />
+
+          <Slider label="Edge Blur ×" value={tg.edgeBlurMultiplier} min={0} max={2} step={0.05}
+            onChange={v => setTgParam('edgeBlurMultiplier', v)}
+            description="Ring blur as a multiple of the middle's. Theirs is 0.7 — the ring is sharper than the body." />
+
+          <Slider label="Edge Feather" value={tg.edgeFeather} min={0} max={20} step={0.5}
+            onChange={v => setTgParam('edgeFeather', v)}
+            description="Softness of both weight boundaries, in texels of the source image." />
+
+          <Slider label="Tint Strength" value={tg.tintStrength} min={0} max={1} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setTgParam('tintStrength', v)}
+            description="Mix toward the tint colour. Theirs is 0.05." />
+
+          <Slider label="Tint R" value={tg.tintR} min={0} max={1} step={0.01}
+            onChange={v => setTgParam('tintR', v)} />
+          <Slider label="Tint G" value={tg.tintG} min={0} max={1} step={0.01}
+            onChange={v => setTgParam('tintG', v)} />
+          <Slider label="Tint B" value={tg.tintB} min={0} max={1} step={0.01}
+            onChange={v => setTgParam('tintB', v)}
+            description="Their default is the violet 0.58 / 0.44 / 0.96." />
+        </AccordionSection>
+
+        <AccordionSection title="LIQUID GLASS 3D (CSS)" open={openSection === 'glass3d'} onToggle={() => toggle('glass3d')}>
           <Toggle label="Use 3D glass" value={use3d} onChange={setUse3d}
             description="OFF falls back to the old flat implementation on all three panels, so you can flip between them. The three GLASS sections below only do anything while this is off." />
 
@@ -777,16 +872,20 @@ export default function TunePage() {
 
           <Slider label="Bevel Falloff" value={glass3d.falloff} min={0.4} max={6} step={0.1}
             onChange={v => setG3('falloff', v)}
-            description="How the bend ramps across that width. High presses it hard against the rim and leaves the middle flat and readable; low spreads it across the whole panel, which distorts content but feels more like a lens." />
+            description="How the bend ramps across that width. 1 is linear, which is exactly what their (sdfDist - start) / (end - start) computes. Higher presses it against the rim and leaves the middle readable; lower spreads it across the panel." />
+
+          <Slider label="Ring Feather" value={glass3d.feather} min={0} max={1} step={0.01}
+            onChange={v => setG3('feather', v)}
+            description="Softness of the boundary between the frosted middle and the refracting ring. Their edgeFeather. Near 0 the two regions meet in a visible line." />
 
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
             REFRACTION
           </div>
 
-          <Slider label="Refraction" value={glass3d.scale} min={-260} max={80} step={2}
+          <Slider label="Refraction" value={glass3d.scale} min={-260} max={340} step={2}
             fmt={v => v.toFixed(0)} onChange={v => setG3('scale', v)}
-            description="Displacement in pixels. Negative pulls the backdrop outward at the rim, which magnifies like a real lens; positive pushes it in. 0 leaves only the frost." />
+            description="Displacement in pixels. Positive samples outward along the ring, matching their uv + dir * refractionStrength — that is the direction that smears the background hard at the rim. Theirs runs about twice the ring width, so push it high before deciding it is wrong." />
 
           <Slider label="Map Strength" value={glass3d.strength} min={0} max={2} step={0.02}
             onChange={v => setG3('strength', v)}
@@ -834,9 +933,21 @@ export default function TunePage() {
             FROST &amp; BODY
           </div>
 
-          <Slider label="Blur" value={glass3d.blur} min={0} max={24} step={0.25}
+          <Slider label="Body Blur" value={glass3d.blur} min={0} max={30} step={0.25}
             onChange={v => setG3('blur', v)}
-            description="Backdrop blur across the panel. Their shader blurs the middle more than the rim; CSS gives one blur for the whole element, so this is uniform." />
+            description="Blur of the frosted middle. Lives inside the filter rather than in backdrop-filter, so the ring can differ from it." />
+
+          <Slider label="Ring Blur ×" value={glass3d.edgeBlurMultiplier} min={0} max={2} step={0.05}
+            onChange={v => setG3('edgeBlurMultiplier', v)}
+            description="Ring blur as a multiple of the body's. Their default is 0.7 — the ring is SHARPER than the middle, not softer, because the refraction detail is the point of the ring and blurring it away defeats it." />
+
+          <Slider label="Tint" value={glass3d.tintStrength} min={0} max={0.6} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setG3('tintStrength', v)}
+            description="Mixes the glass toward a colour, across both the body and the ring. Theirs is 0.05 — glass reads as glass when the tint is a suggestion rather than a filter." />
+
+          <Slider label="Tint Hue" value={glass3d.tintHue} min={0} max={360} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setG3('tintHue', v)}
+            description="Degrees. 265 is roughly their violet; swing toward 90 for something that sits with the page's greens." />
 
           <Slider label="Saturate" value={glass3d.saturate} min={0.5} max={3} step={0.05}
             onChange={v => setG3('saturate', v)}

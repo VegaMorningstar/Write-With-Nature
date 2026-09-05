@@ -85,6 +85,20 @@ function _sdRoundedBox(px, py, halfW, halfH, r) {
  *   darker where it faces away, alpha confined to the band. Composited with
  *   overlay, so mid-grey is a no-op.
  */
+function _hslToRgb(hDeg, s, l) {
+  const h = ((hDeg % 360) + 360) % 360 / 360
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+  const f = t => {
+    t = (t + 1) % 1
+    if (t < 1 / 6) return p + (q - p) * 6 * t
+    if (t < 1 / 2) return q
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+    return p
+  }
+  return [f(h + 1 / 3), f(h), f(h - 1 / 3)]
+}
+
 function _buildMaps(w, h, radius, o) {
   const s = Math.min(1, MAP_MAX / Math.max(w, h))
   const mw = Math.max(8, Math.round(w * s))
@@ -102,6 +116,9 @@ function _buildMaps(w, h, radius, o) {
   const lx = Math.cos(theta)
   const ly = Math.sin(theta)
 
+  // Feather on the ring's inner boundary, matching their edgeFeather
+  const feather = Math.max(0.5, band * o.feather)
+
   const dispCanvas = document.createElement('canvas')
   dispCanvas.width = mw
   dispCanvas.height = mh
@@ -113,6 +130,16 @@ function _buildMaps(w, h, radius, o) {
   bevCanvas.height = mh
   const bevCtx = bevCanvas.getContext('2d')
   const bev = bevCtx.createImageData(mw, mh)
+
+  // The ring weight. Their calculateWeights makes this a plateau — it feathers
+  // at `start` and then stays at 1 across the whole band — while the
+  // displacement ramps linearly within it. Two different curves doing two
+  // different jobs; collapsing them into one is what softens the effect.
+  const maskCanvas = document.createElement('canvas')
+  maskCanvas.width = mw
+  maskCanvas.height = mh
+  const maskCtx = maskCanvas.getContext('2d')
+  const mask = maskCtx.createImageData(mw, mh)
 
   for (let y = 0; y < mh; y++) {
     for (let x = 0; x < mw; x++) {
@@ -131,7 +158,8 @@ function _buildMaps(w, h, radius, o) {
       const ux = ax / len
       const uy = ay / len
 
-      // 0 well inside the shape, 1 at the edge
+      // Their normalizedDist: 0 at the ring's inner edge, 1 at the outer. Linear
+      // by default, because that is what (sdfDist - start) / (end - start) is.
       const t = Math.max(0, Math.min(1, (dist + band) / band))
       const ramp = t ** o.falloff
 
@@ -139,6 +167,13 @@ function _buildMaps(w, h, radius, o) {
       disp.data[i + 1] = 128
       disp.data[i + 2] = 128 + uy * ramp * 127 * o.strength
       disp.data[i + 3] = 255
+
+      // Plateau across the band, feathered only on the way in
+      const weight = _smoothStep(-band - feather, -band + feather, dist)
+      mask.data[i] = 255
+      mask.data[i + 1] = 255
+      mask.data[i + 2] = 255
+      mask.data[i + 3] = Math.round(Math.max(0, Math.min(1, weight)) * 255)
 
       // Bevel: how much this part of the turned-over edge faces the light
       const bt = Math.max(0, Math.min(1, (dist + bevelBand) / bevelBand))
@@ -155,8 +190,13 @@ function _buildMaps(w, h, radius, o) {
 
   dispCtx.putImageData(disp, 0, 0)
   bevCtx.putImageData(bev, 0, 0)
+  maskCtx.putImageData(mask, 0, 0)
 
-  return { displacement: dispCanvas.toDataURL(), bevel: bevCanvas.toDataURL() }
+  return {
+    displacement: dispCanvas.toDataURL(),
+    bevel: bevCanvas.toDataURL(),
+    ringMask: maskCanvas.toDataURL(),
+  }
 }
 
 // ── SVG filter ───────────────────────────────────────────────────────────────
@@ -173,10 +213,21 @@ function _ensureDefs() {
   return _defs
 }
 
-// Three displacement passes at slightly different scales, each keeping one
-// channel, screened back together. Same idea as their
-// sampleWithChromaticAberration reassembling vec3f(r.x, g.y, b.z).
-function _buildFilter(id, scales) {
+/**
+ * The filter graph, mirroring their fragment shader:
+ *
+ *   tintedBlur * weights.inside + tintedRing * weights.ring + normal * outside
+ *
+ * The middle of the panel gets a plain blurred backdrop; the ring gets a
+ * *less* blurred one that has been displaced outward and split per channel;
+ * the two are mixed by the ring mask. Outside needs no branch — backdrop-filter
+ * only applies within the element, so it is already untouched.
+ *
+ * Note edgeBlurMultiplier is below 1 in their defaults: the ring is sharper
+ * than the middle, not blurrier. The refraction detail is the point of the
+ * ring, and blurring it away defeats it.
+ */
+function _buildFilter(id) {
   const filter = document.createElementNS(SVG_NS, 'filter')
   filter.setAttribute('id', id)
   filter.setAttribute('x', '-40%')
@@ -185,10 +236,27 @@ function _buildFilter(id, scales) {
   filter.setAttribute('height', '180%')
   filter.setAttribute('color-interpolation-filters', 'sRGB')
 
-  const feImage = document.createElementNS(SVG_NS, 'feImage')
-  feImage.setAttribute('result', 'map')
-  feImage.setAttribute('preserveAspectRatio', 'none')
-  filter.appendChild(feImage)
+  const feMap = document.createElementNS(SVG_NS, 'feImage')
+  feMap.setAttribute('result', 'map')
+  feMap.setAttribute('preserveAspectRatio', 'none')
+  filter.appendChild(feMap)
+
+  const feRing = document.createElementNS(SVG_NS, 'feImage')
+  feRing.setAttribute('result', 'ringMask')
+  feRing.setAttribute('preserveAspectRatio', 'none')
+  filter.appendChild(feRing)
+
+  // inside path — the frosted body
+  const insideBlur = document.createElementNS(SVG_NS, 'feGaussianBlur')
+  insideBlur.setAttribute('in', 'SourceGraphic')
+  insideBlur.setAttribute('result', 'insideBlur')
+  filter.appendChild(insideBlur)
+
+  // ring path — sharper source, then displaced
+  const ringBlur = document.createElementNS(SVG_NS, 'feGaussianBlur')
+  ringBlur.setAttribute('in', 'SourceGraphic')
+  ringBlur.setAttribute('result', 'ringSrc')
+  filter.appendChild(ringBlur)
 
   const KEEP = [
     '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0',
@@ -196,16 +264,17 @@ function _buildFilter(id, scales) {
     '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0',
   ]
 
+  const displacements = []
   const channels = []
   for (let i = 0; i < 3; i++) {
     const d = document.createElementNS(SVG_NS, 'feDisplacementMap')
-    d.setAttribute('in', 'SourceGraphic')
+    d.setAttribute('in', 'ringSrc')
     d.setAttribute('in2', 'map')
-    d.setAttribute('scale', scales[i])
     d.setAttribute('xChannelSelector', 'R')
     d.setAttribute('yChannelSelector', 'B')
     d.setAttribute('result', 'd' + i)
     filter.appendChild(d)
+    displacements.push(d)
 
     const cm = document.createElementNS(SVG_NS, 'feColorMatrix')
     cm.setAttribute('in', 'd' + i)
@@ -227,10 +296,42 @@ function _buildFilter(id, scales) {
   b2.setAttribute('in', 'c01')
   b2.setAttribute('in2', channels[2])
   b2.setAttribute('mode', 'screen')
+  b2.setAttribute('result', 'ringOut')
   filter.appendChild(b2)
 
+  // weights.ring — keep the refracted result only where the mask is opaque
+  const ringPart = document.createElementNS(SVG_NS, 'feComposite')
+  ringPart.setAttribute('in', 'ringOut')
+  ringPart.setAttribute('in2', 'ringMask')
+  ringPart.setAttribute('operator', 'in')
+  ringPart.setAttribute('result', 'ringPart')
+  filter.appendChild(ringPart)
+
+  // weights.inside — the frosted body everywhere the mask is not
+  const insidePart = document.createElementNS(SVG_NS, 'feComposite')
+  insidePart.setAttribute('in', 'insideBlur')
+  insidePart.setAttribute('in2', 'ringMask')
+  insidePart.setAttribute('operator', 'out')
+  insidePart.setAttribute('result', 'insidePart')
+  filter.appendChild(insidePart)
+
+  const combined = document.createElementNS(SVG_NS, 'feComposite')
+  combined.setAttribute('in', 'ringPart')
+  combined.setAttribute('in2', 'insidePart')
+  combined.setAttribute('operator', 'over')
+  combined.setAttribute('result', 'combined')
+  filter.appendChild(combined)
+
+  // applyTint — mix(color, tintColor, strength). A colour matrix does this in
+  // one pass: scale the channels by (1 - strength) and add tint * strength
+  // through the constant column.
+  const tint = document.createElementNS(SVG_NS, 'feColorMatrix')
+  tint.setAttribute('in', 'combined')
+  tint.setAttribute('type', 'matrix')
+  filter.appendChild(tint)
+
   _ensureDefs().appendChild(filter)
-  return { filter, feImage }
+  return { filter, feMap, feRing, insideBlur, ringBlur, displacements, tint }
 }
 
 // ── Overlays ─────────────────────────────────────────────────────────────────
@@ -342,21 +443,33 @@ function _resolveRadius(el, w, h, override) {
 }
 
 export const GLASS_3D_DEFAULTS = {
-  // Refraction band, as a fraction of the panel's smaller half-dimension. This
-  // is the bevel's width — the whole difference between a plate and a blob.
-  band: 0.42,
-  // Ramp exponent across that band. Higher pushes the bend hard against the rim.
-  falloff: 2.4,
+  // Ring width as a fraction of the panel's smaller half-dimension. Theirs works
+  // out at roughly 0.45 of the lens: (end - start) against the lens half-height.
+  // This is the bevel, and the whole difference between a plate and a blob.
+  band: 0.45,
+  // Ramp across the ring. 1 is linear, which is what their
+  // (sdfDist - start) / (end - start) actually is.
+  falloff: 1,
   // Magnitude baked into the map, before the filter's own scale
   strength: 1,
-  // feDisplacementMap scale in px. Negative pulls the backdrop outward.
-  scale: -110,
+  // feDisplacementMap scale in px. Positive samples outward along the ring's
+  // direction, matching their uv + dir * refractionStrength. Theirs runs about
+  // twice the ring width, which is why the reference smears so hard.
+  scale: 160,
   // Per-channel scale offset — the chromatic aberration
-  chroma: 8,
-  // Frost
-  blur: 3,
-  saturate: 1.4,
+  chroma: 14,
+  // Feather on the ring's inner boundary, as a fraction of the band
+  feather: 0.14,
+  // Frost. blur is the body; the ring uses blur * edgeBlurMultiplier, and
+  // theirs is 0.7 — the ring is sharper than the middle, not blurrier.
+  blur: 7,
+  edgeBlurMultiplier: 0.7,
+  saturate: 1.35,
   brightness: 1.02,
+  // Their tintStrength is 0.05 of a violet. Glass reads as glass when the tint
+  // is a suggestion.
+  tintStrength: 0.06,
+  tintHue: 265,
   // Bevel lighting
   bevel: 0.85,
   bevelWidth: 0.75,
@@ -392,8 +505,7 @@ export function liquidGlass3d(el, opts) {
   }
 
   const id = 'lg3d-' + (++_uid)
-  const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma]
-  const parts = _buildFilter(id, scales)
+  const parts = _buildFilter(id)
   const bevelSpan = _createBevel(el)
 
   const prevShadow = el.style.boxShadow
@@ -406,9 +518,28 @@ export function liquidGlass3d(el, opts) {
     const radius = _resolveRadius(el, w, h, o.radius)
     const maps = _buildMaps(w, h, radius, o)
 
-    parts.feImage.setAttribute('href', maps.displacement)
-    parts.feImage.setAttribute('width', w)
-    parts.feImage.setAttribute('height', h)
+    for (const fe of [parts.feMap, parts.feRing]) {
+      fe.setAttribute('width', w)
+      fe.setAttribute('height', h)
+    }
+    parts.feMap.setAttribute('href', maps.displacement)
+    parts.feRing.setAttribute('href', maps.ringMask)
+
+    parts.insideBlur.setAttribute('stdDeviation', o.blur)
+    parts.ringBlur.setAttribute('stdDeviation', (o.blur * o.edgeBlurMultiplier).toFixed(2))
+
+    // Red displaced furthest out, blue least — their samples[0].x / [2].z split
+    const scales = [o.scale + o.chroma, o.scale, o.scale - o.chroma]
+    parts.displacements.forEach((d, i) => d.setAttribute('scale', scales[i].toFixed(1)))
+
+    const s = Math.max(0, Math.min(1, o.tintStrength))
+    const [tr, tg, tb] = _hslToRgb(o.tintHue, 0.6, 0.66)
+    parts.tint.setAttribute('values', [
+      1 - s, 0, 0, 0, (tr * s).toFixed(4),
+      0, 1 - s, 0, 0, (tg * s).toFixed(4),
+      0, 0, 1 - s, 0, (tb * s).toFixed(4),
+      0, 0, 0, 1, 0,
+    ].join(' '))
 
     bevelSpan.style.backgroundImage = `url(${maps.bevel})`
 
@@ -426,8 +557,10 @@ export function liquidGlass3d(el, opts) {
   }
 
   refresh()
+  // No blur() here — the two blurs live inside the filter so the ring and the
+  // body can differ, which is the whole point of edgeBlurMultiplier.
   el.style.backdropFilter = el.style.webkitBackdropFilter =
-    `url(#${id}) blur(${o.blur}px) saturate(${o.saturate}) brightness(${o.brightness})`
+    `url(#${id}) saturate(${o.saturate}) brightness(${o.brightness})`
 
   let timer = null
   const ro = new ResizeObserver(() => {
