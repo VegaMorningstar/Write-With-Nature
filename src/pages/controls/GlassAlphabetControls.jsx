@@ -142,21 +142,29 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
         onChange={v => setPtr('clickImpulse', v)}
         description="Kicks the clicked tile and its neighbours." />
 
-      <GroupLabel>BACKDROP</GroupLabel>
-      <Note>
-        The shader cannot sample the DOM, so the page behind the grid is rebuilt
-        into a texture each frame — paper gradients, the fluid canvas, then the
-        letters. That is why the fluid&apos;s multiply blend is no longer a
-        problem here: this reads the fluid canvas directly rather than relying on
-        backdrop-filter, which cannot see blended content.
-      </Note>
+      {/* Bench only: the app has one fluid blend and it is not tuned per
+          element, so ?tune omits this rather than offering a dial prod has no
+          equivalent for. */}
+      {setFluidBlend && (
+        <>
+          <GroupLabel>BACKDROP</GroupLabel>
+          <Note>
+            The shader cannot sample the DOM, so the page behind the grid is
+            rebuilt into a texture each frame — paper gradients, the fluid
+            canvas, then the letters. That is why the fluid&apos;s multiply
+            blend is no longer a problem here: this reads the fluid canvas
+            directly rather than relying on backdrop-filter, which cannot see
+            blended content.
+          </Note>
 
-      <Toggle
-        label="Fluid blend: multiply"
-        value={fluidBlend === 'multiply'}
-        onChange={v => setFluidBlend(v ? 'multiply' : 'normal')}
-        description="On is what the app ships — the colour stains the paper. Off lifts it into an overlay. Either way the glass here sees it."
-      />
+          <Toggle
+            label="Fluid blend: multiply"
+            value={fluidBlend === 'multiply'}
+            onChange={v => setFluidBlend(v ? 'multiply' : 'normal')}
+            description="On is what the app ships — the colour stains the paper. Off lifts it into an overlay. Either way the glass here sees it."
+          />
+        </>
+      )}
     </>
   )
 }

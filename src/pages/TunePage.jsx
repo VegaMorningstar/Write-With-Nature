@@ -16,6 +16,12 @@ import JellyWireframeButton from '../ui-elements/jelly-wireframe-button/JellyWir
 import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 import LiquidGlassControls from './controls/LiquidGlassControls.jsx'
+import GlassAlphabetControls from './controls/GlassAlphabetControls.jsx'
+import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
+import {
+  MATERIAL_DEFAULTS as ALPHA_MATERIAL,
+  POINTER_DEFAULTS as ALPHA_POINTER,
+} from '../ui-elements/glass-alphabet/constants.ts'
 
 // Rebuilds the glass effect whenever opts change (slider-reactive)
 function useLiveGlass(ref, opts) {
@@ -199,7 +205,14 @@ const RADII_DEF = {
   panel: 20,      // .compose-card, .board, .colophon
   input: 45,      // textarea
   tile: 7,        // .tile
-  alphaCell: 6,   // .alpha-cell
+}
+
+// The colophon's A-Z, now twenty-six lenses of liquid glass rather than CSS
+// cells. Its corner radius lives in here and not in RADII_DEF, because the
+// shader insets it by the edge width instead of applying it to a border box.
+const ALPHA_DEF = {
+  material: { ...ALPHA_MATERIAL },
+  pointer: { ...ALPHA_POINTER },
 }
 
 /**
@@ -282,6 +295,10 @@ export default function TunePage() {
   const [frost, setFrost] = useState(FROST_DEF)
   const setFrostParam = (k, v) => setFrost(f => ({ ...f, [k]: v }))
 
+  const [alpha, setAlpha] = useState(ALPHA_DEF)
+  const setAlphaMat = (k, v) => setAlpha(s => ({ ...s, material: { ...s.material, [k]: v } }))
+  const setAlphaPtr = (k, v) => setAlpha(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
+
   // Scatter goes last so it roughens the blurred backdrop rather than being
   // smoothed away by the blur that follows it.
   const frostFilter =
@@ -347,6 +364,7 @@ export default function TunePage() {
       panelGlass,
       radii,
       frost,
+      glassAlphabet: alpha,
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -358,6 +376,7 @@ export default function TunePage() {
     setPanelGlass({ ...PANEL_GLASS_DEF })
     setRadii({ ...RADII_DEF })
     setFrost({ ...FROST_DEF })
+    setAlpha(structuredClone(ALPHA_DEF))
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
     setFluidKey(k => k + 1)
   }
@@ -476,11 +495,10 @@ export default function TunePage() {
               <h3>About this tool</h3>
               <p>All imagery from NASA's public domain <a href="https://science.nasa.gov/mission/landsat/outreach/your-name-in-landsat/" target="_blank" rel="noreferrer">Your Name in Landsat</a> project — real Landsat 8 &amp; 9 satellite scenes where Earth's surface naturally forms letter shapes from orbit. Click any tile to cycle its satellite scene.</p>
             </div>
-            <div className="alpha-grid">
-              {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(ch => (
-                <div key={ch} className="alpha-cell has" style={{ borderRadius: radii.alphaCell }}>{ch}</div>
-              ))}
-            </div>
+            {/* Twenty-six lenses of liquid glass, each a real button. Clicking
+                one only wobbles it for now; onSelect is where the Landsat grid
+                for that letter will open. */}
+            <GlassAlphabet material={alpha.material} pointer={alpha.pointer} />
           </footer>
 
         </div>
@@ -624,6 +642,20 @@ export default function TunePage() {
           />
         </AccordionSection>
 
+        <AccordionSection title="GLASS ALPHABET" open={openSection === 'alphabet'} onToggle={() => toggle('alphabet')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            The colophon&apos;s A&ndash;Z. Twenty-six lenses running TypeGPU&apos;s
+            liquid glass in one draw call, with the letters in a texture beneath
+            them so the glass refracts them rather than sitting over them.
+          </div>
+          <GlassAlphabetControls
+            material={alpha.material}
+            setMat={setAlphaMat}
+            pointer={alpha.pointer}
+            setPtr={setAlphaPtr}
+          />
+        </AccordionSection>
+
         <AccordionSection title="EDGE CURVATURE" open={openSection === 'radii'} onToggle={() => toggle('radii')}>
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
             The glass reads each panel&apos;s computed border-radius, so moving the
@@ -642,9 +674,6 @@ export default function TunePage() {
             fmt={v => v.toFixed(0)} onChange={v => setRadius('tile', v)}
             description="The letter tiles on the board." />
 
-          <Slider label="Alpha Cell Radius (px)" value={radii.alphaCell} min={0} max={30} step={1}
-            fmt={v => v.toFixed(0)} onChange={v => setRadius('alphaCell', v)}
-            description="The small alphabet cells in the colophon." />
         </AccordionSection>
 
         <AccordionSection title="INPUT FROST" open={openSection === 'frost'} onToggle={() => toggle('frost')}>
