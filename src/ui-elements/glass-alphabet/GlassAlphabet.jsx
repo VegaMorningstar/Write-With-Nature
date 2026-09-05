@@ -40,6 +40,7 @@ export default function GlassAlphabet({
   useEffect(() => { pointerCfgRef.current = pointer }, [pointer])
 
   const [focused, setFocused] = useState(-1)
+  const [error, setError] = useState(null)
   // Set once the springs exist, so a click can reach them from outside the effect
   const pressRef = useRef(null)
 
@@ -230,7 +231,10 @@ export default function GlassAlphabet({
           root.destroy()
         }
       } catch (e) {
+        // Surfaced on the page, not just logged. A silent catch here hid two
+        // separate bugs behind an empty grid that looked like a tuning problem.
         console.warn('[GlassAlphabet] init failed:', e)
+        if (!cancelled) setError(String(e?.message || e))
       }
     }
 
@@ -254,12 +258,28 @@ export default function GlassAlphabet({
       className="glass-alphabet"
       style={{
         position: 'relative',
+        // Its own stacking context, so the canvas below cannot escape behind an
+        // ancestor's background. Without this a negative z-index child is
+        // painted behind whatever opaque parent happens to be above it.
+        isolation: 'isolate',
         display: 'grid',
         gridTemplateColumns: `repeat(${columns}, 1fr)`,
         gap: 8,
         padding: 10,
       }}
     >
+      {error && (
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 2, pointerEvents: 'none',
+          fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#a33',
+          background: 'rgba(255,240,240,0.85)', borderRadius: 10, padding: 8,
+          textAlign: 'center', lineHeight: 1.5,
+        }}>
+          glass alphabet failed to start — {error}
+        </div>
+      )}
+
       {gpuSupported && (
         <canvas
           ref={canvasRef}
@@ -267,8 +287,9 @@ export default function GlassAlphabet({
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
             pointerEvents: 'none',
-            // Negative so the buttons paint above without a wrapper
-            zIndex: -1,
+            // 0, with the buttons explicitly above at 1. Nothing here relies on
+            // paint order between positioned and in-flow content.
+            zIndex: 0,
           }}
         />
       )}
@@ -286,6 +307,9 @@ export default function GlassAlphabet({
             onFocus={() => setFocused(i)}
             onBlur={() => setFocused(-1)}
             style={{
+              // Above the canvas, explicitly
+              position: 'relative',
+              zIndex: 1,
               // Transparent: the canvas behind is the surface
               background: 'none',
               border: 'none',
