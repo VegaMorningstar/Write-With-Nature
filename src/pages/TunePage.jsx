@@ -193,12 +193,30 @@ const GLASS_DEF = {
 // that matters is the damping ratio, damping / (2 * sqrt(stiffness * mass)):
 const PANEL_GLASS_DEF = { ...PANEL_GLASS }
 
-// Read off index.css, so the sliders start where the app does
+// index.css values, except the input radius — 45 to sit inside the panel's own
+// curve rather than fighting it.
 const RADII_DEF = {
   panel: 20,      // .compose-card, .board, .colophon
-  input: 10,      // textarea
+  input: 45,      // textarea
   tile: 7,        // .tile
   alphaCell: 6,   // .alpha-cell
+}
+
+/**
+ * Frost on the compose input.
+ *
+ * index.css already gives it blur(16px) saturate(160%), but that was tuned
+ * against the old CSS panel. The liquid glass behind it is busier — it refracts
+ * and disperses — so the input needs more separation from it to read as its own
+ * surface rather than a hole in the panel.
+ */
+const FROST_DEF = {
+  blur: 26,
+  saturate: 170,
+  brightness: 1.08,
+  bgAlpha: 0.22,
+  borderAlpha: 0.4,
+  svgFilter: true,
 }
 
 const TILE_COLORS = [
@@ -246,6 +264,22 @@ export default function TunePage() {
   const setRadius = (k, v) => setRadii(r => ({ ...r, [k]: v }))
   const panelStyle = { borderRadius: radii.panel }
 
+  const [frost, setFrost] = useState(FROST_DEF)
+  const setFrostParam = (k, v) => setFrost(f => ({ ...f, [k]: v }))
+
+  const frostFilter =
+    `${frost.svgFilter ? 'url(#glass-element) ' : ''}` +
+    `blur(${frost.blur}px) saturate(${frost.saturate}%) brightness(${frost.brightness})`
+
+  const inputStyle = {
+    width: '100%',
+    borderRadius: radii.input,
+    background: `rgba(255,255,255,${frost.bgAlpha})`,
+    borderColor: `rgba(255,255,255,${frost.borderAlpha})`,
+    backdropFilter: frostFilter,
+    WebkitBackdropFilter: frostFilter,
+  }
+
   // Where the shader owns the surface, the panel's own background, border and
   // outer glow have to go — they paint outside the canvas and would show as a
   // second edge beside the glass one.
@@ -290,6 +324,7 @@ export default function TunePage() {
       glass:   { compose: composeG, board: boardG, colophon: colophonG },
       panelGlass,
       radii,
+      frost,
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -300,6 +335,7 @@ export default function TunePage() {
     setBlendMode(BLEND_DEF)
     setPanelGlass({ ...PANEL_GLASS_DEF })
     setRadii({ ...RADII_DEF })
+    setFrost({ ...FROST_DEF })
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
     setFluidKey(k => k + 1)
   }
@@ -358,7 +394,7 @@ export default function TunePage() {
               <LiquidGlassPanel params={panelGlass} />
               <textarea
                 rows={4}
-                style={{ width: '100%', borderRadius: radii.input }}
+                style={inputStyle}
                 defaultValue={'Rivers, glaciers & coastlines — shaped into letters from orbit.\nEach line becomes its own row of satellite tiles.'}
               />
               {/* The shipped button, with no props — exactly as App.jsx mounts
@@ -566,9 +602,9 @@ export default function TunePage() {
             fmt={v => v.toFixed(0)} onChange={v => setRadius('panel', v)}
             description="Compose card, board and colophon. Also the outer curve of the liquid glass, since the lens is fitted to the element." />
 
-          <Slider label="Input Radius (px)" value={radii.input} min={0} max={60} step={1}
+          <Slider label="Input Radius (px)" value={radii.input} min={0} max={120} step={1}
             fmt={v => v.toFixed(0)} onChange={v => setRadius('input', v)}
-            description="The compose textarea. For its curve to nest cleanly inside the panel's, this wants to be the panel radius minus the gap between them — concentric corners share a centre, so equal radii read as too round at the inset edge." />
+            description="The compose textarea. Concentric corners share a centre, so a curve that nests inside the panel's wants the panel radius minus the gap between them — but the input is much shorter than the panel, so a large radius reads as a lozenge rather than a rounded box. 45 leans into that deliberately." />
 
           <Slider label="Tile Radius (px)" value={radii.tile} min={0} max={40} step={1}
             fmt={v => v.toFixed(0)} onChange={v => setRadius('tile', v)}
@@ -577,6 +613,38 @@ export default function TunePage() {
           <Slider label="Alpha Cell Radius (px)" value={radii.alphaCell} min={0} max={30} step={1}
             fmt={v => v.toFixed(0)} onChange={v => setRadius('alphaCell', v)}
             description="The small alphabet cells in the colophon." />
+        </AccordionSection>
+
+        <AccordionSection title="INPUT FROST" open={openSection === 'frost'} onToggle={() => toggle('frost')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            The compose textarea sits on top of the liquid glass, so its frost is
+            filtering the shader&apos;s output rather than the page. That output is
+            busy — refracted and dispersed — so the input needs more separation
+            than index.css gives it to read as its own surface instead of a hole
+            in the panel.
+          </div>
+
+          <Slider label="Blur (px)" value={frost.blur} min={0} max={60} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setFrostParam('blur', v)}
+            description="index.css ships 16, which was tuned against the old CSS panel." />
+
+          <Slider label="Saturate (%)" value={frost.saturate} min={50} max={300} step={5}
+            fmt={v => v.toFixed(0)} onChange={v => setFrostParam('saturate', v)}
+            description="Keeps the colour behind it alive through the blur rather than washing to grey." />
+
+          <Slider label="Brightness" value={frost.brightness} min={0.7} max={1.5} step={0.01}
+            onChange={v => setFrostParam('brightness', v)} />
+
+          <Slider label="Fill Opacity" value={frost.bgAlpha} min={0} max={0.6} step={0.01}
+            onChange={v => setFrostParam('bgAlpha', v)}
+            description="White wash over the blur. This is what actually makes it read as frosted rather than merely blurred — blur alone keeps the backdrop's brightness." />
+
+          <Slider label="Border Opacity" value={frost.borderAlpha} min={0} max={1} step={0.01}
+            onChange={v => setFrostParam('borderAlpha', v)}
+            description="The 1px rim. With the panel's own border gone, this is the only hard edge left in the compose card." />
+
+          <Toggle label="SVG glass filter" value={frost.svgFilter} onChange={v => setFrostParam('svgFilter', v)}
+            description="The displacement filter from index.html that gives the input its own small refraction. OFF leaves a plain frost, which reads cleaner against the liquid glass but flatter." />
         </AccordionSection>
 
         <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
