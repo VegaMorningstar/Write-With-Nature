@@ -28,12 +28,19 @@
  * comes through and the fluid does not.
  */
 import { paintPaper } from '../liquid-glass/backdrop.js'
+import { LETTER_TEX_W, LETTER_TEX_H } from './scene.ts'
 
 export function createTileBackdrop() {
   const paper = document.createElement('canvas')
   const letters = document.createElement('canvas')
   const paperCtx = paper.getContext('2d')
   const letterCtx = letters.getContext('2d')
+
+  // Exactly the letter texture's size, so the upload is one-to-one. Uploading a
+  // device-sized canvas into that texture would stretch it and the shader would
+  // squeeze it back, and the round trip costs detail the squeeze cannot return.
+  letters.width = LETTER_TEX_W
+  letters.height = LETTER_TEX_H
 
   let rect = { left: 0, top: 0, width: 0, height: 0 }
   let dpr = 1
@@ -43,11 +50,9 @@ export function createTileBackdrop() {
     dpr = devicePixelRatio
     const w = Math.max(2, Math.round(r.width * dpr))
     const h = Math.max(2, Math.round(r.height * dpr))
-    for (const c of [paper, letters]) {
-      if (c.width !== w || c.height !== h) {
-        c.width = w
-        c.height = h
-      }
+    if (paper.width !== w || paper.height !== h) {
+      paper.width = w
+      paper.height = h
     }
   }
 
@@ -87,11 +92,16 @@ export function createTileBackdrop() {
     }
     paperCtx.restore()
 
-    // ── Letters: a coverage mask in canvas-local CSS pixels
+    // ── Letters: a coverage mask, drawn in the canvas's CSS pixels but scaled
+    // to fill the texture. The scale is slightly anisotropic where the grid is
+    // not exactly 2:1, which stretches the glyphs — and the shader's sampling
+    // squeezes them back by precisely the same factor, so what lands on screen
+    // is undistorted and rasterized at the texture's resolution rather than the
+    // canvas's. In y that is more than twice the detail.
     letterCtx.setTransform(1, 0, 0, 1, 0, 0)
     letterCtx.clearRect(0, 0, letters.width, letters.height)
     letterCtx.save()
-    letterCtx.scale(dpr, dpr)
+    letterCtx.scale(letters.width / rect.width, letters.height / rect.height)
     letterCtx.font = `${style.weight} ${style.size}px 'Playfair Display', Georgia, serif`
     letterCtx.textAlign = 'center'
     letterCtx.textBaseline = 'middle'

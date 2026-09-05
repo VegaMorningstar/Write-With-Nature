@@ -1,14 +1,18 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { LETTERS } from '../data/letters'
 import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
 import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
-
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
 
 export default function Colophon() {
   const colophonRef = useRef(null)
   usePanelGlass(colophonRef, { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, mode: 'polar', aberrationIntensity: 5, elasticity: 0 })
+
+  // Which letters have scenes behind them. The tiles for the rest stay in the
+  // grid but sit disabled, so the alphabet reads as an alphabet rather than a
+  // gappy subset of one.
+  const available = useMemo(() => new Set(Object.keys(LETTERS)), [])
 
   return (
     <footer className="colophon" ref={colophonRef}>
@@ -28,17 +32,10 @@ export default function Colophon() {
           to find all available filenames and add more variants.
         </p>
       </div>
-      <div className="alpha-grid">
-        {ALPHABET.map(ch => (
-          <div
-            key={ch}
-            className={`alpha-cell${LETTERS[ch] ? ' has' : ''}`}
-            title={LETTERS[ch] ? `${LETTERS[ch].length} variant(s)` : 'not yet mapped'}
-          >
-            {ch}
-          </div>
-        ))}
-      </div>
+      {/* Twenty-six lenses of liquid glass, each a real button. Clicking one
+          only wobbles it for now; onSelect is where the Landsat grid for that
+          letter will open. */}
+      <GlassAlphabet available={available} />
     </footer>
   )
 }

@@ -37,6 +37,10 @@ import { tgpu, common, d, std, type TgpuRoot } from 'typegpu';
 
 export const TILE_COUNT = 26;
 
+/** The letter texture's size, matched by the canvas that feeds it. */
+export const LETTER_TEX_W = 1024;
+export const LETTER_TEX_H = 512;
+
 const Params = d.struct({
   radius: d.f32,
   start: d.f32,
@@ -118,18 +122,25 @@ export async function setupAlphabet(
   // the point for the letters, which are read through a lens at mip 0.
   const TEX_SIZE = 1024;
 
-  const makeTexture = () =>
+  const makeTexture = (w: number, h: number) =>
     root
       .createTexture({
-        size: [TEX_SIZE, TEX_SIZE, 1],
+        size: [w, h, 1],
         // 6 levels, because textureSampleBias needs a mip chain for the blur
         format: 'rgba8unorm',
         mipLevelCount: 6,
       })
       .$usage('sampled', 'render');
 
-  const paperTexture = makeTexture();
-  const letterTexture = makeTexture();
+  const paperTexture = makeTexture(TEX_SIZE, TEX_SIZE);
+  // OURS: the letters get a 2:1 texture, and their canvas is drawn at exactly
+  // that size. Both matter for sharpness. A square texture fed from a grid twice
+  // as wide as it is tall stretches the glyphs 2x vertically on upload and the
+  // shader squeezes them back on the way out — two resamples, and the second
+  // undoes the first only in geometry, not in the detail lost to the first.
+  // 8 columns by 4 rows is close to 2:1 whatever the tile size, since both
+  // dimensions scale together, so this stays right across the size slider.
+  const letterTexture = makeTexture(LETTER_TEX_W, LETTER_TEX_H);
   const paperView = paperTexture.createView();
   const letterView = letterTexture.createView();
 
@@ -208,6 +219,12 @@ export async function setupAlphabet(
    * The letter texture carries only alpha, so what comes back is how much of the
    * glyph each channel sees — mixing the letter colour through that gives real
    * fringing on the glyph's edges rather than three tinted copies of it.
+   *
+   * textureSampleLevel, not textureSampleBias. Bias is added to a level the
+   * hardware derives from the uv derivatives, and a 1024-wide texture read
+   * across a canvas narrower than that is a minification — so even at bias zero
+   * the glyph was coming back from a mip below the sharpest one. An explicit
+   * level says what we actually mean, and the slider drives it directly.
    */
   const sampleMaskWithChromaticAberration = (
     tex: d.texture2d<d.F32>,
@@ -215,13 +232,13 @@ export async function setupAlphabet(
     uv: d.v2f,
     offset: number,
     dir: d.v2f,
-    blur: number,
+    level: number,
   ) => {
     'use gpu';
     const samples = d.arrayOf(d.f32, 3)();
     for (const i of tgpu.unroll(std.range(3))) {
       const channelOffset = dir * (d.f32(i) - 1) * offset;
-      samples[i] = std.textureSampleBias(tex, samp, uv - channelOffset, blur).w;
+      samples[i] = std.textureSampleLevel(tex, samp, uv - channelOffset, level).w;
     }
     return d.vec3f(samples[0], samples[1], samples[2]);
   };

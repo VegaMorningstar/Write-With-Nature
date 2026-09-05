@@ -35,10 +35,10 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
       <Slider label="Ring Start (px)" value={material.ringStart} min={0} max={30} step={0.5}
         onChange={v => setMat('ringStart', v)}
         description="The flat blurred band before the rim begins. Their square starts it at about 0.27 of the box's half-width." />
-      <Slider label="Refraction" value={material.refractionStrength} min={0} max={0.4} step={0.002}
+      <Slider label="Refraction" value={material.refractionStrength} min={0} max={0.9} step={0.002}
         fmt={v => v.toFixed(3)} onChange={v => setMat('refractionStrength', v)}
-        description="How far the ring drags the backdrop, in canvas heights — the same unit the liquid glass square uses, so its 0.1 transfers straight over." />
-      <Slider label="Rim Aberration" value={material.chromaticStrength} min={0} max={0.1} step={0.0005}
+        description="How far the ring drags the backdrop, in canvas heights — the same unit the liquid glass square uses, so its 0.1 transfers straight over. A tile this small needs several times that before the bend is legible; the ceiling was raised once the tuned value hit it." />
+      <Slider label="Rim Aberration" value={material.chromaticStrength} min={0} max={0.25} step={0.0005}
         fmt={v => v.toFixed(4)} onChange={v => setMat('chromaticStrength', v)}
         description="Splits the rim's displacement across three refractive indices — red bends least, blue most. This is the width of the colour fringe at the edge." />
       <Slider label="Fringe Falloff" value={material.chromaticFalloff} min={0.2} max={6} step={0.05}
