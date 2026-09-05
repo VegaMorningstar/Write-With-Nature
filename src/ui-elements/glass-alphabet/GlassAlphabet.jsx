@@ -276,11 +276,14 @@ export default function GlassAlphabet({
                 backdropFilter: frost,
                 WebkitBackdropFilter: frost,
                 // Face: speckle for the dust, the tile's own colour rising from
-                // one corner, a lit wash, then the white fill that reads as frost.
+                // one corner, a corner sheen, then the white fill. Every one of
+                // these adds opacity, so each stops well short of covering the
+                // tile — a sheen across a corner reads as glass, the same wash
+                // over the whole face reads as a painted chip.
                 backgroundImage: [
-                  speckle(m.grain * 0.28),
-                  `radial-gradient(120% 120% at 25% 115%, ${rgb(r, g, b, m.tintStrength * 0.9)} 0%, transparent 62%)`,
-                  `linear-gradient(${m.faceAngle}deg, rgba(255,255,255,${m.faceGradient}) 0%, rgba(255,255,255,0) 65%)`,
+                  speckle(m.grain * 0.12),
+                  `radial-gradient(110% 110% at 22% 118%, ${rgb(r, g, b, m.tintStrength * 0.9)} 0%, transparent 55%)`,
+                  `linear-gradient(${m.faceAngle}deg, rgba(255,255,255,${m.faceGradient}) 0%, rgba(255,255,255,0) 48%)`,
                   `linear-gradient(0deg, rgba(255,255,255,${m.fill}), rgba(255,255,255,${m.fill}))`,
                 ].join(', '),
                 border: `${m.borderWidth}px solid rgba(255,255,255,${m.border})`,

@@ -37,13 +37,19 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr }) {
         description="Refracts three times at three scales and takes red, green and blue from each — the same trick the WebGPU liquid glass plays with three refractive indices. Needs some Refraction above zero to show." />
 
       <GroupLabel>FROST</GroupLabel>
+      <Note>
+        Four white layers land on a tile — Fill, Face Gradient, Grain, and
+        whatever Brightness lifts out of the backdrop — and they compound. Half
+        opacity on each is an opaque tile. Keep them low or the glass turns
+        into a painted chip.
+      </Note>
 
       <Slider label="Blur (px)" value={material.blur} min={0} max={40} step={0.5}
         onChange={v => setMat('blur', v)}
-        description="Blurs whatever the page puts behind the tile." />
+        description="Blurs whatever the page puts behind the tile. On a 30px tile anything past about 6 averages the backdrop to a flat colour, which is its own kind of opaque." />
       <Slider label="Fill" value={material.fill} min={0} max={1} step={0.01}
         onChange={v => setMat('fill', v)}
-        description="The white wash over that blur. This is what reads as frosted — blur alone keeps the backdrop's brightness and looks like plastic." />
+        description="A flat white wash over the whole face. The most direct way to kill transparency — small values only." />
       <Slider label="Grain" value={material.grain} min={0} max={1} step={0.01}
         onChange={v => setMat('grain', v)}
         description="Speckle painted over the fill. The dust half of frost." />
@@ -93,7 +99,7 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr }) {
         description="How much of that colour lands in the tile's own face, rather than only in its halo." />
       <Slider label="Face Gradient" value={material.faceGradient} min={0} max={1} step={0.01}
         onChange={v => setMat('faceGradient', v)}
-        description="A white wash across the face, brighter at one corner — what gives a flat rectangle a lit surface." />
+        description="A sheen across one corner — what gives a flat rectangle a lit surface. It fades out by halfway, so it stays a highlight rather than a coat; it is still the largest single source of opacity here." />
       <Slider label="Face Angle" value={material.faceAngle} min={0} max={360} step={1}
         fmt={v => v.toFixed(0)} onChange={v => setMat('faceAngle', v)} />
 

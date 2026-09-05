@@ -27,17 +27,19 @@ export const MATERIAL_DEFAULTS = {
   gap: 5,            // px between tiles
 
   // ── Frost ─────────────────────────────────────────────────────────────────
-  blur: 12,
-  saturate: 140,
-  brightness: 1.06,
-  // The white wash. Blur alone keeps the backdrop's brightness and reads as
-  // plastic; this is what makes it frosted.
-  fill: 0.16,
+  // Four separate white layers land on a tile — fill, faceGradient, the
+  // speckle, and whatever brightness lifts out of the backdrop — and they
+  // compound. Half-opacity on each is an opaque tile, not a translucent one.
+  // Kept low deliberately: the tile should be a pane, not a chiclet.
+  blur: 4,
+  saturate: 130,
+  brightness: 1.02,
+  fill: 0.06,
 
   // ── Refraction ────────────────────────────────────────────────────────────
   // The lens. Noise displaces the backdrop behind the tile, the way
   // #glass-element does for the compose card and the board.
-  refraction: 18,      // px of displacement
+  refraction: 10,      // px of displacement
   refractionScale: 0.012, // noise base frequency — low is a broad warp
   // Three displacement passes at three scales, one channel taken from each.
   // The WebGPU liquid glass does the same thing with three refractive indices.
@@ -61,13 +63,15 @@ export const MATERIAL_DEFAULTS = {
   glowStrength: 0.42,
   glowSpread: 2.6,    // in tiles
   glowBlur: 10,       // px, the outer halo
-  tintStrength: 0.38, // how much of that colour lands in the tile's own face
+  tintStrength: 0.2,  // how much of that colour lands in the tile's own face
   nearR: 255, nearG: 150, nearB: 210,   // centre of the bloom
   farR: 150, farG: 160, farB: 255,      // its edges
 
   // The face gradient: a soft wash rising from one corner, which is what gives
-  // a flat rectangle the look of a solid with a lit face.
-  faceGradient: 0.42,
+  // a flat rectangle the look of a solid with a lit face. It is the single
+  // largest source of opacity on the tile — a sheen across one corner, not a
+  // coat over the whole face.
+  faceGradient: 0.2,
   faceAngle: 155,
 
   // ── Letter ────────────────────────────────────────────────────────────────
