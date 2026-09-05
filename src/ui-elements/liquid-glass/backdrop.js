@@ -15,6 +15,15 @@
  * glass refracts the page's background, not its content. Anything the lens is
  * placed over is covered rather than bent.
  *
+ * The fluid layer is also unreliable. Its context runs with
+ * preserveDrawingBuffer: false, so the buffer is only readable during the frame
+ * that drew it — and it has to stay that way, because the library's on-screen
+ * pass blends without clearing and relies on the browser to clear between
+ * frames. Force the flag and the colour accumulates instead of dissipating.
+ * Reading it therefore depends on this update() landing in a rAF that runs
+ * after the library's own, which is not guaranteed; when it does not, the
+ * gradients come through and the fluid does not.
+ *
  * Rendered at a fraction of device resolution: it is about to be blurred and
  * displaced, and a full-size upload every frame is a lot of bandwidth for
  * detail that is immediately destroyed.

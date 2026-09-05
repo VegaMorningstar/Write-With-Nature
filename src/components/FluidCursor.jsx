@@ -33,21 +33,16 @@ export default function FluidCursor() {
         return originalAdd.call(this, type, listener, options)
       }
 
-      // The library asks for preserveDrawingBuffer: false, which lets the
-      // browser throw the WebGL buffer away as soon as it has been composited.
-      // Anything that later reads this canvas — drawImage into the collage
-      // export, or into the backdrop the liquid glass refracts — then gets an
-      // empty frame. Forcing it true keeps the pixels readable. It costs the
-      // driver an optimisation, which is the price of the canvas being legible
-      // to the rest of the app.
-      const originalGetContext = HTMLCanvasElement.prototype.getContext
-      HTMLCanvasElement.prototype.getContext = function (type, attrs) {
-        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
-          attrs = { ...(attrs || {}), preserveDrawingBuffer: true }
-        }
-        return originalGetContext.call(this, type, attrs)
-      }
-
+      // Do NOT force preserveDrawingBuffer here. It looks like the obvious way
+      // to make this canvas readable by the collage export and by the liquid
+      // glass backdrop, and it does — but the library's on-screen pass blends
+      // with ONE / ONE_MINUS_SRC_ALPHA and never clears the default framebuffer,
+      // relying on the browser to clear it between frames. Preserve the buffer
+      // and every frame blends onto the last, so colour accumulates and the
+      // dissipation settings stop meaning anything.
+      //
+      // To read this canvas, draw from it inside a rAF registered after the
+      // library's own, while the buffer is still valid for the current frame.
       try {
         initFluid({
           transparent: true,
@@ -63,7 +58,6 @@ export default function FluidCursor() {
         })
       } finally {
         window.addEventListener = originalAdd
-        HTMLCanvasElement.prototype.getContext = originalGetContext
       }
     })
   }, [])
