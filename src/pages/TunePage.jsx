@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { liquidGlass } from '../lib/liquid-glass'
 import { liquidGlass3d, GLASS_3D_DEFAULTS } from '../lib/liquid-glass-3d'
 import LiquidGlassDemo from '../ui-elements/liquid-glass/LiquidGlassDemo'
+import LiquidGlassOverlay from '../ui-elements/liquid-glass/LiquidGlassOverlay'
+import { overlayDefaults } from '../ui-elements/liquid-glass/overlay.ts'
 import JellyRenderButton, { HOVER_DEFAULTS } from '../ui-elements/jelly-render-button/JellyRenderButton'
 import {
   MATERIAL_DEFAULTS,
@@ -213,6 +215,19 @@ const TGPU_GLASS_DEF = {
   tintR: 0.58,
   tintG: 0.44,
   tintB: 0.96,
+}
+
+// Same shader, laid over the page instead of a photo. Starts bigger and rounder
+// than their lozenge, since it has a whole viewport to sit in.
+const OVERLAY_DEF = {
+  ...overlayDefaults,
+  centerX: 0.5,
+  centerY: 0.42,
+  rectW: 0.16,
+  rectH: 0.05,
+  radius: 0.02,
+  start: 0.04,
+  end: 0.09,
 }
 const JELLY_HOVER_DEF = { ...HOVER_DEFAULTS }
 const JELLY_MATERIAL_DEF = { ...MATERIAL_DEFAULTS }
@@ -469,6 +484,12 @@ export default function TunePage() {
   const [tg, setTg] = useState(TGPU_GLASS_DEF)
   const setTgParam = (k, v) => setTg(p => ({ ...p, [k]: v }))
 
+  // The same shader laid over the real page
+  const [ov, setOv] = useState(OVERLAY_DEF)
+  const [ovOn, setOvOn] = useState(true)
+  const [ovTop, setOvTop] = useState(false)
+  const setOvParam = (k, v) => setOv(p => ({ ...p, [k]: v }))
+
   const legacyCompose  = use3d ? null : composeG
   const legacyBoard    = use3d ? null : boardG
   const legacyColophon = use3d ? null : colophonG
@@ -514,6 +535,9 @@ export default function TunePage() {
     setGlass3d({ ...GLASS_3D_DEF })
     setUse3d(true)
     setTg({ ...TGPU_GLASS_DEF })
+    setOv({ ...OVERLAY_DEF })
+    setOvOn(true)
+    setOvTop(false)
     setJellyHover({ ...JELLY_HOVER_DEF })
     setJellyMat({ ...JELLY_MATERIAL_DEF })
     setWireMat({ ...WIRE_MATERIAL_DEF })
@@ -540,6 +564,7 @@ export default function TunePage() {
   return (
     <>
       <TuneFluid key={fluidKey} opts={appliedFluid} blendMode={blendMode} />
+      {ovOn && <LiquidGlassOverlay params={ov} onTop={ovTop} />}
 
       {/* SVG glass filter for inline elements (textarea, buttons, alpha-cells) */}
       <svg style={{ display: 'none', position: 'absolute' }} xmlns="http://www.w3.org/2000/svg">
@@ -790,7 +815,68 @@ export default function TunePage() {
         <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
 
         {/* ── Glass sections ── */}
-        <AccordionSection title="TYPEGPU LIQUID GLASS" open={openSection === 'tgpuGlass'} onToggle={() => toggle('tgpuGlass')}>
+        <AccordionSection title="GLASS ON PAGE" open={openSection === 'overlay'} onToggle={() => toggle('overlay')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            Their shader with no photo behind it — the backdrop is rebuilt every
+            frame from the page gradients and the fluid canvas, so the lens holds
+            still while the fluid moves under it.
+          </div>
+
+          <Toggle label="Show" value={ovOn} onChange={setOvOn} />
+          <Toggle label="Above content" value={ovTop} onChange={setOvTop}
+            description="Off keeps it under the panels, so it bends only the background. On lifts it over everything, which is the only way to see it against a busy area — but it will cover what is under it, because the backdrop texture holds the page's background and not its DOM." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            PLACEMENT
+          </div>
+
+          <Slider label="Centre X" value={ov.centerX} min={0} max={1} step={0.005}
+            onChange={v => setOvParam('centerX', v)}
+            description="Viewport fraction. Static — this is the whole point, the glass stays where you put it." />
+          <Slider label="Centre Y" value={ov.centerY} min={0} max={1} step={0.005}
+            onChange={v => setOvParam('centerY', v)} />
+          <Slider label="Width" value={ov.rectW} min={0.01} max={0.5} step={0.005}
+            onChange={v => setOvParam('rectW', v)}
+            description="Half-width of the box the SDF measures from, before Edge End inflates it into the visible lens." />
+          <Slider label="Height" value={ov.rectH} min={0.01} max={0.5} step={0.005}
+            onChange={v => setOvParam('rectH', v)} />
+          <Slider label="Corner Radius" value={ov.radius} min={0} max={0.05} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setOvParam('radius', v)} />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            GLASS — their parameters
+          </div>
+
+          <Slider label="Edge Start" value={ov.start} min={0} max={0.1} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setOvParam('start', v)}
+            description="Where the frosted middle ends and the refracting ring begins." />
+          <Slider label="Edge End" value={ov.end} min={0} max={0.2} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setOvParam('end', v)}
+            description="The lens's outer boundary. The visible shape is the box inflated by this." />
+          <Slider label="Refraction Strength" value={ov.refractionStrength} min={0} max={0.2} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setOvParam('refractionStrength', v)} />
+          <Slider label="Chromatic Strength" value={ov.chromaticStrength} min={0} max={0.1} step={0.001}
+            fmt={v => v.toFixed(3)} onChange={v => setOvParam('chromaticStrength', v)} />
+          <Slider label="Blur" value={ov.blur} min={0} max={6} step={0.1}
+            onChange={v => setOvParam('blur', v)} />
+          <Slider label="Edge Blur ×" value={ov.edgeBlurMultiplier} min={0} max={2} step={0.05}
+            onChange={v => setOvParam('edgeBlurMultiplier', v)} />
+          <Slider label="Edge Feather" value={ov.edgeFeather} min={0} max={20} step={0.5}
+            onChange={v => setOvParam('edgeFeather', v)} />
+          <Slider label="Tint Strength" value={ov.tintStrength} min={0} max={1} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setOvParam('tintStrength', v)} />
+          <Slider label="Tint R" value={ov.tintR} min={0} max={1} step={0.01}
+            onChange={v => setOvParam('tintR', v)} />
+          <Slider label="Tint G" value={ov.tintG} min={0} max={1} step={0.01}
+            onChange={v => setOvParam('tintG', v)} />
+          <Slider label="Tint B" value={ov.tintB} min={0} max={1} step={0.01}
+            onChange={v => setOvParam('tintB', v)} />
+        </AccordionSection>
+
+        <AccordionSection title="TYPEGPU LIQUID GLASS (demo)" open={openSection === 'tgpuGlass'} onToggle={() => toggle('tgpuGlass')}>
           <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
             padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
             Their shader, their parameters, their ranges. Drives the panel at the

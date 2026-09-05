@@ -1,0 +1,99 @@
+/**
+ * A fixed, full-viewport canvas carrying the liquid glass lens.
+ *
+ * The lens stays put; the fluid cursor keeps moving underneath it, and the
+ * backdrop texture is rebuilt every frame so the refraction tracks it.
+ *
+ * z-index sits above the fluid canvas (5) and below the glass panels (20) by
+ * default, so it refracts the background without covering any content. `onTop`
+ * lifts it over everything, which is the only way to see it against a busy part
+ * of the page — at the cost of covering whatever is under the lens, since the
+ * backdrop texture holds the page's background but not its DOM.
+ */
+import { useRef, useEffect } from 'react'
+
+const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
+
+export default function LiquidGlassOverlay({ params, onTop = false, backdropScale = 0.5 }) {
+  const canvasRef = useRef(null)
+  const sceneRef = useRef(null)
+  const cleanupRef = useRef(null)
+  const paramsRef = useRef(params)
+
+  useEffect(() => {
+    paramsRef.current = params
+    if (params && sceneRef.current) sceneRef.current.setParams(params)
+  }, [params])
+
+  useEffect(() => {
+    if (!gpuSupported) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    let cancelled = false
+    let backdrop = null
+    let ro = null
+
+    async function init() {
+      try {
+        const { tgpu } = await import('typegpu')
+        const { setupOverlay } = await import('./overlay.ts')
+        const { createBackdrop } = await import('./backdrop.js')
+        if (cancelled) return
+
+        backdrop = createBackdrop({ scale: backdropScale })
+
+        const fit = () => {
+          const w = window.innerWidth
+          const h = window.innerHeight
+          const dpr = Math.min(window.devicePixelRatio || 1, 2)
+          canvas.width = Math.round(w * dpr)
+          canvas.height = Math.round(h * dpr)
+          backdrop.resize(w, h)
+          sceneRef.current?.resizeBackdrop(backdrop.width, backdrop.height)
+        }
+        fit()
+
+        const root = await tgpu.init()
+        const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
+        const scene = await setupOverlay(root, context, backdrop.canvas)
+        if (cancelled) { scene.onCleanup(); root.destroy(); return }
+
+        scene.beforeFrame = () => backdrop.update()
+        if (paramsRef.current) scene.setParams(paramsRef.current)
+
+        sceneRef.current = scene
+        cleanupRef.current = () => { scene.onCleanup(); root.destroy() }
+
+        ro = new ResizeObserver(fit)
+        ro.observe(document.documentElement)
+      } catch (e) {
+        console.warn('[LiquidGlassOverlay] init failed:', e)
+      }
+    }
+
+    init()
+
+    return () => {
+      cancelled = true
+      ro?.disconnect()
+      cleanupRef.current?.()
+      cleanupRef.current = null
+      sceneRef.current = null
+    }
+  }, [backdropScale])
+
+  if (!gpuSupported) return null
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed', top: 0, left: 0,
+        width: '100%', height: '100%',
+        pointerEvents: 'none',
+        zIndex: onTop ? 9998 : 8,
+      }}
+    />
+  )
+}
