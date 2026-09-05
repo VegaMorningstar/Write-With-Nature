@@ -18,11 +18,22 @@
  * Without WebGPU this renders the buttons with a plain frosted CSS fallback:
  * the behaviour survives, the refraction does not.
  */
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import { LETTERS, MATERIAL_DEFAULTS, POINTER_DEFAULTS, squashProperties, liftProperties } from './constants.ts'
 import { Spring } from './spring.ts'
 
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
+
+/**
+ * :focus-visible rather than :focus, so a click does not leave a ring behind —
+ * the press is marked by the tile's own glow instead. Keyboard focus still needs
+ * a visible target, and the browser's own heuristic is better at telling the two
+ * apart than anything reconstructable from pointer events.
+ */
+const FOCUS_CSS = `
+.ga-key { outline: none; -webkit-tap-highlight-color: transparent; }
+.ga-key:focus-visible { outline: 2px solid rgba(74,124,63,0.8); outline-offset: 3px; }
+`
 
 export default function GlassAlphabet({
   material = MATERIAL_DEFAULTS,
@@ -36,7 +47,6 @@ export default function GlassAlphabet({
   const buttonRefs = useRef([])
   const springsRef = useRef(null)
   const sceneRef = useRef(null)
-  const [focused, setFocused] = useState(-1)
 
   const m = { ...MATERIAL_DEFAULTS, ...material }
   const p = { ...POINTER_DEFAULTS, ...pointer }
@@ -160,7 +170,7 @@ export default function GlassAlphabet({
         const backdrop = createTileBackdrop()
         const root = await tgpu.init()
         const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
-        const scene = await setupAlphabet(root, context, backdrop.canvas)
+        const scene = await setupAlphabet(root, context, backdrop.paper, backdrop.letters)
         if (cancelled) { scene.onCleanup(); root.destroy(); return }
 
         scene.beforeFrame = () => {
@@ -184,8 +194,9 @@ export default function GlassAlphabet({
           const localStride = mm.size + mm.gap
           const H = rect.height
 
-          const letters = []
+          const glyphs = []
           const tiles = []
+          const halfBox = Math.max(mm.size / 2 - mm.edge, 0.5)
           for (let i = 0; i < LETTERS.length; i++) {
             const sq = springs ? springs.squash[i].value : 0
             const ly = springs ? springs.lift[i].value : 0
@@ -198,21 +209,31 @@ export default function GlassAlphabet({
             const hx = halfPx * (1 + sq) - mm.edge
             const hy = halfPx * (1 - sq * 0.7) - mm.edge
 
+            // Emission from residual wobble energy, as on the jelly: the spring's
+            // speed while it is still ringing, plus how far it is from rest. A
+            // settled tile is at zero, so the grid is dark until it is touched.
+            const glow = springs
+              ? Math.min(
+                (Math.abs(springs.squash[i].velocity) * 0.05 +
+                  Math.abs(springs.squash[i].value) * 1.4) * ptrRef.current.glowGain,
+                1.2,
+              )
+              : 0
+
             // Into box space: canvas heights on both axes, which is what makes
             // the shader's isotropic space line up with square pixels.
-            tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H })
+            tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H, glow })
 
             const has = !availRef.current || availRef.current.has(LETTERS[i])
-            letters.push({ letter: LETTERS[i], x: cx, y: cy, alpha: has ? 1 : 0.3 })
+            glyphs.push({ letter: LETTERS[i], x: cx, y: cy, alpha: has ? 1 : 0.3 })
           }
           scene.setTiles(tiles)
 
           // Radius is measured on the box, which is inset by `edge`; the visible
           // corner is that plus the inflation, so subtract to land on the value
           // the user asked for. Never larger than the box it rounds.
-          const boxRadius = Math.max(0, mm.radius - mm.edge) / H
           scene.setParams({
-            radius: Math.min(boxRadius, Math.max(mm.size / 2 - mm.edge, 0.5) / H),
+            radius: Math.min(Math.max(0, mm.radius - mm.edge) / H, halfBox / H),
             start: mm.ringStart / H,
             end: Math.max(mm.edge / H, 0.0005),
             chromaticStrength: mm.chromaticStrength,
@@ -223,12 +244,20 @@ export default function GlassAlphabet({
             tintStrength: mm.tintStrength,
             tintR: mm.tintR, tintG: mm.tintG, tintB: mm.tintB,
             chromaticFalloff: mm.chromaticFalloff,
+            bodyChromatic: mm.bodyChromatic,
+            // The body's dispersion ramps over the box's own half-width, so it
+            // scales with the tile instead of needing a second slider.
+            bodyDepth: halfBox / H,
+            letterBlur: mm.letterBlur,
+            letterR: mm.letterR, letterG: mm.letterG, letterB: mm.letterB,
+            glowStrength: mm.glowStrength,
+            glowHalo: mm.glowHalo / H,
+            glowR: mm.glowR, glowG: mm.glowG, glowB: mm.glowB,
           })
 
-          backdrop.update(letters, {
+          backdrop.update(glyphs, {
             size: mm.letterSize,
             weight: mm.letterWeight,
-            r: mm.letterR, g: mm.letterG, b: mm.letterB,
             opacity: mm.letterOpacity,
           })
         }
@@ -307,6 +336,7 @@ export default function GlassAlphabet({
         isolation: 'isolate',
       }}
     >
+      <style>{FOCUS_CSS}</style>
       <canvas
         ref={canvasRef}
         aria-hidden="true"
@@ -321,6 +351,7 @@ export default function GlassAlphabet({
         return (
           <button
             key={letter}
+            className="ga-key"
             ref={el => { buttonRefs.current[i] = el }}
             type="button"
             disabled={!has}
@@ -328,8 +359,8 @@ export default function GlassAlphabet({
             onClick={() => { press(i); onSelect?.(letter) }}
             onPointerEnter={() => enter(i)}
             onPointerLeave={() => leave(i)}
-            onFocus={() => { setFocused(i); enter(i) }}
-            onBlur={() => { setFocused(-1); leave(i) }}
+            onFocus={() => enter(i)}
+            onBlur={() => leave(i)}
             style={{
               position: 'absolute',
               left: cell.x,
@@ -343,8 +374,6 @@ export default function GlassAlphabet({
               border: 'none',
               color: 'transparent',
               cursor: has ? 'pointer' : 'default',
-              outline: focused === i ? '2px solid rgba(74,124,63,0.75)' : 'none',
-              outlineOffset: 2,
               willChange: 'transform',
               ...fallbackStyle(has),
             }}

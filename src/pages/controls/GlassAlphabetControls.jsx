@@ -29,21 +29,24 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
         drawn, so the gaps show the real page.
       </Note>
 
-      <Slider label="Edge Width (px)" value={material.edge} min={1} max={20} step={0.5}
+      <Slider label="Edge Width (px)" value={material.edge} min={1} max={40} step={0.5}
         onChange={v => setMat('edge', v)}
-        description="The rim's thickness, and how far the tile grows beyond its box. Most of what reads as glass happens in this band." />
-      <Slider label="Ring Start (px)" value={material.ringStart} min={0} max={12} step={0.5}
+        description="The rim's thickness, and how far the tile grows beyond its box. Nearly everything that reads as depth happens in this band — a thin rim gives a flat pane however strong the refraction. The approved square runs it at 0.6 of the box's half-width." />
+      <Slider label="Ring Start (px)" value={material.ringStart} min={0} max={30} step={0.5}
         onChange={v => setMat('ringStart', v)}
-        description="Above zero leaves a flat blurred band before the rim begins." />
-      <Slider label="Refraction" value={material.refractionStrength} min={0} max={0.12} step={0.001}
+        description="The flat blurred band before the rim begins. Their square starts it at about 0.27 of the box's half-width." />
+      <Slider label="Refraction" value={material.refractionStrength} min={0} max={0.4} step={0.002}
         fmt={v => v.toFixed(3)} onChange={v => setMat('refractionStrength', v)}
-        description="How far the ring drags the backdrop, as a fraction of the canvas. TypeGPU's demo runs 0.1 across a full-screen lozenge; on a 30px tile that hauls in colour from the far side of the grid." />
-      <Slider label="Chromatic Aberration" value={material.chromaticStrength} min={0} max={0.04} step={0.0005}
+        description="How far the ring drags the backdrop, in canvas heights — the same unit the liquid glass square uses, so its 0.1 transfers straight over." />
+      <Slider label="Rim Aberration" value={material.chromaticStrength} min={0} max={0.1} step={0.0005}
         fmt={v => v.toFixed(4)} onChange={v => setMat('chromaticStrength', v)}
-        description="Splits that displacement across three refractive indices — red bends least, blue most. This is the width of the colour fringe at the rim." />
+        description="Splits the rim's displacement across three refractive indices — red bends least, blue most. This is the width of the colour fringe at the edge." />
       <Slider label="Fringe Falloff" value={material.chromaticFalloff} min={0.2} max={6} step={0.05}
         onChange={v => setMat('chromaticFalloff', v)}
         description="Exponent on the fringe's ramp across the ring. 1 is TypeGPU's linear version; higher pushes the colour into the outer rim." />
+      <Slider label="Body Dispersion" value={material.bodyChromatic} min={0} max={0.06} step={0.0005}
+        fmt={v => v.toFixed(4)} onChange={v => setMat('bodyChromatic', v)}
+        description="The jelly's dispersion rather than the rim's: splits what you see through the middle of the tile, letter included. Strongest against the tile's own edge and fading to nothing at its centre, since a slab splits light where you look through it at an angle and not head on." />
 
       <GroupLabel>BODY</GroupLabel>
 
@@ -69,22 +72,46 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
       <Slider label="Tint G" value={material.tintG} min={0} max={1} step={0.01} onChange={v => setMat('tintG', v)} />
       <Slider label="Tint B" value={material.tintB} min={0} max={1} step={0.01} onChange={v => setMat('tintB', v)} />
 
-      <GroupLabel>LETTER — painted under the glass</GroupLabel>
+      <GroupLabel>LETTER — under the glass</GroupLabel>
       <Note>
-        The letters go into the backdrop the shader refracts, not on top of the
-        canvas, so they are displaced and split by the lens the way RENDER is
-        under the jelly button. Sliding Refraction up moves them.
+        The letters sit in a texture of their own, refracted and fringed by the
+        lens like everything else behind the tile but sampled at their own mip
+        bias. Sharing the backdrop&apos;s bias is what made them mush: that bias
+        exists to blur the glass body, and a 20px glyph does not survive it.
       </Note>
 
       <Slider label="Size (px)" value={material.letterSize} min={6} max={60} step={1}
         fmt={v => v.toFixed(0)} onChange={v => setMat('letterSize', v)} />
       <Slider label="Weight" value={material.letterWeight} min={300} max={900} step={100}
         fmt={v => v.toFixed(0)} onChange={v => setMat('letterWeight', v)} />
+      <Slider label="Letter Blur" value={material.letterBlur} min={0} max={4} step={0.05}
+        onChange={v => setMat('letterBlur', v)}
+        description="Its own mip bias, independent of the body's. Zero is mip 0 — as sharp as the glyph was drawn." />
       <Slider label="Opacity" value={material.letterOpacity} min={0} max={1} step={0.01}
         onChange={v => setMat('letterOpacity', v)} />
       <Slider label="R" value={material.letterR} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('letterR', v)} />
       <Slider label="G" value={material.letterG} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('letterG', v)} />
       <Slider label="B" value={material.letterB} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('letterB', v)} />
+
+      <GroupLabel>GLOW — the press</GroupLabel>
+      <Note>
+        Emission from residual wobble energy, as on the jelly. It replaces the
+        focus ring a click used to leave behind — the ring is now keyboard-only,
+        via :focus-visible, so a mouse press is marked by light instead of a
+        green band.
+      </Note>
+
+      <Slider label="Glow Strength" value={material.glowStrength} min={0} max={3} step={0.02}
+        onChange={v => setMat('glowStrength', v)} />
+      <Slider label="Glow Gain" value={pointer.glowGain} min={0} max={3} step={0.02}
+        onChange={v => setPtr('glowGain', v)}
+        description="How readily spring energy becomes light. A settled tile is always dark, so this sets how bright a disturbed one gets, not a floor." />
+      <Slider label="Halo Reach (px)" value={material.glowHalo} min={0} max={60} step={1}
+        fmt={v => v.toFixed(0)} onChange={v => setMat('glowHalo', v)}
+        description="How far the light spills past the tile into the gaps." />
+      <Slider label="R" value={material.glowR} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('glowR', v)} />
+      <Slider label="G" value={material.glowG} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('glowG', v)} />
+      <Slider label="B" value={material.glowB} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('glowB', v)} />
 
       <GroupLabel>WOBBLE</GroupLabel>
       <Note>
