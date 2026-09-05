@@ -5,12 +5,30 @@
  * colour field across the grid, and springs. All CSS — an earlier WebGPU build
  * bought nothing the reference needed and failed silently three times over.
  */
-import { Slider, GroupLabel, Note } from './primitives.jsx'
+import { Slider, Toggle, GroupLabel, Note } from './primitives.jsx'
 
-export function GlassAlphabetControls({ material, setMat, pointer, setPtr }) {
+export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluidBlend, setFluidBlend }) {
   return (
     <>
-      <GroupLabel first>SHAPE</GroupLabel>
+      <GroupLabel first>BACKDROP — read this before judging the glass</GroupLabel>
+      <Note>
+        The fluid cursor paints with mix-blend-mode: multiply. An element that
+        blends forms its own backdrop root, and Chrome will not let a
+        backdrop-filter sample blended content — so the tiles cannot see the
+        fluid however the z-order is arranged, and neither can any other frosted
+        panel in the app. All that is left behind them is the page gradient,
+        which is smooth and pale, and against that a perfectly clear pane and a
+        white chip look the same.
+      </Note>
+
+      <Toggle
+        label="Fluid visible to the glass"
+        value={fluidBlend === 'normal'}
+        onChange={v => setFluidBlend(v ? 'normal' : 'multiply')}
+        description="Drops the fluid's multiply blend on this page only, so it enters the tiles' backdrop and you can see what is actually being refracted. Off is what the app ships."
+      />
+
+      <GroupLabel>SHAPE</GroupLabel>
 
       <Slider label="Tile Size (px)" value={material.size} min={20} max={140} step={1}
         fmt={v => v.toFixed(0)} onChange={v => setMat('size', v)}

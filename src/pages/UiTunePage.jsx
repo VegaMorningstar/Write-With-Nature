@@ -147,6 +147,11 @@ export default function UiTunePage() {
   const setAlphaMat = (k, v) => setAlpha(s => ({ ...s, material: { ...s.material, [k]: v } }))
   const setAlphaPtr = (k, v) => setAlpha(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
   const [lastLetter, setLastLetter] = useState(null)
+  // Not a look — a visibility switch. The fluid's multiply blend hides it from
+  // every backdrop-filter on the page, so with it on there is nothing behind
+  // the tiles but a smooth gradient and transparent glass is indistinguishable
+  // from a white chip.
+  const [fluidBlend, setFluidBlend] = useState('normal')
 
   // Liquid glass
   const [glass, setGlass] = useState(GLASS_DEF)
@@ -180,7 +185,7 @@ export default function UiTunePage() {
       {/* The real component, not a copy of its settings. The liquid glass in
           'page' mode refracts this, so it has to behave exactly as it does in
           the app — a second set of numbers here would drift. */}
-      <FluidCursor />
+      <FluidCursor blend={fluidBlend} />
 
       {/* No stacking context here — .page sets z-index 20 and needs to resolve
           against the root, or it lands under the fluid canvas at 5. */}
@@ -288,6 +293,8 @@ export default function UiTunePage() {
             setMat={setAlphaMat}
             pointer={alpha.pointer}
             setPtr={setAlphaPtr}
+            fluidBlend={fluidBlend}
+            setFluidBlend={setFluidBlend}
           />
         </AccordionSection>
 
