@@ -242,16 +242,22 @@ body::after {
 
 textarea {
   flex: 1;
-  background: rgba(255,255,255,0.14);
-  backdrop-filter: url(#glass-element) blur(16px) saturate(160%) brightness(1.10);
-  -webkit-backdrop-filter: url(#glass-element) blur(16px) saturate(160%) brightness(1.10);
-  border: 1px solid rgba(255,255,255,0.32);
+  /* Frost tuned against the liquid glass now behind it rather than the old CSS
+     panel: heavier blur, a stronger white wash, and grain in both the forms a
+     roughened surface has — speckle painted onto the fill, and #frost-scatter
+     displacing the backdrop after the blur. Brightness below 1 sets it back
+     from the panel instead of glowing off it. */
+  background-color: rgba(255,255,255,0.22);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.3'/%3E%3C/svg%3E");
+  backdrop-filter: url(#glass-element) blur(26px) saturate(170%) brightness(0.91) url(#frost-scatter);
+  -webkit-backdrop-filter: url(#glass-element) blur(26px) saturate(170%) brightness(0.91) url(#frost-scatter);
+  border: 1px solid rgba(255,255,255,0.40);
   box-shadow:
     -2px -2px 7px rgba(255,255,255,0.55),
     3px 3px 10px rgba(0,0,0,0.12),
     inset 1px 1px 4px rgba(255,255,255,0.40),
     inset -1px -1px 3px rgba(0,0,0,0.04);
-  border-radius: 10px; color: var(--ink);
+  border-radius: 45px; color: var(--ink);
   font-family: 'Crimson Pro', Georgia, serif;
   font-size: 1.2rem; font-weight: 300;
   padding: 12px 16px; resize: vertical;

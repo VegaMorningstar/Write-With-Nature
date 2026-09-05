@@ -181,6 +181,16 @@ export default function App() {
           <feComposite in="SourceGraphic" in2="specClipped" operator="arithmetic" k1="0" k2="1" k3="0.5" k4="0" result="litSrc"/>
           <feDisplacementMap in="litSrc" in2="softMap" scale="28" xChannelSelector="R" yChannelSelector="G"/>
         </filter>
+
+        {/* Micro-roughness for the compose input. Fine turbulence displacing the
+            backdrop a couple of pixels — the refractive half of frost, as
+            distinct from the speckle painted on the fill. Separate from
+            #glass-element, which displaces at 28: that is a warp of the whole
+            surface rather than a roughness of it. */}
+        <filter id="frost-scatter" x="-8%" y="-8%" width="116%" height="116%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="9" result="rough"/>
+          <feDisplacementMap in="SourceGraphic" in2="rough" scale="2" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
       </svg>
 
       <div className="page">
