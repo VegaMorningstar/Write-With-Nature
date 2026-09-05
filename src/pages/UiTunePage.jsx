@@ -284,15 +284,15 @@ export default function UiTunePage() {
             by Edge End, as with the panels.
           </Note>
 
-          <Slider label="Corner Radius" value={alpha.material.radius} min={0} max={0.5} step={0.005}
+          <Slider label="Corner Radius" value={alpha.material.radius} min={0} max={1} step={0.005}
             fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('radius', v)}
-            description="0.5 is a circle at these proportions; the reference squares sit around 0.25." />
-          <Slider label="Edge Start" value={alpha.material.start} min={0} max={0.3} step={0.005}
+            description="Fraction of the tile's smaller half-extent. 1 is fully rounded; the reference squares sit around 0.35." />
+          <Slider label="Edge Start" value={alpha.material.start} min={0} max={1} step={0.005}
             fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('start', v)}
-            description="Where the frosted middle gives way to the refracting ring." />
-          <Slider label="Edge End" value={alpha.material.end} min={0.01} max={0.5} step={0.005}
+            description="Where the frosted middle gives way to the refracting ring. A fraction of the tile's half-height, so it means the same at any tile size." />
+          <Slider label="Edge End" value={alpha.material.end} min={0.02} max={1.2} step={0.005}
             fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('end', v)}
-            description="The tile's outer boundary. Larger inflates each tile past its button, so they start to merge into each other." />
+            description="The tile's outer boundary, and how far the box is inset before being inflated back — so the visible tile stays on its button however this moves." />
           <Slider label="Refraction" value={alpha.material.refractionStrength} min={0} max={0.5} step={0.005}
             fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('refractionStrength', v)} />
           <Slider label="Chromatic Aberration" value={alpha.material.chromaticStrength} min={0} max={0.2} step={0.002}
@@ -300,7 +300,7 @@ export default function UiTunePage() {
           <Slider label="Aberration Edge Bias" value={alpha.material.chromaticFalloff} min={0.2} max={4} step={0.05}
             onChange={v => setAlphaMat('chromaticFalloff', v)} />
 
-          <Slider label="Gap" value={alpha.material.gap} min={0} max={0.3} step={0.005}
+          <Slider label="Gap" value={alpha.material.gap} min={0} max={0.8} step={0.005}
             fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('gap', v)}
             description="Extra inset on every tile, purely to open space between them. The CSS grid gap alone is not enough once the glass inflates each tile by Edge End — without this they grow into each other and the grid fuses into one sheet." />
 

@@ -8,14 +8,17 @@ export const MATERIAL_DEFAULTS = {
   // ── Glass, same model as the liquid glass panels ──────────────────────────
   // Distances are in tile heights, so they read the same whatever size the
   // tiles end up.
-  radius: 0.26,
-  start: 0.04,
+  // Fraction of the box's smaller half-extent — 1 is a fully rounded end
+  radius: 0.34,
+  // These, and every other distance here, are fractions of a TILE's half-height,
+  // not of the grid. The shader converts them.
+  start: 0.18,
   // The box is inset by this before the shader inflates it back, so the visible
   // tile lands on its button rather than growing past it into its neighbours.
-  end: 0.1,
-  // Extra inset, in tile heights, purely to open a gap between tiles. The CSS
-  // grid gap alone was not enough once the glass inflated each one.
-  gap: 0.06,
+  end: 0.42,
+  // Extra inset purely to open space between tiles. The CSS grid gap alone is
+  // not enough once the glass inflates each one.
+  gap: 0.12,
   refractionStrength: 0.16,
   chromaticStrength: 0.05,
   chromaticFalloff: 0.5,

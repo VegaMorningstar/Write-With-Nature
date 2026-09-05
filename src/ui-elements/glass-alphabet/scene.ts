@@ -129,36 +129,54 @@ export async function setupGlassAlphabet(
     let nearestCentre = d.vec2f();
     let nearestHalf = d.vec2f(0.05, 0.05);
     let nearestGlow = d.f32(0);
+    // Every distance below is a fraction of a tile's half-height, converted
+    // through this. Shape space is normalised by the HOST height, and a tile is
+    // only a small fraction of that, so treating the two as the same unit
+    // collapses the boxes to nothing.
+    let nearestScale = d.f32(0.05);
 
     for (let i = 0; i < TILE_COUNT; i++) {
       const rect = tilesUniform.$.rect[i];
       const state = tilesUniform.$.state[i];
 
       const centre = rect.xy;
+      const tileH = std.max(rect.w, 0.004);
+
       // Squash scales the local coordinate, so a positive value widens the tile.
-      // The box is inset by `end` and by half the gap, because the shader
-      // inflates it by `end` to make the visible shape — without the inset the
-      // tiles grow into each other and the grid fuses into one sheet.
+      // The box is inset by `end` and `gap` because the shader inflates it by
+      // `end` to make the visible shape — without that the visible tile
+      // overflows its button and meets its neighbours.
       const grown = d.vec2f(rect.z * (1 + state.x), rect.w * (1 + state.y));
+      const inset = (p.end + p.gap) * tileH;
       const half = d.vec2f(
-        std.max(grown.x - p.end - p.gap, 0.004),
-        std.max(grown.y - p.end - p.gap, 0.004),
+        std.max(grown.x - inset, 0.004),
+        std.max(grown.y - inset, 0.004),
       );
-      const dist = sdRoundedBox2d(pos.sub(centre), half, p.radius);
+
+      const dist = sdRoundedBox2d(
+        pos.sub(centre),
+        half,
+        p.radius * std.min(half.x, half.y),
+      );
 
       if (dist < nearest) {
         nearest = dist;
         nearestCentre = centre;
         nearestHalf = half;
         nearestGlow = state.z;
+        nearestScale = tileH;
       }
     }
 
     // Their weights: inside the ring is frosted, the ring refracts, outside is
     // left alone — which for an overlay means left transparent.
-    const featherUV = p.edgeFeather / 512;
-    const inside = 1 - std.smoothstep(p.start - featherUV, p.start + featherUV, nearest);
-    const outside = std.smoothstep(p.end - featherUV, p.end + featherUV, nearest);
+    // Into shape-space distances
+    const startD = p.start * nearestScale;
+    const endD = p.end * nearestScale;
+    const featherUV = p.edgeFeather * 0.004 * nearestScale;
+
+    const inside = 1 - std.smoothstep(startD - featherUV, startD + featherUV, nearest);
+    const outside = std.smoothstep(endD - featherUV, endD + featherUV, nearest);
     const ring = std.max(0, 1 - inside - outside);
     const cover = std.saturate(inside + ring);
 
@@ -166,15 +184,17 @@ export async function setupGlassAlphabet(
       return d.vec4f();
     }
 
-    const normalizedDist = (nearest - p.start) / std.max(p.end - p.start, 0.0001);
+    const normalizedDist = (nearest - startD) / std.max(endD - startD, 0.0001);
     const dir = std.normalize(pos.sub(nearestCentre) + d.vec2f(0.0001, 0.0001));
 
     const bgUv = uv.mul(uvScaleUniform.$).add(uvOffsetUniform.$);
 
     const blurred = std.textureSampleBias(sampledView.$, sampler.$, bgUv, p.blur).rgb;
+    // Scaled by the tile too: these offsets are in backdrop uv, and an offset
+    // sized for a whole panel would drag half the page through a 40px tile.
     const refracted = sampleChromatic(
-      bgUv.add(dir.mul(p.refractionStrength * normalizedDist)),
-      p.chromaticStrength * std.saturate(normalizedDist) ** p.chromaticFalloff,
+      bgUv.add(dir.mul(p.refractionStrength * normalizedDist * nearestScale)),
+      p.chromaticStrength * (std.saturate(normalizedDist) ** p.chromaticFalloff) * nearestScale,
       dir,
       p.blur * p.edgeBlurMultiplier,
     );
@@ -210,7 +230,7 @@ export async function setupGlassAlphabet(
     // other even where their colours match.
     const theta = (p.lightAngle * 3.14159265) / 180;
     const lightDir = d.vec2f(std.cos(theta), std.sin(theta));
-    const rim = std.smoothstep(-p.end, 0, nearest);
+    const rim = std.smoothstep(-endD, 0, nearest);
     const facing = std.dot(std.normalize(local + d.vec2f(0.0001, 0.0001)), lightDir);
     const bevel = facing * rim * p.bevel;
 
