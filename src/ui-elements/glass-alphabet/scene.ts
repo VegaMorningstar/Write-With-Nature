@@ -38,6 +38,13 @@ const Params = d.struct({
   glowNear: d.vec3f,
   glowFar: d.vec3f,
   hoverGlow: d.f32,
+  // Per-tile form: what makes each one read as its own object rather than a
+  // window onto a shared surface.
+  faceGradient: d.f32,
+  bevel: d.f32,
+  edgeDarken: d.f32,
+  lightAngle: d.f32,
+  gap: d.f32,
 });
 
 /**
@@ -120,6 +127,7 @@ export async function setupGlassAlphabet(
     // grid lookup would be faster but would tie the shader to the layout.
     let nearest = d.f32(1e9);
     let nearestCentre = d.vec2f();
+    let nearestHalf = d.vec2f(0.05, 0.05);
     let nearestGlow = d.f32(0);
 
     for (let i = 0; i < TILE_COUNT; i++) {
@@ -127,13 +135,21 @@ export async function setupGlassAlphabet(
       const state = tilesUniform.$.state[i];
 
       const centre = rect.xy;
-      // Squash scales the local coordinate, so a positive value widens the tile
-      const half = d.vec2f(rect.z * (1 + state.x), rect.w * (1 + state.y));
+      // Squash scales the local coordinate, so a positive value widens the tile.
+      // The box is inset by `end` and by half the gap, because the shader
+      // inflates it by `end` to make the visible shape — without the inset the
+      // tiles grow into each other and the grid fuses into one sheet.
+      const grown = d.vec2f(rect.z * (1 + state.x), rect.w * (1 + state.y));
+      const half = d.vec2f(
+        std.max(grown.x - p.end - p.gap, 0.004),
+        std.max(grown.y - p.end - p.gap, 0.004),
+      );
       const dist = sdRoundedBox2d(pos.sub(centre), half, p.radius);
 
       if (dist < nearest) {
         nearest = dist;
         nearestCentre = centre;
+        nearestHalf = half;
         nearestGlow = state.z;
       }
     }
@@ -172,23 +188,45 @@ export async function setupGlassAlphabet(
 
     colour = std.mix(colour, p.tintColor, p.tintStrength);
 
-    // Glow field behind the grid — brightest at the centre and falling to the
-    // far colour, so the tiles bloom through the middle rather than each
-    // lighting itself identically.
-    const centred = pos.sub(d.vec2f(shapeUniform.$.x * 0.5, 0.5));
-    const field = std.exp(-std.dot(centred, centred) / std.max(p.glowSpread, 0.01));
+    // The glow field is sampled at the TILE'S CENTRE, not per pixel. Sampling
+    // it per pixel gives one smooth wash flowing across the whole grid, which
+    // is exactly what makes 26 tiles read as a single sheet. One colour per
+    // tile is what makes each one an object.
+    const gridCentre = d.vec2f(shapeUniform.$.x * 0.5, 0.5);
+    const tileOffset = nearestCentre.sub(gridCentre);
+    const field = std.exp(-std.dot(tileOffset, tileOffset) / std.max(p.glowSpread, 0.01));
     const glowColour = std.mix(p.glowFar, p.glowNear, field);
 
-    // Concentrated at the rim, where a real edge would catch light
-    const edgeBand = 1 - std.smoothstep(0, p.end, std.abs(nearest));
+    // Position within this tile, -1..1 on each axis
+    const local = pos.sub(nearestCentre).div(std.max(nearestHalf, d.vec2f(0.004)));
+    const radial = std.saturate(std.length(local));
+
+    // Each tile brighter through its middle and deeper at its rim — the soft
+    // internal gradient that gives a cube its volume.
+    const face = std.mix(1.0, 1 - radial * radial, p.faceGradient);
+
+    // Bevel: the rim turns over, so it catches or loses the light by which way
+    // it faces. This is the cue that separates neighbouring tiles from each
+    // other even where their colours match.
+    const theta = (p.lightAngle * 3.14159265) / 180;
+    const lightDir = d.vec2f(std.cos(theta), std.sin(theta));
+    const rim = std.smoothstep(-p.end, 0, nearest);
+    const facing = std.dot(std.normalize(local + d.vec2f(0.0001, 0.0001)), lightDir);
+    const bevel = facing * rim * p.bevel;
+
+    // Darkening into the rim, so tiles do not bleed into their neighbours
+    const edgeShade = 1 - rim * p.edgeDarken;
+
     const pointerDist = std.length(pos.sub(pointerUniform.$));
     const pointerLift = std.exp(-pointerDist * pointerDist * 6) * p.hoverGlow;
 
     const glow = glowColour.mul(
-      (field * p.glowStrength + nearestGlow + pointerLift) * (edgeBand ** p.glowEdge),
+      (field * p.glowStrength + nearestGlow + pointerLift) * face * (1 - rim * 0.35 * p.glowEdge),
     );
 
-    return d.vec4f(colour.add(glow).mul(cover), cover);
+    const shaded = colour.mul(edgeShade).add(d.vec3f(bevel)).add(glow);
+
+    return d.vec4f(shaded.mul(cover), cover);
   });
 
   const pipeline = root.createRenderPipeline({
@@ -259,6 +297,11 @@ export async function setupGlassAlphabet(
         glowNear: d.vec3f(o.glowR, o.glowG, o.glowB),
         glowFar: d.vec3f(o.glowFarR, o.glowFarG, o.glowFarB),
         hoverGlow: o.hoverGlow,
+        faceGradient: o.faceGradient,
+        bevel: o.bevel,
+        edgeDarken: o.edgeDarken,
+        lightAngle: o.lightAngle,
+        gap: o.gap,
       });
     },
     onCleanup() {

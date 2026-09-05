@@ -9,8 +9,13 @@ export const MATERIAL_DEFAULTS = {
   // Distances are in tile heights, so they read the same whatever size the
   // tiles end up.
   radius: 0.26,
-  start: 0.06,
-  end: 0.2,
+  start: 0.04,
+  // The box is inset by this before the shader inflates it back, so the visible
+  // tile lands on its button rather than growing past it into its neighbours.
+  end: 0.1,
+  // Extra inset, in tile heights, purely to open a gap between tiles. The CSS
+  // grid gap alone was not enough once the glass inflated each one.
+  gap: 0.06,
   refractionStrength: 0.16,
   chromaticStrength: 0.05,
   chromaticFalloff: 0.5,
@@ -47,6 +52,15 @@ export const MATERIAL_DEFAULTS = {
   glowFarB: 1.0,
   // Extra glow on a tile the pointer is near
   hoverGlow: 0.8,
+
+  // ── Per-tile form ─────────────────────────────────────────────────────────
+  // Without these the tiles are flat windows onto a shared surface, and 26 of
+  // them read as one sheet however far apart they sit. Each one needs its own
+  // internal gradient and its own lit rim to become an object.
+  faceGradient: 0.55,
+  bevel: 0.16,
+  edgeDarken: 0.3,
+  lightAngle: 130,
 };
 
 /** How the grid responds to the pointer. */

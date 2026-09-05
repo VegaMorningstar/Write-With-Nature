@@ -300,6 +300,33 @@ export default function UiTunePage() {
           <Slider label="Aberration Edge Bias" value={alpha.material.chromaticFalloff} min={0.2} max={4} step={0.05}
             onChange={v => setAlphaMat('chromaticFalloff', v)} />
 
+          <Slider label="Gap" value={alpha.material.gap} min={0} max={0.3} step={0.005}
+            fmt={v => v.toFixed(3)} onChange={v => setAlphaMat('gap', v)}
+            description="Extra inset on every tile, purely to open space between them. The CSS grid gap alone is not enough once the glass inflates each tile by Edge End — without this they grow into each other and the grid fuses into one sheet." />
+
+          <GroupLabel>FORM — what makes a tile an object</GroupLabel>
+          <Note>
+            Twenty-six flat windows onto the same backdrop read as one sheet
+            however far apart they sit. These give each tile its own internal
+            gradient and its own lit rim.
+          </Note>
+
+          <Slider label="Face Gradient" value={alpha.material.faceGradient} min={0} max={1} step={0.01}
+            onChange={v => setAlphaMat('faceGradient', v)}
+            description="Brighter through the middle of each tile, deeper at its rim — the soft internal falloff that gives a cube volume. 0 is a flat face." />
+
+          <Slider label="Bevel Light" value={alpha.material.bevel} min={0} max={0.8} step={0.01}
+            onChange={v => setAlphaMat('bevel', v)}
+            description="The rim turns over, so it catches light on one side and loses it on the other. This is what separates neighbouring tiles even where their colours match." />
+
+          <Slider label="Edge Darken" value={alpha.material.edgeDarken} min={0} max={1} step={0.01}
+            onChange={v => setAlphaMat('edgeDarken', v)}
+            description="Shading into the rim, which stops a tile bleeding into the one beside it." />
+
+          <Slider label="Light Angle" value={alpha.material.lightAngle} min={0} max={360} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setAlphaMat('lightAngle', v)}
+            description="Degrees. Drives the bevel on every tile, so they are all lit from the same direction." />
+
           <GroupLabel>FROST</GroupLabel>
           <Slider label="Blur" value={alpha.material.blur} min={0} max={6} step={0.1}
             onChange={v => setAlphaMat('blur', v)} />
@@ -327,10 +354,10 @@ export default function UiTunePage() {
 
         <AccordionSection title="ALPHABET — GLOW" open={openSection === 'alphaGlow'} onToggle={() => toggle('alphaGlow')}>
           <Note>
-            A field behind the whole grid rather than per-tile lighting, so tiles
-            pick it up according to where they sit — which is what gives the
-            reference its bloom through the middle instead of 26 identical
-            squares. Concentrated at the rim, where a real edge catches light.
+            Sampled at each tile&apos;s CENTRE, not per pixel — so a tile gets one
+            colour and reads as an object. Sampling per pixel gives a smooth
+            wash flowing across the whole grid, which is what made 26 tiles look
+            like a single sheet.
           </Note>
 
           <Slider label="Strength" value={alpha.material.glowStrength} min={0} max={3} step={0.02}
