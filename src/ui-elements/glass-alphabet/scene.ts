@@ -1,83 +1,148 @@
 /**
- * Twenty-six glass tiles on one canvas.
+ * TypeGPU's liquid glass, twenty-six times over.
  *
- * The letters are not in here — they are DOM text inside real <button>
- * elements sitting on top, which keeps them crisp, selectable and clickable.
- * This draws only the glass and the glow behind them.
+ * The shader body is theirs, by way of our own overlay.ts — calculateWeights,
+ * applyTint, sampleWithChromaticAberration and the sampling in the fragment
+ * function come from
+ * TypeGPU/apps/typegpu-docs/src/examples/simple/liquid-glass/index.ts.
  *
- * The glass model is TypeGPU's liquid-glass: a rounded box measured by an SDF,
- * with the backdrop displaced outward across a ring between `start` and `end`
- * and merely blurred inside it. The difference is that the SDF is a union of 26
- * boxes rather than one, so each pixel finds its nearest tile first and then
- * runs the same treatment against it.
+ * Four things are ours, each marked OURS below:
  *
- * Everything is measured in tile heights, so a value means the same thing
- * whatever size the grid ends up.
+ *   1. Their SDF is a single rounded box; ours is the union of twenty-six, which
+ *      is their minimum. One loop over a uniform array gives every tile the same
+ *      lens in one draw call. The loop has to carry `dir` and the glow along
+ *      with the distance, since with a union the fragment must use the values
+ *      belonging to whichever tile actually won.
+ *   2. The letters live in their own texture rather than in the backdrop. Two
+ *      reasons: the backdrop is sampled at a mip bias to blur the glass body,
+ *      which turns a 15px letter to mush, and a separate texture can be given
+ *      its own dispersion so the letter fringes like the word under the jelly.
+ *      It carries a mask in its alpha and takes its colour from a uniform, so
+ *      the three chromatic samples produce real fringing on the glyph edges
+ *      rather than three copies of a coloured bitmap.
+ *   3. Refraction is converted out of box space before it is added to uv.
+ *      Theirs adds a box-space offset straight to uv, which on a canvas that is
+ *      not square displaces horizontally and vertically by different numbers of
+ *      pixels. Their demo is square enough not to care; a wide grid is not.
+ *   4. Emission from residual wobble energy, as on the jelly — full strength
+ *      inside the tile and decaying outside it, so a pressed tile both brightens
+ *      and throws light into the gaps around it.
+ *
+ * Everything reaching setTiles and setParams is in box space: canvas heights,
+ * with x scaled by the aspect so corners come out circular. GlassAlphabet.jsx
+ * converts from pixels, which is the only sane unit to tune a 46px tile in.
  */
 import { sdRoundedBox2d } from '@typegpu/sdf';
 import { tgpu, common, d, std, type TgpuRoot } from 'typegpu';
-import { TILE_COUNT } from './constants.ts';
+
+export const TILE_COUNT = 26;
+
+/** The letter texture's size, matched by the canvas that feeds it. */
+export const LETTER_TEX_W = 1024;
+export const LETTER_TEX_H = 512;
 
 const Params = d.struct({
   radius: d.f32,
   start: d.f32,
   end: d.f32,
-  refractionStrength: d.f32,
   chromaticStrength: d.f32,
-  chromaticFalloff: d.f32,
+  refractionStrength: d.f32,
   blur: d.f32,
-  edgeBlurMultiplier: d.f32,
   edgeFeather: d.f32,
+  edgeBlurMultiplier: d.f32,
   tintStrength: d.f32,
   tintColor: d.vec3f,
-  frostFill: d.f32,
-  frostGrain: d.f32,
+  chromaticFalloff: d.f32,
+  // OURS
+  bodyChromatic: d.f32,
+  bodyDepth: d.f32,
+  letterBlur: d.f32,
+  letterColor: d.vec3f,
   glowStrength: d.f32,
-  glowSpread: d.f32,
-  glowEdge: d.f32,
-  glowNear: d.vec3f,
-  glowFar: d.vec3f,
-  hoverGlow: d.f32,
-  // Per-tile form: what makes each one read as its own object rather than a
-  // window onto a shared surface.
-  faceGradient: d.f32,
-  bevel: d.f32,
-  edgeDarken: d.f32,
-  lightAngle: d.f32,
-  gap: d.f32,
-  rimLight: d.f32,
-  rimWidth: d.f32,
+  glowHalo: d.f32,
+  glowColor: d.vec3f,
 });
 
-/**
- * Per-tile geometry and state, as two vec4 arrays rather than a struct array —
- * a uniform array of structs pads every element to 16 bytes anyway, and this
- * keeps the layout obvious.
- *
- *   rect  = centre.xy, half-extent.xy
- *   state = squashX, squashY, glow, pressed
- */
-const Tiles = d.struct({
-  rect: d.arrayOf(d.vec4f, TILE_COUNT),
-  state: d.arrayOf(d.vec4f, TILE_COUNT),
+export type SceneParams = {
+  radius: number;
+  start: number;
+  end: number;
+  chromaticStrength: number;
+  refractionStrength: number;
+  blur: number;
+  edgeFeather: number;
+  edgeBlurMultiplier: number;
+  tintStrength: number;
+  tintR: number;
+  tintG: number;
+  tintB: number;
+  chromaticFalloff: number;
+  bodyChromatic: number;
+  bodyDepth: number;
+  letterBlur: number;
+  letterR: number;
+  letterG: number;
+  letterB: number;
+  glowStrength: number;
+  glowHalo: number;
+  glowR: number;
+  glowG: number;
+  glowB: number;
+};
+
+/** xy = centre in box space, zw = half-extents in box space. */
+const Tiles = d.arrayOf(d.vec4f, TILE_COUNT);
+/** x = glow, from residual wobble energy. The rest is padding. */
+const Glows = d.arrayOf(d.vec4f, TILE_COUNT);
+
+const Weights = d.struct({
+  inside: d.f32,
+  ring: d.f32,
+  outside: d.f32,
 });
 
-export async function setupGlassAlphabet(
+const TintParams = d.struct({
+  color: d.vec3f,
+  strength: d.f32,
+});
+
+export async function setupAlphabet(
   root: TgpuRoot,
   context: GPUCanvasContext,
-  backdropCanvas: HTMLCanvasElement,
+  paperCanvas: HTMLCanvasElement,
+  letterCanvas: HTMLCanvasElement,
 ) {
-  // Fixed size, written with fit:'stretch'. Sampling is in uv, so the stretch
-  // undoes itself, and the pipeline keeps one view for its lifetime.
+  // Fixed size, written with fit: 'stretch'. Recreating it on resize would leave
+  // the compiled pipeline holding a view of a destroyed texture — the shader
+  // captures the view when it is built, not on every frame. Sampling is in uv
+  // space, so the stretch undoes itself.
+  //
+  // Both backdrops cover only the grid's own rectangle rather than the whole
+  // viewport, so 1024 across a few hundred CSS pixels is oversampled — which is
+  // the point for the letters, which are read through a lens at mip 0.
   const TEX_SIZE = 1024;
-  const backdropTexture = root
-    .createTexture({
-      size: [TEX_SIZE, TEX_SIZE, 1],
-      format: 'rgba8unorm',
-      mipLevelCount: 6,
-    })
-    .$usage('sampled', 'render');
-  const sampledView = backdropTexture.createView();
+
+  const makeTexture = (w: number, h: number) =>
+    root
+      .createTexture({
+        size: [w, h, 1],
+        // 6 levels, because textureSampleBias needs a mip chain for the blur
+        format: 'rgba8unorm',
+        mipLevelCount: 6,
+      })
+      .$usage('sampled', 'render');
+
+  const paperTexture = makeTexture(TEX_SIZE, TEX_SIZE);
+  // OURS: the letters get a 2:1 texture, and their canvas is drawn at exactly
+  // that size. Both matter for sharpness. A square texture fed from a grid twice
+  // as wide as it is tall stretches the glyphs 2x vertically on upload and the
+  // shader squeezes them back on the way out — two resamples, and the second
+  // undoes the first only in geometry, not in the detail lost to the first.
+  // 8 columns by 4 rows is close to 2:1 whatever the tile size, since both
+  // dimensions scale together, so this stays right across the size slider.
+  const letterTexture = makeTexture(LETTER_TEX_W, LETTER_TEX_H);
+  const paperView = paperTexture.createView();
+  const letterView = letterTexture.createView();
 
   const sampler = root.createSampler({
     magFilter: 'linear',
@@ -85,31 +150,55 @@ export async function setupGlassAlphabet(
     mipmapFilter: 'linear',
   });
 
-  const paramsUniform = root.createUniform(Params);
-  const tilesUniform = root.createUniform(Tiles);
+  const shapeScaleUniform = root.createUniform(d.vec2f, d.vec2f(1, 1));
 
-  // Kept on the CPU and written whole. A uniform has no per-element write —
-  // writePartial belongs to buffers — and 52 vec4s a frame is nothing.
-  const rectValues = Array.from({ length: TILE_COUNT }, () => d.vec4f(0, 0, 0.001, 0.001));
-  const stateValues = Array.from({ length: TILE_COUNT }, () => d.vec4f(0, 0, 0, 0));
-  const writeTiles = () => tilesUniform.write({ rect: rectValues, state: stateValues });
-  writeTiles();
-  // x = aspect, so the shape space is isotropic; y unused
-  const shapeUniform = root.createUniform(d.vec2f, d.vec2f(1, 1));
-  // Which slice of the viewport-sized backdrop sits behind this canvas
-  const uvScaleUniform = root.createUniform(d.vec2f, d.vec2f(1, 1));
-  const uvOffsetUniform = root.createUniform(d.vec2f, d.vec2f(0, 0));
-  // Pointer in shape space, for the hover glow
-  const pointerUniform = root.createUniform(d.vec2f, d.vec2f(-99, -99));
+  const tilesUniform = root.createUniform(
+    Tiles,
+    Array.from({ length: TILE_COUNT }, () => d.vec4f(0.5, 0.5, 0.02, 0.02)),
+  );
+  const glowsUniform = root.createUniform(
+    Glows,
+    Array.from({ length: TILE_COUNT }, () => d.vec4f(0, 0, 0, 0)),
+  );
 
-  const hash = (p: d.v2f) => {
+  const paramsUniform = root.createUniform(Params, {
+    radius: 0.02,
+    start: 0.02,
+    end: 0.04,
+    chromaticStrength: 0.02,
+    refractionStrength: 0.1,
+    blur: 1.2,
+    edgeFeather: 2,
+    edgeBlurMultiplier: 0.7,
+    tintStrength: 0.05,
+    tintColor: d.vec3f(0.58, 0.44, 0.96),
+    chromaticFalloff: 1,
+    bodyChromatic: 0.01,
+    bodyDepth: 0.05,
+    letterBlur: 0,
+    letterColor: d.vec3f(0.11, 0.1, 0.06),
+    glowStrength: 0,
+    glowHalo: 0.03,
+    glowColor: d.vec3f(0.68, 0.85, 0.45),
+  });
+
+  // ── theirs, unchanged ───────────────────────────────────────────────────────
+  const calculateWeights = (sdfDist: number, start: number, end: number, featherUV: number) => {
     'use gpu';
-    // Cheap value noise for the frost speckle — a texture would be one more
-    // resource for something this small.
-    return std.fract(std.sin(std.dot(p, d.vec2f(127.1, 311.7))) * 43758.5453);
+    const inside = 1 - std.smoothstep(start - featherUV, start + featherUV, sdfDist);
+    const outside = std.smoothstep(end - featherUV, end + featherUV, sdfDist);
+    const ring = std.max(0, 1 - inside - outside);
+    return Weights({ inside, ring, outside });
   };
 
-  const sampleChromatic = (
+  const applyTint = (color: d.v3f, tint: d.Infer<typeof TintParams>) => {
+    'use gpu';
+    return std.mix(d.vec4f(color, 1), d.vec4f(tint.color, 1), tint.strength);
+  };
+
+  const sampleWithChromaticAberration = (
+    tex: d.texture2d<d.F32>,
+    samp: d.sampler,
     uv: d.v2f,
     offset: number,
     dir: d.v2f,
@@ -119,158 +208,151 @@ export async function setupGlassAlphabet(
     const samples = d.arrayOf(d.vec3f, 3)();
     for (const i of tgpu.unroll(std.range(3))) {
       const channelOffset = dir * (d.f32(i) - 1) * offset;
-      samples[i] = std.textureSampleBias(sampledView.$, sampler.$, uv - channelOffset, blur).rgb;
+      samples[i] = std.textureSampleBias(tex, samp, uv - channelOffset, blur).rgb;
     }
     return d.vec3f(samples[0].x, samples[1].y, samples[2].z);
+  };
+  // ── end theirs ──────────────────────────────────────────────────────────────
+
+  /**
+   * OURS: the same three-index split, against a coverage mask instead of colour.
+   * The letter texture carries only alpha, so what comes back is how much of the
+   * glyph each channel sees — mixing the letter colour through that gives real
+   * fringing on the glyph's edges rather than three tinted copies of it.
+   *
+   * textureSampleLevel, not textureSampleBias. Bias is added to a level the
+   * hardware derives from the uv derivatives, and a 1024-wide texture read
+   * across a canvas narrower than that is a minification — so even at bias zero
+   * the glyph was coming back from a mip below the sharpest one. An explicit
+   * level says what we actually mean, and the slider drives it directly.
+   */
+  const sampleMaskWithChromaticAberration = (
+    tex: d.texture2d<d.F32>,
+    samp: d.sampler,
+    uv: d.v2f,
+    offset: number,
+    dir: d.v2f,
+    level: number,
+  ) => {
+    'use gpu';
+    const samples = d.arrayOf(d.f32, 3)();
+    for (const i of tgpu.unroll(std.range(3))) {
+      const channelOffset = dir * (d.f32(i) - 1) * offset;
+      samples[i] = std.textureSampleLevel(tex, samp, uv - channelOffset, level).w;
+    }
+    return d.vec3f(samples[0], samples[1], samples[2]);
   };
 
   const fragmentShader = tgpu.fragmentFn({
     in: { uv: d.vec2f },
     out: d.vec4f,
   })(({ uv }) => {
-    const p = paramsUniform.$;
-    // Isotropic, in tile heights
-    const pos = d.vec2f(uv.x * shapeUniform.$.x, uv.y);
+    // Box space: canvas heights, x widened by the aspect so the space is
+    // isotropic and a square tile is square.
+    const p = uv.mul(shapeScaleUniform.$);
 
-    // Nearest tile. Twenty-six boxes is few enough to just test them all; a
-    // grid lookup would be faster but would tie the shader to the layout.
-    let nearest = d.f32(1e9);
-    let nearestCentre = d.vec2f();
-    let nearestHalf = d.vec2f(0.05, 0.05);
-    let nearestGlow = d.f32(0);
-    // Every distance below is a fraction of a tile's half-height, converted
-    // through this. Shape space is normalised by the HOST height, and a tile is
-    // only a small fraction of that, so treating the two as the same unit
-    // collapses the boxes to nothing.
-    let nearestScale = d.f32(0.05);
+    // OURS: union of the tiles. Carry the winning tile's direction and glow as
+    // well as its distance — with one box theirs is the only direction there is,
+    // but here every tile refracts outward from its own centre.
+    let sdfDist = d.f32(1e6);
+    let dir = d.vec2f(0, 1);
+    let glow = d.f32(0);
 
-    for (let i = 0; i < TILE_COUNT; i++) {
-      const rect = tilesUniform.$.rect[i];
-      const state = tilesUniform.$.state[i];
+    for (const i of std.range(TILE_COUNT)) {
+      const tile = tilesUniform.$[i];
+      const half = d.vec2f(tile.z, tile.w);
+      const rel = p.sub(d.vec2f(tile.x, tile.y));
+      const dist = sdRoundedBox2d(rel, half, paramsUniform.$.radius);
 
-      const centre = rect.xy;
-      const tileH = std.max(rect.w, 0.004);
+      // Theirs, per tile. Guarded against the exact centre, where the vector is
+      // zero and normalize returns NaN — the weights discard that pixel, but a
+      // NaN survives multiplication by zero and would punch a hole in it.
+      const raw = rel.mul(d.vec2f(half.y, half.x));
+      const dirI = raw.div(std.max(std.length(raw), 1e-6));
 
-      // Squash scales the local coordinate, so a positive value widens the tile.
-      // The box is inset by `end` and `gap` because the shader inflates it by
-      // `end` to make the visible shape — without that the visible tile
-      // overflows its button and meets its neighbours.
-      const grown = d.vec2f(rect.z * (1 + state.x), rect.w * (1 + state.y));
-      const inset = (p.end + p.gap) * tileH;
-      const half = d.vec2f(
-        std.max(grown.x - inset, 0.004),
-        std.max(grown.y - inset, 0.004),
-      );
-
-      const dist = sdRoundedBox2d(
-        pos.sub(centre),
-        half,
-        p.radius * std.min(half.x, half.y),
-      );
-
-      if (dist < nearest) {
-        nearest = dist;
-        nearestCentre = centre;
-        nearestHalf = half;
-        nearestGlow = state.z;
-        nearestScale = tileH;
-      }
+      const closer = dist < sdfDist;
+      sdfDist = std.select(sdfDist, dist, closer);
+      dir = std.select(dir, dirI, closer);
+      glow = std.select(glow, glowsUniform.$[i].x, closer);
     }
 
-    // Their weights: inside the ring is frosted, the ring refracts, outside is
-    // left alone — which for an overlay means left transparent.
-    // Into shape-space distances
-    const startD = p.start * nearestScale;
-    const endD = p.end * nearestScale;
-    const featherUV = p.edgeFeather * 0.004 * nearestScale;
+    const normalizedDist =
+      (sdfDist - paramsUniform.$.start) / (paramsUniform.$.end - paramsUniform.$.start);
 
-    const inside = 1 - std.smoothstep(startD - featherUV, startD + featherUV, nearest);
-    const outside = std.smoothstep(endD - featherUV, endD + featherUV, nearest);
-    const ring = std.max(0, 1 - inside - outside);
-    const cover = std.saturate(inside + ring);
+    const texDim = std.textureDimensions(paperView.$, 0);
+    const featherUV = paramsUniform.$.edgeFeather / std.max(texDim.x, texDim.y);
+    const weights = calculateWeights(sdfDist, paramsUniform.$.start, paramsUniform.$.end, featherUV);
 
-    if (cover < 0.002) {
-      return d.vec4f();
-    }
-
-    const normalizedDist = (nearest - startD) / std.max(endD - startD, 0.0001);
-    const dir = std.normalize(pos.sub(nearestCentre) + d.vec2f(0.0001, 0.0001));
-
-    const bgUv = uv.mul(uvScaleUniform.$).add(uvOffsetUniform.$);
-
-    const blurred = std.textureSampleBias(sampledView.$, sampler.$, bgUv, p.blur).rgb;
-    // Scaled by the tile too: these offsets are in backdrop uv, and an offset
-    // sized for a whole panel would drag half the page through a 40px tile.
-    const refracted = sampleChromatic(
-      bgUv.add(dir.mul(p.refractionStrength * normalizedDist * nearestScale)),
-      p.chromaticStrength * (std.saturate(normalizedDist) ** p.chromaticFalloff) * nearestScale,
-      dir,
-      p.blur * p.edgeBlurMultiplier,
+    // OURS: dir is a unit vector in box space, and uv is not — on a canvas wider
+    // than it is tall, adding one to the other displaces further horizontally
+    // than vertically. Dividing by the shape scale converts back, so the
+    // strength is a distance in canvas heights like every other param here.
+    const ringUv = uv.add(
+      dir.mul(paramsUniform.$.refractionStrength * normalizedDist).div(shapeScaleUniform.$),
     );
 
-    let colour = std.mix(blurred, refracted, ring);
+    // Their ramp: no fringing at the inner edge of the ring, most at the outer.
+    // Saturate before the power — normalizedDist runs negative inside the ring
+    // and past 1 outside it, and a fractional exponent on a negative base is not
+    // a number. The weights discard those regions anyway.
+    const ringOffset =
+      paramsUniform.$.chromaticStrength *
+      std.saturate(normalizedDist) ** paramsUniform.$.chromaticFalloff;
 
-    // Frost: the white wash is what reads as frosted, and the speckle is the
-    // roughness of the surface catching light.
-    const speckle = (hash(std.floor(uv.mul(900))) - 0.5) * p.frostGrain * 0.35;
-    colour = std.mix(colour, d.vec3f(1), p.frostFill).add(d.vec3f(speckle));
+    // OURS: the body disperses too, the way the jelly's does. Strongest against
+    // the tile's own edge and fading to nothing at its centre — a slab of glass
+    // splits light where you look through it at an angle, not head on.
+    const bodyOffset =
+      paramsUniform.$.bodyChromatic *
+      std.saturate(1 + sdfDist / std.max(paramsUniform.$.bodyDepth, 1e-4));
 
-    colour = std.mix(colour, p.tintColor, p.tintStrength);
-
-    // The glow field is sampled at the TILE'S CENTRE, not per pixel. Sampling
-    // it per pixel gives one smooth wash flowing across the whole grid, which
-    // is exactly what makes 26 tiles read as a single sheet. One colour per
-    // tile is what makes each one an object.
-    const gridCentre = d.vec2f(shapeUniform.$.x * 0.5, 0.5);
-    const tileOffset = nearestCentre.sub(gridCentre);
-    const field = std.exp(-std.dot(tileOffset, tileOffset) / std.max(p.glowSpread, 0.01));
-    const glowColour = std.mix(p.glowFar, p.glowNear, field);
-
-    // Position within this tile, -1..1 on each axis
-    const local = pos.sub(nearestCentre).div(std.max(nearestHalf, d.vec2f(0.004)));
-    const radial = std.saturate(std.length(local));
-
-    // Each tile brighter through its middle and deeper at its rim — the soft
-    // internal gradient that gives a cube its volume.
-    const face = std.mix(1.0, 1 - radial * radial, p.faceGradient);
-
-    // Bevel: the rim turns over, so it catches or loses the light by which way
-    // it faces. This is the cue that separates neighbouring tiles from each
-    // other even where their colours match.
-    const theta = (p.lightAngle * 3.14159265) / 180;
-    const lightDir = d.vec2f(std.cos(theta), std.sin(theta));
-    const rim = std.smoothstep(-endD, 0, nearest);
-    const facing = std.dot(std.normalize(local + d.vec2f(0.0001, 0.0001)), lightDir);
-    const bevel = facing * rim * p.bevel;
-
-    // A bright band hugging the tile's edge, mostly even the whole way round.
-    // This is the single most identifying feature of the reference — each tile
-    // outlined in light — and it is what reads as a distinct pane rather than a
-    // patch of a larger surface. The bevel above only tilts it toward the light.
-    const rimBand = std.exp(-((nearest / std.max(p.rimWidth * nearestScale, 0.0005)) ** 2));
-    const rimLight = rimBand * p.rimLight;
-
-    // Darkening into the rim, so tiles do not bleed into their neighbours
-    const edgeShade = 1 - rim * p.edgeDarken;
-
-    const pointerDist = std.length(pos.sub(pointerUniform.$));
-    const pointerLift = std.exp(-pointerDist * pointerDist * 6) * p.hoverGlow;
-
-    const glow = glowColour.mul(
-      (field * p.glowStrength + nearestGlow + pointerLift) * face * (1 - rim * 0.35 * p.glowEdge),
+    const paperBody = sampleWithChromaticAberration(
+      paperView.$, sampler.$, uv, bodyOffset, dir, paramsUniform.$.blur,
+    );
+    const paperRing = sampleWithChromaticAberration(
+      paperView.$, sampler.$, ringUv, ringOffset, dir,
+      paramsUniform.$.blur * paramsUniform.$.edgeBlurMultiplier,
     );
 
-    const shaded = colour
-      .mul(edgeShade)
-      .add(d.vec3f(bevel))
-      .add(glow)
-      .add(d.vec3f(rimLight));
+    // OURS: the letters at their own bias — zero by default, so the glyph stays
+    // sharp while the page behind it blurs. Sampling both out of one texture is
+    // what made them mush.
+    const maskBody = sampleMaskWithChromaticAberration(
+      letterView.$, sampler.$, uv, bodyOffset, dir, paramsUniform.$.letterBlur,
+    );
+    const maskRing = sampleMaskWithChromaticAberration(
+      letterView.$, sampler.$, ringUv, ringOffset, dir, paramsUniform.$.letterBlur,
+    );
 
-    // The rim also lifts alpha, so the outline survives on a tile that is
-    // otherwise nearly clear
-    const alpha = std.saturate(cover + rimBand * p.rimLight * 0.5);
+    const bodyColor = std.mix(paperBody, paramsUniform.$.letterColor, maskBody);
+    const ringColor = std.mix(paperRing, paramsUniform.$.letterColor, maskRing);
 
-    return d.vec4f(shaded.mul(alpha), alpha);
+    const tint = TintParams({
+      color: paramsUniform.$.tintColor,
+      strength: paramsUniform.$.tintStrength,
+    });
+
+    const tintedBlur = applyTint(bodyColor, tint);
+    const tintedRing = applyTint(ringColor, tint);
+
+    // Their third term is the untouched background at weights.outside. Between
+    // tiles that would paint our reconstruction of the page over the real page,
+    // so the outside weight becomes transparency and the gaps show the real DOM.
+    // Premultiplied, matching the canvas mode.
+    const cover = std.saturate(weights.inside + weights.ring);
+    const glass = tintedBlur.rgb.mul(weights.inside).add(tintedRing.rgb.mul(weights.ring));
+
+    // OURS: emission from residual wobble energy, as the jelly does it. Full
+    // strength anywhere inside the lens and decaying outside it, so one term is
+    // both the tile brightening and the light it throws into the gaps.
+    const halo =
+      std.exp(-std.max(sdfDist - paramsUniform.$.end, 0) / std.max(paramsUniform.$.glowHalo, 1e-5)) *
+      glow * paramsUniform.$.glowStrength;
+
+    return d.vec4f(
+      glass.add(paramsUniform.$.glowColor.mul(halo)),
+      std.saturate(cover + halo),
+    );
   });
 
   const pipeline = root.createRenderPipeline({
@@ -285,8 +367,10 @@ export async function setupGlassAlphabet(
     frameId = requestAnimationFrame(render);
     try {
       onFrame?.();
-      backdropTexture.write(backdropCanvas, { fit: 'stretch' });
-      backdropTexture.generateMipmaps();
+      paperTexture.write(paperCanvas, { fit: 'stretch' });
+      paperTexture.generateMipmaps();
+      letterTexture.write(letterCanvas, { fit: 'stretch' });
+      letterTexture.generateMipmaps();
       pipeline.withColorAttachment({ view: context }).draw(3);
     } catch (e) {
       console.error('[GlassAlphabet] render error:', e);
@@ -295,63 +379,48 @@ export async function setupGlassAlphabet(
   frameId = requestAnimationFrame(render);
 
   return {
+    /** Called at the top of each frame, to repaint the backdrop canvases. */
     set beforeFrame(fn: (() => void) | null) {
       onFrame = fn;
     },
+    /**
+     * Aspect correction. Pass the canvas's CSS size; every distance in the tiles
+     * and params is then measured in canvas heights.
+     */
     setShapeScale(w: number, h: number) {
-      shapeUniform.write(d.vec2f(h > 0 ? w / h : 1, 1));
+      shapeScaleUniform.write(d.vec2f(h > 0 ? w / h : 1, 1));
     },
-    setViewportRect(rect: { x: number; y: number; w: number; h: number }, vw: number, vh: number) {
-      uvScaleUniform.write(d.vec2f(rect.w / vw, rect.h / vh));
-      uvOffsetUniform.write(d.vec2f(rect.x / vw, rect.y / vh));
+    /**
+     * The whole array, every frame. Not writePartial — that is a buffer method,
+     * and calling it on a uniform throws from inside the render loop where the
+     * only sign of it is a silent black canvas.
+     */
+    setTiles(tiles: { cx: number; cy: number; hx: number; hy: number; glow: number }[]) {
+      tilesUniform.write(
+        tiles.map(t => d.vec4f(t.cx, t.cy, Math.max(t.hx, 0.0005), Math.max(t.hy, 0.0005))),
+      );
+      glowsUniform.write(tiles.map(t => d.vec4f(t.glow, 0, 0, 0)));
     },
-    setPointer(x: number, y: number) {
-      pointerUniform.write(d.vec2f(x, y));
-    },
-    /** rect = [cx, cy, hx, hy] per tile, in shape space. */
-    setTileRects(rects: number[][]) {
-      for (let i = 0; i < TILE_COUNT; i++) {
-        const r = rects[i];
-        if (r) rectValues[i] = d.vec4f(r[0], r[1], r[2], r[3]);
-      }
-      writeTiles();
-    },
-    /** state = [squashX, squashY, glow, pressed] per tile. */
-    setTileStates(states: number[][]) {
-      for (let i = 0; i < TILE_COUNT; i++) {
-        const s = states[i];
-        if (s) stateValues[i] = d.vec4f(s[0], s[1], s[2], s[3]);
-      }
-      writeTiles();
-    },
-    setParams(o: Record<string, number>) {
+    setParams(p: SceneParams) {
       paramsUniform.write({
-        radius: o.radius,
-        start: o.start,
-        end: o.end,
-        refractionStrength: o.refractionStrength,
-        chromaticStrength: o.chromaticStrength,
-        chromaticFalloff: Math.max(o.chromaticFalloff, 0.05),
-        blur: o.blur,
-        edgeBlurMultiplier: o.edgeBlurMultiplier,
-        edgeFeather: o.edgeFeather,
-        tintStrength: o.tintStrength,
-        tintColor: d.vec3f(o.tintR, o.tintG, o.tintB),
-        frostFill: o.frostFill,
-        frostGrain: o.frostGrain,
-        glowStrength: o.glowStrength,
-        glowSpread: o.glowSpread,
-        glowEdge: o.glowEdge,
-        glowNear: d.vec3f(o.glowR, o.glowG, o.glowB),
-        glowFar: d.vec3f(o.glowFarR, o.glowFarG, o.glowFarB),
-        hoverGlow: o.hoverGlow,
-        faceGradient: o.faceGradient,
-        bevel: o.bevel,
-        edgeDarken: o.edgeDarken,
-        lightAngle: o.lightAngle,
-        gap: o.gap,
-        rimLight: o.rimLight,
-        rimWidth: o.rimWidth,
+        radius: p.radius,
+        start: p.start,
+        end: p.end,
+        chromaticStrength: p.chromaticStrength,
+        refractionStrength: p.refractionStrength,
+        blur: p.blur,
+        edgeFeather: p.edgeFeather,
+        edgeBlurMultiplier: p.edgeBlurMultiplier,
+        tintStrength: p.tintStrength,
+        tintColor: d.vec3f(p.tintR, p.tintG, p.tintB),
+        chromaticFalloff: Math.max(p.chromaticFalloff ?? 1, 0.05),
+        bodyChromatic: p.bodyChromatic,
+        bodyDepth: Math.max(p.bodyDepth, 1e-4),
+        letterBlur: p.letterBlur,
+        letterColor: d.vec3f(p.letterR / 255, p.letterG / 255, p.letterB / 255),
+        glowStrength: p.glowStrength,
+        glowHalo: Math.max(p.glowHalo, 1e-5),
+        glowColor: d.vec3f(p.glowR / 255, p.glowG / 255, p.glowB / 255),
       });
     },
     onCleanup() {

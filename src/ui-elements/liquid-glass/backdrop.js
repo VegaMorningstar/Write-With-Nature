@@ -60,6 +60,18 @@ function ellipticGrad(ctx, cw, ch, cxPct, cyPct, rxPct, ryPct, rgb, alpha, stopP
 }
 
 /**
+ * Paints the page's paper into `ctx`, sized as if it covered a `w` x `h`
+ * viewport. Callers that only need a slice of the page translate the context
+ * first — see the glass alphabet, which paints the region behind its own grid
+ * at full resolution rather than downsampling the whole viewport.
+ */
+export function paintPaper(ctx, w, h) {
+  ctx.fillStyle = PAPER_BASE
+  ctx.fillRect(0, 0, w, h)
+  for (const g of PAPER_GRADIENTS) ellipticGrad(ctx, w, h, ...g)
+}
+
+/**
  * One backdrop shared by every panel on the page.
  *
  * Each panel refracts the same thing — the page behind it — so rebuilding the
@@ -114,9 +126,7 @@ export function createBackdrop({ scale = 0.5 } = {}) {
     paper.width = w
     paper.height = h
 
-    paperCtx.fillStyle = PAPER_BASE
-    paperCtx.fillRect(0, 0, w, h)
-    for (const g of PAPER_GRADIENTS) ellipticGrad(paperCtx, w, h, ...g)
+    paintPaper(paperCtx, w, h)
     return true
   }
 

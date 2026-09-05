@@ -1,335 +1,384 @@
 /**
- * The alphabet as a grid of frosted glass buttons.
+ * The alphabet as twenty-six lenses of liquid glass.
  *
- * Twenty-six real <button> elements — click handlers, keyboard focus, screen
- * reader semantics, and the letter as DOM text so it stays crisp and
- * selectable — with a single canvas behind them drawing all the glass. One
- * WebGPU device for the grid, not one per tile.
+ * One canvas runs TypeGPU's liquid-glass shader over a union of 26 rounded
+ * boxes (scene.ts), and twenty-six transparent <button> elements sit on top of
+ * it carrying the behaviour — click handlers, keyboard focus, disabled state,
+ * aria labels. The glass is drawn, the buttons are real; neither has to
+ * compromise for the other.
  *
- * The buttons' measured rects position the tiles in the shader, and the same
- * spring values drive both the shader and a CSS transform on the button, so a
- * tile and its letter wobble together rather than drifting apart.
+ * The letters are painted into the backdrop the shader refracts, not laid over
+ * the canvas, so they sit *under* the glass and are displaced and split by it —
+ * the same way the word RENDER sits under the jelly button.
  *
- * Without WebGPU it degrades to plain buttons, which still work.
+ * Wobble comes from the jelly's springs. They resize and shift each tile's box
+ * in the uniform every frame, which is why the deformation is in the glass
+ * itself rather than a CSS transform of a picture of glass.
+ *
+ * Without WebGPU this renders the buttons with a plain frosted CSS fallback:
+ * the behaviour survives, the refraction does not.
  */
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import { LETTERS, MATERIAL_DEFAULTS, POINTER_DEFAULTS, squashProperties, liftProperties } from './constants.ts'
 import { Spring } from './spring.ts'
 
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
+/**
+ * :focus-visible rather than :focus, so a click does not leave a ring behind —
+ * the press is marked by the tile's own glow instead. Keyboard focus still needs
+ * a visible target, and the browser's own heuristic is better at telling the two
+ * apart than anything reconstructable from pointer events.
+ */
+const FOCUS_CSS = `
+.ga-key { outline: none; -webkit-tap-highlight-color: transparent; }
+.ga-key:focus-visible { outline: 2px solid rgba(74,124,63,0.8); outline-offset: 3px; }
+`
+
 export default function GlassAlphabet({
   material = MATERIAL_DEFAULTS,
   pointer = POINTER_DEFAULTS,
-  available,          // Set of letters that have content; others render dimmed
+  available,
   onSelect,
-  columns = 9,
+  columns = 8,
 }) {
   const hostRef = useRef(null)
   const canvasRef = useRef(null)
   const buttonRefs = useRef([])
+  const springsRef = useRef(null)
   const sceneRef = useRef(null)
-  const cleanupRef = useRef(null)
 
-  const materialRef = useRef(material)
-  const pointerCfgRef = useRef(pointer)
+  const m = { ...MATERIAL_DEFAULTS, ...material }
+  const p = { ...POINTER_DEFAULTS, ...pointer }
+
+  // The render loop reads these rather than closing over them, so tuning a
+  // slider does not tear down and rebuild the WebGPU pipeline.
+  const matRef = useRef(m)
+  const ptrRef = useRef(p)
+  const availRef = useRef(available)
+  useEffect(() => { matRef.current = m; ptrRef.current = p; availRef.current = available })
+
+  const rows = Math.ceil(LETTERS.length / columns)
+  // Room for the lens: the visible tile is the box inflated by `edge`, so the
+  // grid needs that much clearance before the canvas would clip its own rim.
+  const pad = Math.ceil(m.edge) + 6
+  const stride = m.size + m.gap
+  const width = pad * 2 + columns * m.size + (columns - 1) * m.gap
+  const height = pad * 2 + rows * m.size + (rows - 1) * m.gap
+
+  const cellAt = i => ({
+    x: pad + (i % columns) * stride,
+    y: pad + Math.floor(i / columns) * stride,
+  })
+
+  // ── Springs, and the frame loop that feeds them to the shader ──────────────
   useEffect(() => {
-    materialRef.current = material
-    sceneRef.current?.setParams(material)
-  }, [material])
-  useEffect(() => { pointerCfgRef.current = pointer }, [pointer])
-
-  const [focused, setFocused] = useState(-1)
-  const [error, setError] = useState(null)
-  // Set once the springs exist, so a click can reach them from outside the effect
-  const pressRef = useRef(null)
-
-  useEffect(() => {
-    if (!gpuSupported) return
-    const host = hostRef.current
-    const canvas = canvasRef.current
-    if (!host || !canvas) return
-
-    let cancelled = false
-    let backdrop = null
-    let ro = null
-    let raf = 0
-
-    // Per-tile springs. squash drives the shape, lift drives the glow.
     const squash = LETTERS.map(() => new Spring(squashProperties))
     const lift = LETTERS.map(() => new Spring(liftProperties))
-    // Base geometry in shape space, remeasured only on resize — a transform
-    // does not change layout, so the rects stay valid while tiles wobble.
-    let rects = LETTERS.map(() => [0, 0, 0.05, 0.05])
-    let pointerShape = [-99, -99]
+    springsRef.current = { squash, lift }
+
+    let raf = 0
+    let last = 0
     let lastPointer = null
     let lastNudge = 0
-    let lastFrame = 0
+
+    const tick = now => {
+      raf = requestAnimationFrame(tick)
+      const dt = Math.min(last ? (now - last) / 1000 : 0, 0.1)
+      last = now
+      if (dt <= 0) return
+
+      // Fixed substeps — explicit Euler on springs this stiff diverges past
+      // roughly 60ms, and one stalled frame would otherwise blow them up.
+      const steps = Math.min(Math.ceil(dt / (1 / 240)), 32)
+      const step = dt / steps
+      for (let s = 0; s < steps; s++) {
+        for (let i = 0; i < LETTERS.length; i++) {
+          squash[i].step(step)
+          lift[i].step(step)
+        }
+      }
+
+      // The buttons follow the glass so the hit target stays under what is drawn
+      for (let i = 0; i < LETTERS.length; i++) {
+        const btn = buttonRefs.current[i]
+        if (!btn) continue
+        const sq = squash[i].value
+        btn.style.transform =
+          `translateY(${(-lift[i].value * 40).toFixed(2)}px) scale(${(1 + sq).toFixed(4)}, ${(1 - sq * 0.7).toFixed(4)})`
+      }
+    }
+    raf = requestAnimationFrame(tick)
+
+    const onMove = e => {
+      const cfg = ptrRef.current
+      const now = performance.now()
+
+      const travelled = lastPointer
+        ? Math.hypot(e.clientX - lastPointer[0], e.clientY - lastPointer[1])
+        : 0
+      lastPointer = [e.clientX, e.clientY]
+      if (now - lastNudge < cfg.throttleMs) return
+      lastNudge = now
+
+      const speed = Math.min(travelled / Math.max(cfg.sensitivity, 1), 1) * cfg.strength
+      if (speed <= 0.001) return
+
+      // Proximity in tile widths, so the disturbance follows the cursor across
+      // the grid rather than hitting everything equally
+      for (let i = 0; i < LETTERS.length; i++) {
+        const btn = buttonRefs.current[i]
+        if (!btn) continue
+        const r = btn.getBoundingClientRect()
+        const dist = Math.hypot(
+          e.clientX - (r.left + r.width / 2),
+          e.clientY - (r.top + r.height / 2),
+        ) / Math.max(r.width, 1)
+        const falloff = Math.max(0, 1 - dist / Math.max(cfg.radius, 0.01))
+        if (falloff <= 0) continue
+        const amount = speed * falloff * falloff * cfg.gain
+        squash[i].velocity += amount
+        lift[i].velocity += amount * 0.6
+      }
+    }
+
+    window.addEventListener('pointermove', onMove, { passive: true })
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      cancelAnimationFrame(raf)
+      springsRef.current = null
+    }
+  }, [])
+
+  // ── The glass ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!gpuSupported) return
+    const canvas = canvasRef.current
+    const host = hostRef.current
+    if (!canvas || !host) return
+
+    let cancelled = false
+    let cleanup = null
 
     async function init() {
       try {
         const { tgpu } = await import('typegpu')
-        const { setupGlassAlphabet } = await import('./scene.ts')
-        const { getSharedBackdrop } = await import('../liquid-glass/backdrop.js')
+        const { setupAlphabet } = await import('./scene.ts')
+        const { createTileBackdrop } = await import('./backdrop.js')
         if (cancelled) return
 
-        backdrop = getSharedBackdrop({ scale: 0.5 })
-
-        const measure = scene => {
-          const hostRect = host.getBoundingClientRect()
-          if (!hostRect.width || !hostRect.height) return
-          const dpr = Math.min(window.devicePixelRatio || 1, 2)
-          canvas.width = Math.max(2, Math.round(hostRect.width * dpr))
-          canvas.height = Math.max(2, Math.round(hostRect.height * dpr))
-
-          const aspect = hostRect.width / hostRect.height
-          scene?.setShapeScale(hostRect.width, hostRect.height)
-
-          rects = buttonRefs.current.map(btn => {
-            if (!btn) return [0, 0, 0.001, 0.001]
-            const r = btn.getBoundingClientRect()
-            // Shape space: y in 0..1 across the host, x in 0..aspect
-            return [
-              ((r.left + r.width / 2 - hostRect.left) / hostRect.width) * aspect,
-              (r.top + r.height / 2 - hostRect.top) / hostRect.height,
-              (r.width / 2) / hostRect.height,
-              (r.height / 2) / hostRect.height,
-            ]
-          })
-          scene?.setTileRects(rects)
-
-          const vw = window.innerWidth
-          const vh = window.innerHeight
-          backdrop.resize(vw, vh)
-          scene?.setViewportRect(
-            { x: hostRect.left, y: hostRect.top, w: hostRect.width, h: hostRect.height }, vw, vh,
-          )
-        }
-
-        measure(null)
-        backdrop.update()
-
+        const backdrop = createTileBackdrop()
         const root = await tgpu.init()
         const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
-        const scene = await setupGlassAlphabet(root, context, backdrop.canvas)
+        const scene = await setupAlphabet(root, context, backdrop.paper, backdrop.letters)
         if (cancelled) { scene.onCleanup(); root.destroy(); return }
 
         scene.beforeFrame = () => {
-          backdrop.update()
-          const hostRect = host.getBoundingClientRect()
-          const vw = window.innerWidth
-          const vh = window.innerHeight
-          // The grid scrolls, so its slice of the backdrop moves every frame
-          scene.setViewportRect(
-            { x: hostRect.left, y: hostRect.top, w: hostRect.width, h: hostRect.height }, vw, vh,
-          )
-        }
+          const mm = matRef.current
+          const springs = springsRef.current
+          const rect = host.getBoundingClientRect()
+          if (!rect.width || !rect.height) return
 
-        scene.setParams(materialRef.current)
-        measure(scene)
+          const dpr = Math.min(window.devicePixelRatio || 1, 2)
+          const cw = Math.max(2, Math.round(rect.width * dpr))
+          const ch = Math.max(2, Math.round(rect.height * dpr))
+          if (canvas.width !== cw || canvas.height !== ch) {
+            canvas.width = cw
+            canvas.height = ch
+          }
+          scene.setShapeScale(rect.width, rect.height)
+          backdrop.resize(rect, dpr)
+
+          // Layout, in this canvas's own CSS pixels
+          const localPad = Math.ceil(mm.edge) + 6
+          const localStride = mm.size + mm.gap
+          const H = rect.height
+
+          const glyphs = []
+          const tiles = []
+          const halfBox = Math.max(mm.size / 2 - mm.edge, 0.5)
+          for (let i = 0; i < LETTERS.length; i++) {
+            const sq = springs ? springs.squash[i].value : 0
+            const ly = springs ? springs.lift[i].value : 0
+
+            const cx = localPad + (i % columns) * localStride + mm.size / 2
+            const cy = localPad + Math.floor(i / columns) * localStride + mm.size / 2 - ly * 40
+
+            // Squash the box itself, so the deformation happens in the glass
+            const halfPx = mm.size / 2
+            const hx = halfPx * (1 + sq) - mm.edge
+            const hy = halfPx * (1 - sq * 0.7) - mm.edge
+
+            // Emission from residual wobble energy, as on the jelly: the spring's
+            // speed while it is still ringing, plus how far it is from rest. A
+            // settled tile is at zero, so the grid is dark until it is touched.
+            const glow = springs
+              ? Math.min(
+                (Math.abs(springs.squash[i].velocity) * 0.05 +
+                  Math.abs(springs.squash[i].value) * 1.4) * ptrRef.current.glowGain,
+                1.2,
+              )
+              : 0
+
+            // Into box space: canvas heights on both axes, which is what makes
+            // the shader's isotropic space line up with square pixels.
+            tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H, glow })
+
+            const has = !availRef.current || availRef.current.has(LETTERS[i])
+            glyphs.push({ letter: LETTERS[i], x: cx, y: cy, alpha: has ? 1 : 0.3 })
+          }
+          scene.setTiles(tiles)
+
+          // Radius is measured on the box, which is inset by `edge`; the visible
+          // corner is that plus the inflation, so subtract to land on the value
+          // the user asked for. Never larger than the box it rounds.
+          scene.setParams({
+            radius: Math.min(Math.max(0, mm.radius - mm.edge) / H, halfBox / H),
+            start: mm.ringStart / H,
+            end: Math.max(mm.edge / H, 0.0005),
+            chromaticStrength: mm.chromaticStrength,
+            refractionStrength: mm.refractionStrength,
+            blur: mm.blur,
+            edgeFeather: mm.edgeFeather,
+            edgeBlurMultiplier: mm.edgeBlurMultiplier,
+            tintStrength: mm.tintStrength,
+            tintR: mm.tintR, tintG: mm.tintG, tintB: mm.tintB,
+            chromaticFalloff: mm.chromaticFalloff,
+            bodyChromatic: mm.bodyChromatic,
+            // The body's dispersion ramps over the box's own half-width, so it
+            // scales with the tile instead of needing a second slider.
+            bodyDepth: halfBox / H,
+            letterBlur: mm.letterBlur,
+            letterR: mm.letterR, letterG: mm.letterG, letterB: mm.letterB,
+            glowStrength: mm.glowStrength,
+            glowHalo: mm.glowHalo / H,
+            glowR: mm.glowR, glowG: mm.glowG, glowB: mm.glowB,
+          })
+
+          backdrop.update(glyphs, {
+            size: mm.letterSize,
+            weight: mm.letterWeight,
+            opacity: mm.letterOpacity,
+          })
+        }
 
         sceneRef.current = scene
-        cleanupRef.current = () => { scene.onCleanup(); root.destroy() }
-
-        ro = new ResizeObserver(() => measure(sceneRef.current))
-        ro.observe(host)
-
-        // ── Springs ───────────────────────────────────────────────────────
-        const tick = now => {
-          raf = requestAnimationFrame(tick)
-          const dt = Math.min(lastFrame ? (now - lastFrame) / 1000 : 0, 0.1)
-          lastFrame = now
-          if (dt <= 0) return
-
-          // Fixed substeps: explicit Euler on springs this stiff diverges past
-          // roughly 60ms, and a stalled frame would otherwise blow them up.
-          const steps = Math.min(Math.ceil(dt / (1 / 240)), 32)
-          const step = dt / steps
-          for (let s = 0; s < steps; s++) {
-            for (let i = 0; i < LETTERS.length; i++) {
-              squash[i].step(step)
-              lift[i].step(step)
-            }
-          }
-
-          scene.setTileStates(LETTERS.map((_, i) => [
-            squash[i].value,
-            -squash[i].value * 0.6,   // volume-ish: wider means shorter
-            Math.abs(lift[i].value),
-            0,
-          ]))
-
-          // Same numbers on the button, so the letter tracks its tile
-          for (let i = 0; i < LETTERS.length; i++) {
-            const btn = buttonRefs.current[i]
-            if (!btn) continue
-            const sx = 1 + squash[i].value
-            const sy = 1 - squash[i].value * 0.6
-            btn.style.transform = `scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`
-          }
-        }
-        raf = requestAnimationFrame(tick)
-
-        // A click kicks its own tile hard and its neighbours a little, so the
-        // press reads as landing on the grid rather than on one square.
-        pressRef.current = (index, impulse) => {
-          for (let i = 0; i < rects.length; i++) {
-            const dx = rects[index][0] - rects[i][0]
-            const dy = rects[index][1] - rects[i][1]
-            const tileW = Math.max(rects[i][2] * 2, 0.001)
-            const dist = Math.hypot(dx, dy) / tileW
-            const falloff = Math.max(0, 1 - dist / 2.5)
-            if (falloff <= 0) continue
-            squash[i].velocity -= impulse * falloff * falloff
-            lift[i].velocity += impulse * falloff * falloff * 0.6
-          }
-        }
-
-        // ── Pointer ───────────────────────────────────────────────────────
-        const onMove = e => {
-          const cfg = pointerCfgRef.current
-          const now = performance.now()
-          const hostRect = host.getBoundingClientRect()
-          if (!hostRect.width) return
-
-          const aspect = hostRect.width / hostRect.height
-          pointerShape = [
-            ((e.clientX - hostRect.left) / hostRect.width) * aspect,
-            (e.clientY - hostRect.top) / hostRect.height,
-          ]
-          sceneRef.current?.setPointer(pointerShape[0], pointerShape[1])
-
-          const travelled = lastPointer
-            ? Math.hypot(e.clientX - lastPointer[0], e.clientY - lastPointer[1])
-            : 0
-          lastPointer = [e.clientX, e.clientY]
-          if (now - lastNudge < cfg.throttleMs) return
-          lastNudge = now
-
-          const speed = Math.min(travelled / Math.max(cfg.sensitivity, 1), 1) * cfg.strength
-          if (speed <= 0.001) return
-
-          // Nudge by proximity, so the wave follows the cursor across the grid
-          for (let i = 0; i < rects.length; i++) {
-            const dx = pointerShape[0] - rects[i][0]
-            const dy = pointerShape[1] - rects[i][1]
-            const tileW = Math.max(rects[i][2] * 2, 0.001)
-            const dist = Math.hypot(dx, dy) / tileW
-            const falloff = Math.max(0, 1 - dist / Math.max(cfg.radius, 0.01))
-            if (falloff <= 0) continue
-            const amount = speed * falloff * falloff * cfg.gain
-            squash[i].velocity += amount
-            lift[i].velocity += amount * 0.8
-          }
-        }
-
-        window.addEventListener('pointermove', onMove, { passive: true })
-        cleanupRef.current = () => {
-          window.removeEventListener('pointermove', onMove)
-          cancelAnimationFrame(raf)
-          scene.onCleanup()
-          root.destroy()
-        }
+        cleanup = () => { scene.onCleanup(); root.destroy() }
       } catch (e) {
-        // Surfaced on the page, not just logged. A silent catch here hid two
-        // separate bugs behind an empty grid that looked like a tuning problem.
         console.warn('[GlassAlphabet] init failed:', e)
-        if (!cancelled) setError(String(e?.message || e))
       }
     }
 
     init()
-
     return () => {
       cancelled = true
-      ro?.disconnect()
-      cancelAnimationFrame(raf)
-      cleanupRef.current?.()
-      cleanupRef.current = null
+      cleanup?.()
       sceneRef.current = null
     }
-  }, [])
+  }, [columns])
 
-  const press = i => pressRef.current?.(i, pointerCfgRef.current.clickImpulse)
+  // ── Impulses ───────────────────────────────────────────────────────────────
+  const kick = (index, squashAmount, liftAmount, reach) => {
+    const springs = springsRef.current
+    if (!springs) return
+    const oc = cellAt(index)
+    for (let i = 0; i < LETTERS.length; i++) {
+      const c = cellAt(i)
+      const dist = Math.hypot(oc.x - c.x, oc.y - c.y) / Math.max(stride, 1)
+      const falloff = Math.max(0, 1 - dist / reach)
+      if (falloff <= 0) continue
+      const f = falloff * falloff
+      springs.squash[i].velocity += squashAmount * f
+      springs.lift[i].velocity += liftAmount * f
+    }
+  }
+
+  // Crossing into a tile wobbles it whether or not the cursor was moving fast
+  // enough for the travel-based nudge to fire, so a slow approach still lands.
+  const enter = index => {
+    const cfg = ptrRef.current
+    kick(index, cfg.hoverImpulse * 6, cfg.hoverImpulse * 3, 2)
+    const springs = springsRef.current
+    if (springs) springs.lift[index].target = cfg.hoverLift / 40
+  }
+  const leave = index => {
+    const springs = springsRef.current
+    if (springs) springs.lift[index].target = 0
+  }
+  const press = index => {
+    const cfg = ptrRef.current
+    kick(index, -cfg.clickImpulse * 8, cfg.clickImpulse * 4, 2.5)
+  }
+
+  // Only when there is no WebGPU. With the shader running, the buttons are
+  // invisible hit targets and every pixel comes from the canvas.
+  const fallbackStyle = has => (gpuSupported ? null : {
+    background: 'rgba(255,255,255,0.14)',
+    backdropFilter: 'blur(8px) saturate(150%)',
+    WebkitBackdropFilter: 'blur(8px) saturate(150%)',
+    border: '1px solid rgba(255,255,255,0.4)',
+    color: `rgba(28,26,16,${has ? 0.6 : 0.25})`,
+    fontFamily: "'Playfair Display', Georgia, serif",
+    fontWeight: m.letterWeight,
+    fontSize: m.letterSize,
+  })
 
   return (
     <div
       ref={hostRef}
-      className="glass-alphabet"
       style={{
         position: 'relative',
-        // Its own stacking context, so the canvas below cannot escape behind an
-        // ancestor's background. Without this a negative z-index child is
-        // painted behind whatever opaque parent happens to be above it.
+        width,
+        height,
+        margin: '0 auto',
+        // The canvas sits at the bottom of this element's own stacking context,
+        // so it cannot fall behind the page the way a negative z-index would.
         isolation: 'isolate',
-        display: 'grid',
-        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-        gap: 8,
-        padding: 10,
       }}
     >
-      {error && (
-        <div style={{
-          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', zIndex: 2, pointerEvents: 'none',
-          fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#a33',
-          background: 'rgba(255,240,240,0.85)', borderRadius: 10, padding: 8,
-          textAlign: 'center', lineHeight: 1.5,
-        }}>
-          glass alphabet failed to start — {error}
-        </div>
-      )}
-
-      {gpuSupported && (
-        <canvas
-          ref={canvasRef}
-          aria-hidden="true"
-          style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%',
-            pointerEvents: 'none',
-            // 0, with the buttons explicitly above at 1. Nothing here relies on
-            // paint order between positioned and in-flow content.
-            zIndex: 0,
-          }}
-        />
-      )}
-
+      <style>{FOCUS_CSS}</style>
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          pointerEvents: 'none',
+        }}
+      />
       {LETTERS.map((letter, i) => {
         const has = !available || available.has(letter)
+        const cell = cellAt(i)
         return (
           <button
             key={letter}
+            className="ga-key"
             ref={el => { buttonRefs.current[i] = el }}
             type="button"
             disabled={!has}
             aria-label={`Show Landsat scenes for ${letter}`}
             onClick={() => { press(i); onSelect?.(letter) }}
-            onFocus={() => setFocused(i)}
-            onBlur={() => setFocused(-1)}
+            onPointerEnter={() => enter(i)}
+            onPointerLeave={() => leave(i)}
+            onFocus={() => enter(i)}
+            onBlur={() => leave(i)}
             style={{
-              // Above the canvas, explicitly
-              position: 'relative',
-              zIndex: 1,
-              // Transparent: the canvas behind is the surface
-              background: 'none',
+              position: 'absolute',
+              left: cell.x,
+              top: cell.y,
+              width: m.size,
+              height: m.size,
+              padding: 0,
+              borderRadius: m.radius,
+              // The glass is the canvas underneath; this is behaviour only
+              background: 'transparent',
               border: 'none',
-              padding: '0.7rem 0',
+              color: 'transparent',
               cursor: has ? 'pointer' : 'default',
-              opacity: has ? 1 : 0.32,
-              fontFamily: "'Playfair Display', serif",
-              fontWeight: 700,
-              fontSize: '1rem',
-              color: 'rgba(28,26,16,0.72)',
-              textShadow: '0 1px 2px rgba(255,255,255,0.5)',
-              outline: focused === i ? '2px solid rgba(74,124,63,0.7)' : 'none',
-              outlineOffset: 2,
-              borderRadius: 10,
               willChange: 'transform',
-              // The wobble is written straight to style.transform each frame
-              transition: 'opacity 0.2s',
+              ...fallbackStyle(has),
             }}
           >
-            {letter}
+            {gpuSupported ? '' : letter}
           </button>
         )
       })}

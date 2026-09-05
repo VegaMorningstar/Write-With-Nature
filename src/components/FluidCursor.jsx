@@ -2,7 +2,19 @@ import { useEffect } from 'react'
 
 let _booted = false
 
-export default function FluidCursor() {
+/**
+ * `blend` decides whether CSS glass on the page can see the fluid.
+ *
+ * An element with mix-blend-mode forms its own backdrop root, and Chrome will
+ * not let a backdrop-filter sample blended content — so under 'multiply' the
+ * fluid stains the paper and is invisible to every CSS-frosted surface, which
+ * is left refracting a smooth gradient and reads as flat white.
+ *
+ * The WebGPU glass is not affected either way: it cannot sample the DOM at all,
+ * so it rebuilds the page into a texture and reads this canvas directly. Hence
+ * 'multiply' as the default — the app's look, with nothing given up for it.
+ */
+export default function FluidCursor({ blend = 'multiply' }) {
   useEffect(() => {
     if (_booted) return
     _booted = true
@@ -71,9 +83,7 @@ export default function FluidCursor() {
         pointerEvents: 'none',
         // z-index 5: same layer as the old watercolor canvas — behind glass panels (z:20)
         zIndex: 5,
-        // multiply blend makes the fluid color stain the paper background
-        // rather than sit as a floating overlay above it
-        mixBlendMode: 'multiply',
+        mixBlendMode: blend,
       }}
     />
   )
