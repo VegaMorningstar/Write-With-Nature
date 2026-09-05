@@ -1,3 +1,44 @@
+const FILENAME = 'write-with-nature.png'
+
+const GRAIN_SVG = 'data:image/svg+xml,' + encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'>" +
+  "<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/></filter>" +
+  "<rect width='180' height='180' filter='url(#n)' opacity='0.10'/></svg>"
+)
+
+// Loaded at module scope, long before anyone clicks Save. The export has to run
+// start to finish without yielding, because iOS only allows navigator.share()
+// inside the user gesture that triggered it — an image onload partway through
+// would end that gesture and the share would be refused.
+const grainImage = new Image()
+let grainReady = false
+grainImage.onload = () => { grainReady = true }
+grainImage.src = GRAIN_SVG
+
+// iPadOS reports itself as a Mac, hence the touch-point check
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+// Synchronous on purpose — canvas.toBlob would hand back a callback and lose
+// the gesture, so the base64 is decoded by hand instead.
+function dataUrlToFile(dataUrl, filename) {
+  const [meta, base64] = dataUrl.split(',')
+  const mime = meta.match(/:(.*?);/)[1]
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new File([bytes], filename, { type: mime })
+}
+
+function saveViaLink(dataUrl) {
+  const a = document.createElement('a')
+  a.download = FILENAME
+  a.href = dataUrl
+  a.click()
+}
+
 function rr(ctx, x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y)
   ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r)
@@ -102,24 +143,17 @@ export async function downloadCollage(exportCanvas, showToast) {
   }
 
   // ── 4. Paper grain overlay (matching body::before SVG noise) ─────────────
-  await new Promise(resolve => {
-    const gi = new Image()
-    gi.onload = () => {
-      ctx.globalCompositeOperation = 'multiply'
-      const ts = 180
-      for (let x = 0; x < cv.width; x += ts)
-        for (let y = 0; y < cv.height; y += ts)
-          ctx.drawImage(gi, x, y, ts, ts)
-      ctx.globalCompositeOperation = 'source-over'
-      resolve()
-    }
-    gi.onerror = resolve
-    gi.src = 'data:image/svg+xml,' + encodeURIComponent(
-      "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'>" +
-      "<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/></filter>" +
-      "<rect width='180' height='180' filter='url(#n)' opacity='0.10'/></svg>"
-    )
-  })
+  // Drawn from the preloaded image rather than awaited. If it somehow has not
+  // decoded yet the grain is skipped, which is a far smaller loss than breaking
+  // the gesture chain that lets iOS put this straight into Photos.
+  if (grainReady) {
+    ctx.globalCompositeOperation = 'multiply'
+    const ts = 180
+    for (let x = 0; x < cv.width; x += ts)
+      for (let y = 0; y < cv.height; y += ts)
+        ctx.drawImage(grainImage, x, y, ts, ts)
+    ctx.globalCompositeOperation = 'source-over'
+  }
 
   // ── 5. Draw tiles at natural portrait aspect ratio ────────────────────────
   let y = PAD
@@ -168,9 +202,38 @@ export async function downloadCollage(exportCanvas, showToast) {
   }
 
   // ── 6. Export ─────────────────────────────────────────────────────────────
-  const a = document.createElement('a')
-  a.download = 'write-with-nature.png'
-  a.href = cv.toDataURL('image/png')
-  a.click()
+  // Nothing above this point awaits, so we are still inside the click.
+  const dataUrl = cv.toDataURL('image/png')
+
+  // On iOS a download link drops the file into Files › Downloads and there is
+  // no way to write to Photos from a web page. The share sheet is the sanctioned
+  // route: it offers "Save Image", which does go to Photos. Must be called
+  // synchronously here — awaiting anything first makes iOS refuse it.
+  if (isIOS()) {
+    let file = null
+    try {
+      file = dataUrlToFile(dataUrl, FILENAME)
+    } catch (_) {
+      file = null
+    }
+
+    if (file && navigator.canShare?.({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Write with Nature' })
+        .then(() => showToast('Saved'))
+        .catch(err => {
+          // Dismissing the sheet is not a failure
+          if (err?.name === 'AbortError' || err?.name === 'NotAllowedError') return
+          saveViaLink(dataUrl)
+          showToast('Saved to Files › Downloads')
+        })
+      return
+    }
+
+    saveViaLink(dataUrl)
+    showToast('Saved to Files › Downloads')
+    return
+  }
+
+  saveViaLink(dataUrl)
   showToast('Saved · write-with-nature.png')
 }
