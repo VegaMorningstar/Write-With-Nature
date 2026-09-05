@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { liquidGlass } from '../lib/liquid-glass'
+import { liquidGlass3d, GLASS_3D_DEFAULTS } from '../lib/liquid-glass-3d'
 import JellyRenderButton, { HOVER_DEFAULTS } from '../ui-elements/jelly-render-button/JellyRenderButton'
 import {
   MATERIAL_DEFAULTS,
@@ -21,11 +22,23 @@ import {
 } from '../ui-elements/jelly-wireframe-button/constants.ts'
 
 // Rebuilds the glass effect whenever opts change (slider-reactive)
+// The new SDF-driven glass. Applied here only — App.jsx still runs the old
+// liquid-glass until this is signed off.
+function useLive3dGlass(ref, opts) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !opts) return          // null = the other implementation has the panel
+    const glass = liquidGlass3d(el, opts)
+    return () => glass.destroy()
+  }, [ref, JSON.stringify(opts)]) // eslint-disable-line
+}
+
 function useLiveGlass(ref, opts) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el || !opts) return          // null = the 3D implementation has the panel
     const glass = liquidGlass(el, opts)
     return () => glass.destroy()
   }, [ref, JSON.stringify(opts)]) // eslint-disable-line
@@ -179,6 +192,7 @@ const GLASS_DEF = {
   colophon: { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, aberrationIntensity: 5, elasticity: 0, mode: 'polar'     },
 }
 
+const GLASS_3D_DEF = { ...GLASS_3D_DEFAULTS }
 const JELLY_HOVER_DEF = { ...HOVER_DEFAULTS }
 const JELLY_MATERIAL_DEF = { ...MATERIAL_DEFAULTS }
 // The wireframe carries its own complete material now — its glass has diverged
@@ -424,9 +438,23 @@ export default function TunePage() {
   const boardRef    = useRef(null)
   const colophonRef = useRef(null)
 
-  useLiveGlass(composeRef,  composeG)
-  useLiveGlass(boardRef,    boardG)
-  useLiveGlass(colophonRef, colophonG)
+  // One shared parameter set across all three panels while the look is being
+  // judged. Splitting it per panel later is a state change, nothing more.
+  const [glass3d, setGlass3d] = useState(GLASS_3D_DEF)
+  const [use3d,   setUse3d]   = useState(true)
+  const setG3 = (k, v) => setGlass3d(g => ({ ...g, [k]: v }))
+
+  const legacyCompose  = use3d ? null : composeG
+  const legacyBoard    = use3d ? null : boardG
+  const legacyColophon = use3d ? null : colophonG
+
+  useLiveGlass(composeRef,  legacyCompose)
+  useLiveGlass(boardRef,    legacyBoard)
+  useLiveGlass(colophonRef, legacyColophon)
+
+  useLive3dGlass(composeRef,  use3d ? glass3d : null)
+  useLive3dGlass(boardRef,    use3d ? glass3d : null)
+  useLive3dGlass(colophonRef, use3d ? glass3d : null)
 
   const setFluid = (k, v) => setPendingFluid(p => ({ ...p, [k]: v }))
 
@@ -440,6 +468,7 @@ export default function TunePage() {
     const cfg = {
       fluid:   { ...appliedFluid, blendMode },
       glass:   { compose: composeG, board: boardG, colophon: colophonG },
+      glass3d: { enabled: use3d, ...glass3d },
       jelly:   { hover: jellyHover, springs: jellySprings, material: jellyMat },
       jellyWireframe: {
         hover: wireHover,
@@ -457,6 +486,8 @@ export default function TunePage() {
     setPendingFluid({ ...FLUID_DEF }); setAppliedFluid({ ...FLUID_DEF })
     setBlendMode(BLEND_DEF)
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
+    setGlass3d({ ...GLASS_3D_DEF })
+    setUse3d(true)
     setJellyHover({ ...JELLY_HOVER_DEF })
     setJellyMat({ ...JELLY_MATERIAL_DEF })
     setWireMat({ ...WIRE_MATERIAL_DEF })
@@ -724,6 +755,107 @@ export default function TunePage() {
         <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
 
         {/* ── Glass sections ── */}
+        <AccordionSection title="LIQUID GLASS 3D" open={openSection === 'glass3d'} onToggle={() => toggle('glass3d')}>
+          <Toggle label="Use 3D glass" value={use3d} onChange={setUse3d}
+            description="OFF falls back to the old flat implementation on all three panels, so you can flip between them. The three GLASS sections below only do anything while this is off." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            BEVEL — the shape of the edge
+          </div>
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            The old version displaced the backdrop by a pair of flat X/Y
+            gradients, so every pixel shifted the same way by the same amount —
+            a pane. These two describe a rim that turns over, which is what
+            TypeGPU&apos;s shader does and what reads as thickness.
+          </div>
+
+          <Slider label="Bevel Width" value={glass3d.band} min={0.05} max={1} step={0.01}
+            onChange={v => setG3('band', v)}
+            description="How far in from the edge the glass keeps bending, as a fraction of the panel's smaller half-dimension. Narrow is a sharp-edged sheet; wide rounds the whole panel over into a blob. This is the single strongest control here." />
+
+          <Slider label="Bevel Falloff" value={glass3d.falloff} min={0.4} max={6} step={0.1}
+            onChange={v => setG3('falloff', v)}
+            description="How the bend ramps across that width. High presses it hard against the rim and leaves the middle flat and readable; low spreads it across the whole panel, which distorts content but feels more like a lens." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            REFRACTION
+          </div>
+
+          <Slider label="Refraction" value={glass3d.scale} min={-260} max={80} step={2}
+            fmt={v => v.toFixed(0)} onChange={v => setG3('scale', v)}
+            description="Displacement in pixels. Negative pulls the backdrop outward at the rim, which magnifies like a real lens; positive pushes it in. 0 leaves only the frost." />
+
+          <Slider label="Map Strength" value={glass3d.strength} min={0} max={2} step={0.02}
+            onChange={v => setG3('strength', v)}
+            description="Multiplier baked into the map before Refraction scales it. Mostly redundant with Refraction — useful for pushing past the slider's range or backing the whole effect off without losing the tuning." />
+
+          <Slider label="Chromatic Aberration" value={glass3d.chroma} min={0} max={40} step={0.5}
+            onChange={v => setG3('chroma', v)}
+            description="Splits the three channels onto slightly different displacements, the same reassembly their shader does per channel. Visible as colour fringing at the rim, strongest where the bend is hardest." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            LIGHTING — the other half of looking solid
+          </div>
+
+          <Slider label="Bevel Light" value={glass3d.bevel} min={0} max={2} step={0.02}
+            onChange={v => setG3('bevel', v)}
+            description="Brightness of the lit edge and darkness of the opposite one, from the same SDF as the refraction. Refraction alone bends the backdrop but gives the glass no form of its own; this is what makes the rim read as a surface." />
+
+          <Slider label="Light Angle" value={glass3d.lightAngle} min={0} max={360} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setG3('lightAngle', v)}
+            description="Degrees. Drives the bevel, the inner shadow and the rim light together, so they stay consistent with one another." />
+
+          <Slider label="Light Spread" value={glass3d.bevelWidth} min={0.1} max={2} step={0.02}
+            onChange={v => setG3('bevelWidth', v)}
+            description="Width of the lit band relative to the bevel. Below 1 keeps the highlight tighter than the refraction, which reads as harder glass." />
+
+          <Slider label="Light Falloff" value={glass3d.bevelFalloff} min={0.4} max={6} step={0.1}
+            onChange={v => setG3('bevelFalloff', v)}
+            description="Ramp of the lit band. High gives a thin bright line along the edge; low gives a broad soft sheen." />
+
+          <Slider label="Inner Shadow" value={glass3d.innerShadow} min={0} max={1} step={0.01}
+            onChange={v => setG3('innerShadow', v)}
+            description="Darkening inside the unlit edge. Cheap but effective — it is most of what separates a floating slab from something with a wall." />
+
+          <Slider label="Shadow Size" value={glass3d.innerShadowSize} min={0} max={90} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setG3('innerShadowSize', v)}
+            description="How far that shadow reaches inward, in pixels." />
+
+          <Slider label="Rim Light" value={glass3d.rimLight} min={0} max={1.5} step={0.02}
+            onChange={v => setG3('rimLight', v)}
+            description="A thin bright inset opposite the shadow. Together they make the panel look like it has a near edge and a far one." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', margin: '6px 0 10px',
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            FROST &amp; BODY
+          </div>
+
+          <Slider label="Blur" value={glass3d.blur} min={0} max={24} step={0.25}
+            onChange={v => setG3('blur', v)}
+            description="Backdrop blur across the panel. Their shader blurs the middle more than the rim; CSS gives one blur for the whole element, so this is uniform." />
+
+          <Slider label="Saturate" value={glass3d.saturate} min={0.5} max={3} step={0.05}
+            onChange={v => setG3('saturate', v)}
+            description="Backdrop saturation. Slightly above 1 makes the fluid behind it read through the glass rather than washing out." />
+
+          <Slider label="Brightness" value={glass3d.brightness} min={0.7} max={1.4} step={0.01}
+            onChange={v => setG3('brightness', v)}
+            description="Backdrop brightness. Small lifts here make the panel feel lit from within." />
+
+          <Slider label="Elasticity" value={glass3d.elasticity} min={0} max={1} step={0.02}
+            onChange={v => setG3('elasticity', v)}
+            description="Squash toward the cursor as it approaches. 0 is static — worth leaving off while judging the edge, since motion hides shape." />
+
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', lineHeight: 1.6 }}>
+            The maps are regenerated on every change, so dragging is a touch
+            steppy. It settles the moment you let go.
+          </div>
+        </AccordionSection>
+
         <GlassSection title="GLASS — COMPOSE"  opts={composeG}  onChange={setComposeG}  open={openSection === 'compose'}  onToggle={() => toggle('compose')}  />
         <GlassSection title="GLASS — BOARD"    opts={boardG}    onChange={setBoardG}    open={openSection === 'board'}    onToggle={() => toggle('board')}    />
         <GlassSection title="GLASS — COLOPHON" opts={colophonG} onChange={setColophonG} open={openSection === 'colophon'} onToggle={() => toggle('colophon')} />
