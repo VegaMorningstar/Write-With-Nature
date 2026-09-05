@@ -7,30 +7,48 @@ export default function FluidCursor() {
     if (_booted) return
     _booted = true
 
-    // Force the library's document-level touch listeners to be passive so
-    // calling preventDefault() inside them doesn't block native page scroll.
-    const _origAdd = document.addEventListener.bind(document)
-    document.addEventListener = (type, fn, opts) => {
-      if (type === 'touchstart' || type === 'touchmove') {
-        opts = typeof opts === 'object' ? { ...opts, passive: true } : { passive: true }
-      }
-      _origAdd(type, fn, opts)
-    }
-
     import('smokey-fluid-cursor').then(({ initFluid }) => {
-      document.addEventListener = _origAdd  // restore before any app code runs
-      initFluid({
-        transparent: true,
-        // Slower dissipation → trails linger on the background like paint drying
-        densityDissipation: 1.2,
-        velocityDissipation: 1.6,
-        curl: 24,
-        splatRadius: 0.30,
-        splatForce: 5500,
-        shading: true,
-        colorUpdateSpeed: 6,
-        id: 'fluid-cursor-canvas',
-      })
+      // The library registers
+      //   window.addEventListener('touchmove', h, { passive: false })
+      // and calls preventDefault() unconditionally inside h, which cancels
+      // native scrolling everywhere on the page. Browsers normally force touch
+      // listeners on window/document/body to be passive to stop exactly this,
+      // but passing passive:false explicitly opts back out of that.
+      //
+      // So force it back on the way in. A passive listener's preventDefault()
+      // is a silent no-op while the rest of the handler still runs, so the
+      // splat happens and the page still scrolls.
+      //
+      // It has to be window, not document — the library binds there, and
+      // patching the document instance leaves window's inherited method alone.
+      // And it has to wrap the initFluid call, not the import: the listeners
+      // are registered inside initFluid, not when the module loads.
+      const originalAdd = window.addEventListener
+      window.addEventListener = function (type, listener, options) {
+        if (type === 'touchstart' || type === 'touchmove') {
+          options = typeof options === 'object' && options !== null
+            ? { ...options, passive: true }
+            : { passive: true }
+        }
+        return originalAdd.call(this, type, listener, options)
+      }
+
+      try {
+        initFluid({
+          transparent: true,
+          // Slower dissipation → trails linger on the background like paint drying
+          densityDissipation: 1.2,
+          velocityDissipation: 1.6,
+          curl: 24,
+          splatRadius: 0.30,
+          splatForce: 5500,
+          shading: true,
+          colorUpdateSpeed: 6,
+          id: 'fluid-cursor-canvas',
+        })
+      } finally {
+        window.addEventListener = originalAdd
+      }
     })
   }, [])
 
