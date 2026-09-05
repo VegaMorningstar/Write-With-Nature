@@ -9,7 +9,9 @@
  * Nothing on this page touches the app. Copy Config emits every element's
  * settings so an approved one can be pasted into its constants file.
  */
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
+
+import FluidCursor from '../components/FluidCursor'
 
 import {
   mono, Slider, Toggle, AccordionSection, GroupLabel, Note, btnStyle, ControlPanel,
@@ -132,40 +134,6 @@ export default function UiTunePage() {
   const [glassFollow, setGlassFollow] = useState(false)
   const setGlassParam = (k, v) => setGlass(p => ({ ...p, [k]: v }))
 
-  // The liquid glass in 'page' mode refracts the fluid cursor, so this page
-  // needs one running behind it
-  const bootedRef = useRef(false)
-  useEffect(() => {
-    if (bootedRef.current) return
-    bootedRef.current = true
-    import('smokey-fluid-cursor').then(({ initFluid }) => {
-      const originalAdd = window.addEventListener
-      window.addEventListener = function (type, listener, options) {
-        if (type === 'touchstart' || type === 'touchmove') {
-          options = typeof options === 'object' && options !== null
-            ? { ...options, passive: true }
-            : { passive: true }
-        }
-        return originalAdd.call(this, type, listener, options)
-      }
-      // Without this the canvas reads back empty and the glass has no fluid to
-      // refract — see FluidCursor.jsx
-      const originalGetContext = HTMLCanvasElement.prototype.getContext
-      HTMLCanvasElement.prototype.getContext = function (type, attrs) {
-        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
-          attrs = { ...(attrs || {}), preserveDrawingBuffer: true }
-        }
-        return originalGetContext.call(this, type, attrs)
-      }
-      try {
-        initFluid({ transparent: true, id: 'fluid-cursor-canvas', splatRadius: 0.3, curl: 24 })
-      } finally {
-        window.addEventListener = originalAdd
-        HTMLCanvasElement.prototype.getContext = originalGetContext
-      }
-    })
-  }, [])
-
   const [copied, setCopied] = useState(false)
   const copyConfig = () => {
     navigator.clipboard.writeText(JSON.stringify({
@@ -187,12 +155,14 @@ export default function UiTunePage() {
 
   return (
     <>
-      <canvas id="fluid-cursor-canvas" style={{
-        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-        pointerEvents: 'none', zIndex: 0, mixBlendMode: 'multiply',
-      }} />
+      {/* The real component, not a copy of its settings. The liquid glass in
+          'page' mode refracts this, so it has to behave exactly as it does in
+          the app — a second set of numbers here would drift. */}
+      <FluidCursor />
 
-      <div style={{ paddingRight: 288, position: 'relative', zIndex: 1 }}>
+      {/* No stacking context here — .page sets z-index 20 and needs to resolve
+          against the root, or it lands under the fluid canvas at 5. */}
+      <div style={{ paddingRight: 288 }}>
         <div className="page">
           <div className="masthead" style={{ paddingBottom: '1.5rem' }}>
             <span className="over">UI Element Workbench</span>
