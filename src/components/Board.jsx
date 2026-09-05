@@ -1,12 +1,14 @@
 import { forwardRef } from 'react'
 import Tile from './Tile'
-import useLiquidGlass from '../hooks/useLiquidGlass'
+import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
+import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
+import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 
 const Board = forwardRef(function Board(
   { renderedLines, tileW, vs, onShuffle, onResize, onClear, onCycleVariant, onSave, onInstall, installVisible },
   ref
 ) {
-  useLiquidGlass(ref, { scale: -60, chroma: 4, blur: 2.5, saturate: 1.3, mode: 'prominent', aberrationIntensity: 8, elasticity: 0 })
+  usePanelGlass(ref, { scale: -60, chroma: 4, blur: 2.5, saturate: 1.3, mode: 'prominent', aberrationIntensity: 8, elasticity: 0 })
 
   const hasContent = renderedLines.some(l => l.type === 'row')
 
@@ -47,6 +49,7 @@ const Board = forwardRef(function Board(
       </div>
 
       <div className="board" id="collage" ref={ref}>
+        {glassSupported && <LiquidGlassPanel params={PANEL_GLASS} />}
         {!hasContent && (
           <div className="board-empty">
             <svg width="54" height="54" viewBox="0 0 54 54" fill="none">

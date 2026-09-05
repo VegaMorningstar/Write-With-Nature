@@ -33,6 +33,16 @@ export default function FluidCursor() {
         return originalAdd.call(this, type, listener, options)
       }
 
+      // Do NOT force preserveDrawingBuffer here. It looks like the obvious way
+      // to make this canvas readable by the collage export and by the liquid
+      // glass backdrop, and it does — but the library's on-screen pass blends
+      // with ONE / ONE_MINUS_SRC_ALPHA and never clears the default framebuffer,
+      // relying on the browser to clear it between frames. Preserve the buffer
+      // and every frame blends onto the last, so colour accumulates and the
+      // dissipation settings stop meaning anything.
+      //
+      // To read this canvas, draw from it inside a rAF registered after the
+      // library's own, while the buffer is still valid for the current frame.
       try {
         initFluid({
           transparent: true,
