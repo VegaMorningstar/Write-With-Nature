@@ -1,99 +1,81 @@
 import type { SpringProperties } from './spring.ts';
 
-/** A–Z. The count is baked into the shader's uniform arrays. */
 export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-export const TILE_COUNT = LETTERS.length;
 
+/**
+ * Frosted glass keys, built in CSS.
+ *
+ * The first version of this rendered the tiles in a WebGPU shader. It kept
+ * failing silently — a uniform method that does not exist, a stacking context
+ * that let the canvas paint behind the page — and none of it was buying
+ * anything the reference actually shows. Every feature in that image is a
+ * backdrop-filter, a fill, a border and a shadow. CSS renders it deterministically
+ * and hands us real buttons for free.
+ */
 export const MATERIAL_DEFAULTS = {
-  // ── Glass, same model as the liquid glass panels ──────────────────────────
-  // Distances are in tile heights, so they read the same whatever size the
-  // tiles end up.
-  // Fraction of the box's smaller half-extent — 1 is a fully rounded end
-  radius: 0.34,
-  // These, and every other distance here, are fractions of a TILE's half-height,
-  // not of the grid. The shader converts them.
-  start: 0.18,
-  // The box is inset by this before the shader inflates it back, so the visible
-  // tile lands on its button rather than growing past it into its neighbours.
-  end: 0.42,
-  // Extra inset purely to open space between tiles. The CSS grid gap alone is
-  // not enough once the glass inflates each one.
-  gap: 0.12,
-  refractionStrength: 0.16,
-  chromaticStrength: 0.05,
-  chromaticFalloff: 0.5,
-  blur: 1.6,
-  edgeBlurMultiplier: 0.7,
-  edgeFeather: 2,
-
-  // Lighter than the panels': 26 small tiles stack their tint into something
-  // much heavier than one large sheet of the same glass would read as.
-  tintStrength: 0.02,
-  tintR: 0.62,
-  tintG: 0.52,
-  tintB: 0.95,
+  // ── Shape ─────────────────────────────────────────────────────────────────
+  size: 78,          // px, the tile's side
+  radius: 22,        // px
+  gap: 14,           // px between tiles
 
   // ── Frost ─────────────────────────────────────────────────────────────────
-  // The white wash is what makes it read as frosted; blur alone keeps the
-  // backdrop's brightness and reads as plastic.
-  frostFill: 0.14,
-  frostGrain: 0.35,
+  blur: 14,
+  saturate: 180,
+  brightness: 1.06,
+  // The white wash. Blur alone keeps the backdrop's brightness and reads as
+  // plastic; this is what makes it frosted.
+  fill: 0.34,
 
-  // ── Glow ──────────────────────────────────────────────────────────────────
-  // A field behind the grid rather than per-tile lighting, so the tiles pick it
-  // up according to where they sit — which is what gives the reference image
-  // its bloom through the middle.
-  glowStrength: 0.9,
-  glowSpread: 0.55,
-  glowEdge: 1.5,
-  glowR: 0.98,
-  glowG: 0.42,
-  glowB: 0.86,
-  // Second colour, mixed in by distance, for the pink-to-blue falloff
-  glowFarR: 0.36,
-  glowFarG: 0.5,
-  glowFarB: 1.0,
-  // Extra glow on a tile the pointer is near
-  hoverGlow: 0.8,
+  // ── Rim ───────────────────────────────────────────────────────────────────
+  // A bright outline the whole way round is the clearest single cue that a tile
+  // is its own pane of glass, and it is what the reference leans on hardest.
+  border: 0.72,
+  borderWidth: 1,
+  innerTop: 0.9,     // inset highlight along the top edge
+  innerBottom: 0.22, // inset shade along the bottom, for thickness
 
-  // ── Per-tile form ─────────────────────────────────────────────────────────
-  // Without these the tiles are flat windows onto a shared surface, and 26 of
-  // them read as one sheet however far apart they sit. Each one needs its own
-  // internal gradient and its own lit rim to become an object.
+  // ── Colour ────────────────────────────────────────────────────────────────
+  // Each tile takes one colour from a field centred on the grid, so the bloom
+  // runs through the middle instead of every tile looking identical.
+  glowStrength: 0.55,
+  glowSpread: 2.6,    // in tiles
+  glowBlur: 26,       // px, the outer halo
+  tintStrength: 0.5,  // how much of that colour lands in the tile's own face
+  nearR: 255, nearG: 150, nearB: 210,   // centre of the bloom
+  farR: 150, farG: 160, farB: 255,      // its edges
+
+  // The face gradient: a soft wash rising from one corner, which is what gives
+  // a flat rectangle the look of a solid with a lit face.
   faceGradient: 0.55,
-  bevel: 0.16,
-  edgeDarken: 0.3,
-  lightAngle: 130,
-  // The bright outline hugging every tile. The clearest single cue that a
-  // tile is its own pane rather than a patch of a larger surface.
-  rimLight: 0.55,
-  rimWidth: 0.09,
+  faceAngle: 155,
+
+  // ── Letter ────────────────────────────────────────────────────────────────
+  letterSize: 30,
+  letterWeight: 600,
+  letterR: 74, letterG: 62, letterB: 148,
+  letterOpacity: 0.9,
 };
 
-/** How the grid responds to the pointer. */
 export const POINTER_DEFAULTS = {
-  // Falls off over this many tile widths
-  radius: 2.6,
+  // Falls off over this many tiles
+  radius: 2.4,
   strength: 1,
-  // Impulse into the squash springs from pointer travel
   sensitivity: 40,
-  gain: 1.2,
+  gain: 0.35,
   throttleMs: 32,
-  // Click
-  pressScale: 0.88,
-  clickImpulse: 6,
+  hoverLift: 6,      // px a hovered tile rises
+  clickImpulse: 0.5,
 };
 
-// Loose and quick — these are small tiles, and a long wobble on 26 of them at
-// once reads as noise rather than as jelly.
+// Quick and loose. A long wobble across 26 tiles at once reads as noise.
 export const squashProperties: SpringProperties = {
   mass: 1,
   stiffness: 900,
-  damping: 12,
+  damping: 13,
 };
 
 export const liftProperties: SpringProperties = {
   mass: 1,
   stiffness: 700,
-  damping: 14,
+  damping: 15,
 };

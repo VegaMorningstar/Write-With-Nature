@@ -1,335 +1,232 @@
 /**
- * The alphabet as a grid of frosted glass buttons.
+ * The alphabet as a grid of frosted glass keys.
  *
- * Twenty-six real <button> elements — click handlers, keyboard focus, screen
- * reader semantics, and the letter as DOM text so it stays crisp and
- * selectable — with a single canvas behind them drawing all the glass. One
- * WebGPU device for the grid, not one per tile.
+ * Twenty-six real <button> elements: click handlers, keyboard focus, screen
+ * reader labels, disabled state, and the letter as DOM text. The glass is CSS —
+ * a backdrop-filter frost, a white fill, a bright rim and a coloured halo —
+ * because that is exactly what the look is made of, and it renders the same
+ * everywhere rather than depending on WebGPU.
  *
- * The buttons' measured rects position the tiles in the shader, and the same
- * spring values drive both the shader and a CSS transform on the button, so a
- * tile and its letter wobble together rather than drifting apart.
+ * Each tile takes its colour from a field centred on the grid, so the bloom runs
+ * through the middle instead of 26 identical squares.
  *
- * Without WebGPU it degrades to plain buttons, which still work.
+ * Springs give the wobble. They drive a CSS transform on the button itself, so
+ * the tile and its letter are the same element and cannot drift apart.
  */
 import { useRef, useEffect, useState } from 'react'
 import { LETTERS, MATERIAL_DEFAULTS, POINTER_DEFAULTS, squashProperties, liftProperties } from './constants.ts'
 import { Spring } from './spring.ts'
 
-const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
+const rgb = (r, g, b, a) => `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`
+const mix = (a, b, t) => a + (b - a) * t
 
 export default function GlassAlphabet({
   material = MATERIAL_DEFAULTS,
   pointer = POINTER_DEFAULTS,
-  available,          // Set of letters that have content; others render dimmed
+  available,
   onSelect,
   columns = 9,
 }) {
   const hostRef = useRef(null)
-  const canvasRef = useRef(null)
   const buttonRefs = useRef([])
-  const sceneRef = useRef(null)
-  const cleanupRef = useRef(null)
-
-  const materialRef = useRef(material)
-  const pointerCfgRef = useRef(pointer)
-  useEffect(() => {
-    materialRef.current = material
-    sceneRef.current?.setParams(material)
-  }, [material])
-  useEffect(() => { pointerCfgRef.current = pointer }, [pointer])
-
+  const springsRef = useRef(null)
   const [focused, setFocused] = useState(-1)
-  const [error, setError] = useState(null)
-  // Set once the springs exist, so a click can reach them from outside the effect
-  const pressRef = useRef(null)
+
+  const m = { ...MATERIAL_DEFAULTS, ...material }
+  const p = { ...POINTER_DEFAULTS, ...pointer }
+  const pointerCfg = useRef(p)
+  useEffect(() => { pointerCfg.current = p })
+
+  const rows = Math.ceil(LETTERS.length / columns)
+
+  // Grid position of each tile, and the colour the field gives it there
+  const tiles = LETTERS.map((letter, i) => {
+    const col = i % columns
+    const row = Math.floor(i / columns)
+    const dx = col - (columns - 1) / 2
+    const dy = row - (rows - 1) / 2
+    const field = Math.exp(-(dx * dx + dy * dy) / Math.max(m.glowSpread * m.glowSpread, 0.01))
+    return {
+      letter,
+      col,
+      row,
+      field,
+      colour: [
+        mix(m.farR, m.nearR, field),
+        mix(m.farG, m.nearG, field),
+        mix(m.farB, m.nearB, field),
+      ],
+    }
+  })
 
   useEffect(() => {
-    if (!gpuSupported) return
-    const host = hostRef.current
-    const canvas = canvasRef.current
-    if (!host || !canvas) return
-
-    let cancelled = false
-    let backdrop = null
-    let ro = null
-    let raf = 0
-
-    // Per-tile springs. squash drives the shape, lift drives the glow.
     const squash = LETTERS.map(() => new Spring(squashProperties))
     const lift = LETTERS.map(() => new Spring(liftProperties))
-    // Base geometry in shape space, remeasured only on resize — a transform
-    // does not change layout, so the rects stay valid while tiles wobble.
-    let rects = LETTERS.map(() => [0, 0, 0.05, 0.05])
-    let pointerShape = [-99, -99]
+    springsRef.current = { squash, lift }
+
+    let raf = 0
+    let last = 0
     let lastPointer = null
     let lastNudge = 0
-    let lastFrame = 0
 
-    async function init() {
-      try {
-        const { tgpu } = await import('typegpu')
-        const { setupGlassAlphabet } = await import('./scene.ts')
-        const { getSharedBackdrop } = await import('../liquid-glass/backdrop.js')
-        if (cancelled) return
+    const tick = now => {
+      raf = requestAnimationFrame(tick)
+      const dt = Math.min(last ? (now - last) / 1000 : 0, 0.1)
+      last = now
+      if (dt <= 0) return
 
-        backdrop = getSharedBackdrop({ scale: 0.5 })
-
-        const measure = scene => {
-          const hostRect = host.getBoundingClientRect()
-          if (!hostRect.width || !hostRect.height) return
-          const dpr = Math.min(window.devicePixelRatio || 1, 2)
-          canvas.width = Math.max(2, Math.round(hostRect.width * dpr))
-          canvas.height = Math.max(2, Math.round(hostRect.height * dpr))
-
-          const aspect = hostRect.width / hostRect.height
-          scene?.setShapeScale(hostRect.width, hostRect.height)
-
-          rects = buttonRefs.current.map(btn => {
-            if (!btn) return [0, 0, 0.001, 0.001]
-            const r = btn.getBoundingClientRect()
-            // Shape space: y in 0..1 across the host, x in 0..aspect
-            return [
-              ((r.left + r.width / 2 - hostRect.left) / hostRect.width) * aspect,
-              (r.top + r.height / 2 - hostRect.top) / hostRect.height,
-              (r.width / 2) / hostRect.height,
-              (r.height / 2) / hostRect.height,
-            ]
-          })
-          scene?.setTileRects(rects)
-
-          const vw = window.innerWidth
-          const vh = window.innerHeight
-          backdrop.resize(vw, vh)
-          scene?.setViewportRect(
-            { x: hostRect.left, y: hostRect.top, w: hostRect.width, h: hostRect.height }, vw, vh,
-          )
+      // Fixed substeps — explicit Euler on springs this stiff diverges past
+      // roughly 60ms, and one stalled frame would otherwise blow them up.
+      const steps = Math.min(Math.ceil(dt / (1 / 240)), 32)
+      const step = dt / steps
+      for (let s = 0; s < steps; s++) {
+        for (let i = 0; i < LETTERS.length; i++) {
+          squash[i].step(step)
+          lift[i].step(step)
         }
+      }
 
-        measure(null)
-        backdrop.update()
+      for (let i = 0; i < LETTERS.length; i++) {
+        const btn = buttonRefs.current[i]
+        if (!btn) continue
+        const sq = squash[i].value
+        const ly = lift[i].value
+        btn.style.transform =
+          `translateY(${(-ly * 40).toFixed(2)}px) scale(${(1 + sq).toFixed(4)}, ${(1 - sq * 0.7).toFixed(4)})`
+      }
+    }
+    raf = requestAnimationFrame(tick)
 
-        const root = await tgpu.init()
-        const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
-        const scene = await setupGlassAlphabet(root, context, backdrop.canvas)
-        if (cancelled) { scene.onCleanup(); root.destroy(); return }
+    const onMove = e => {
+      const host = hostRef.current
+      if (!host) return
+      const cfg = pointerCfg.current
+      const now = performance.now()
 
-        scene.beforeFrame = () => {
-          backdrop.update()
-          const hostRect = host.getBoundingClientRect()
-          const vw = window.innerWidth
-          const vh = window.innerHeight
-          // The grid scrolls, so its slice of the backdrop moves every frame
-          scene.setViewportRect(
-            { x: hostRect.left, y: hostRect.top, w: hostRect.width, h: hostRect.height }, vw, vh,
-          )
-        }
+      const travelled = lastPointer
+        ? Math.hypot(e.clientX - lastPointer[0], e.clientY - lastPointer[1])
+        : 0
+      lastPointer = [e.clientX, e.clientY]
+      if (now - lastNudge < cfg.throttleMs) return
+      lastNudge = now
 
-        scene.setParams(materialRef.current)
-        measure(scene)
+      const speed = Math.min(travelled / Math.max(cfg.sensitivity, 1), 1) * cfg.strength
+      if (speed <= 0.001) return
 
-        sceneRef.current = scene
-        cleanupRef.current = () => { scene.onCleanup(); root.destroy() }
-
-        ro = new ResizeObserver(() => measure(sceneRef.current))
-        ro.observe(host)
-
-        // ── Springs ───────────────────────────────────────────────────────
-        const tick = now => {
-          raf = requestAnimationFrame(tick)
-          const dt = Math.min(lastFrame ? (now - lastFrame) / 1000 : 0, 0.1)
-          lastFrame = now
-          if (dt <= 0) return
-
-          // Fixed substeps: explicit Euler on springs this stiff diverges past
-          // roughly 60ms, and a stalled frame would otherwise blow them up.
-          const steps = Math.min(Math.ceil(dt / (1 / 240)), 32)
-          const step = dt / steps
-          for (let s = 0; s < steps; s++) {
-            for (let i = 0; i < LETTERS.length; i++) {
-              squash[i].step(step)
-              lift[i].step(step)
-            }
-          }
-
-          scene.setTileStates(LETTERS.map((_, i) => [
-            squash[i].value,
-            -squash[i].value * 0.6,   // volume-ish: wider means shorter
-            Math.abs(lift[i].value),
-            0,
-          ]))
-
-          // Same numbers on the button, so the letter tracks its tile
-          for (let i = 0; i < LETTERS.length; i++) {
-            const btn = buttonRefs.current[i]
-            if (!btn) continue
-            const sx = 1 + squash[i].value
-            const sy = 1 - squash[i].value * 0.6
-            btn.style.transform = `scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`
-          }
-        }
-        raf = requestAnimationFrame(tick)
-
-        // A click kicks its own tile hard and its neighbours a little, so the
-        // press reads as landing on the grid rather than on one square.
-        pressRef.current = (index, impulse) => {
-          for (let i = 0; i < rects.length; i++) {
-            const dx = rects[index][0] - rects[i][0]
-            const dy = rects[index][1] - rects[i][1]
-            const tileW = Math.max(rects[i][2] * 2, 0.001)
-            const dist = Math.hypot(dx, dy) / tileW
-            const falloff = Math.max(0, 1 - dist / 2.5)
-            if (falloff <= 0) continue
-            squash[i].velocity -= impulse * falloff * falloff
-            lift[i].velocity += impulse * falloff * falloff * 0.6
-          }
-        }
-
-        // ── Pointer ───────────────────────────────────────────────────────
-        const onMove = e => {
-          const cfg = pointerCfgRef.current
-          const now = performance.now()
-          const hostRect = host.getBoundingClientRect()
-          if (!hostRect.width) return
-
-          const aspect = hostRect.width / hostRect.height
-          pointerShape = [
-            ((e.clientX - hostRect.left) / hostRect.width) * aspect,
-            (e.clientY - hostRect.top) / hostRect.height,
-          ]
-          sceneRef.current?.setPointer(pointerShape[0], pointerShape[1])
-
-          const travelled = lastPointer
-            ? Math.hypot(e.clientX - lastPointer[0], e.clientY - lastPointer[1])
-            : 0
-          lastPointer = [e.clientX, e.clientY]
-          if (now - lastNudge < cfg.throttleMs) return
-          lastNudge = now
-
-          const speed = Math.min(travelled / Math.max(cfg.sensitivity, 1), 1) * cfg.strength
-          if (speed <= 0.001) return
-
-          // Nudge by proximity, so the wave follows the cursor across the grid
-          for (let i = 0; i < rects.length; i++) {
-            const dx = pointerShape[0] - rects[i][0]
-            const dy = pointerShape[1] - rects[i][1]
-            const tileW = Math.max(rects[i][2] * 2, 0.001)
-            const dist = Math.hypot(dx, dy) / tileW
-            const falloff = Math.max(0, 1 - dist / Math.max(cfg.radius, 0.01))
-            if (falloff <= 0) continue
-            const amount = speed * falloff * falloff * cfg.gain
-            squash[i].velocity += amount
-            lift[i].velocity += amount * 0.8
-          }
-        }
-
-        window.addEventListener('pointermove', onMove, { passive: true })
-        cleanupRef.current = () => {
-          window.removeEventListener('pointermove', onMove)
-          cancelAnimationFrame(raf)
-          scene.onCleanup()
-          root.destroy()
-        }
-      } catch (e) {
-        // Surfaced on the page, not just logged. A silent catch here hid two
-        // separate bugs behind an empty grid that looked like a tuning problem.
-        console.warn('[GlassAlphabet] init failed:', e)
-        if (!cancelled) setError(String(e?.message || e))
+      // Proximity in tile widths, so the disturbance follows the cursor across
+      // the grid rather than hitting everything equally
+      for (let i = 0; i < LETTERS.length; i++) {
+        const btn = buttonRefs.current[i]
+        if (!btn) continue
+        const r = btn.getBoundingClientRect()
+        const dist = Math.hypot(
+          e.clientX - (r.left + r.width / 2),
+          e.clientY - (r.top + r.height / 2),
+        ) / Math.max(r.width, 1)
+        const falloff = Math.max(0, 1 - dist / Math.max(cfg.radius, 0.01))
+        if (falloff <= 0) continue
+        const amount = speed * falloff * falloff * cfg.gain
+        squash[i].velocity += amount
+        lift[i].velocity += amount * 0.6
       }
     }
 
-    init()
-
+    window.addEventListener('pointermove', onMove, { passive: true })
     return () => {
-      cancelled = true
-      ro?.disconnect()
+      window.removeEventListener('pointermove', onMove)
       cancelAnimationFrame(raf)
-      cleanupRef.current?.()
-      cleanupRef.current = null
-      sceneRef.current = null
+      springsRef.current = null
     }
   }, [])
 
-  const press = i => pressRef.current?.(i, pointerCfgRef.current.clickImpulse)
+  const press = index => {
+    const springs = springsRef.current
+    if (!springs) return
+    const origin = buttonRefs.current[index]?.getBoundingClientRect()
+    if (!origin) return
+    // Kicks its own tile and its neighbours, so the press lands on the grid
+    for (let i = 0; i < LETTERS.length; i++) {
+      const r = buttonRefs.current[i]?.getBoundingClientRect()
+      if (!r) continue
+      const dist = Math.hypot(
+        origin.left - r.left,
+        origin.top - r.top,
+      ) / Math.max(r.width, 1)
+      const falloff = Math.max(0, 1 - dist / 2.5)
+      if (falloff <= 0) continue
+      springs.squash[i].velocity -= pointerCfg.current.clickImpulse * falloff * falloff * 8
+      springs.lift[i].velocity += pointerCfg.current.clickImpulse * falloff * falloff * 4
+    }
+  }
+
+  const frost = `blur(${m.blur}px) saturate(${m.saturate}%) brightness(${m.brightness})`
 
   return (
     <div
       ref={hostRef}
-      className="glass-alphabet"
       style={{
-        position: 'relative',
-        // Its own stacking context, so the canvas below cannot escape behind an
-        // ancestor's background. Without this a negative z-index child is
-        // painted behind whatever opaque parent happens to be above it.
-        isolation: 'isolate',
         display: 'grid',
-        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-        gap: 8,
-        padding: 10,
+        gridTemplateColumns: `repeat(${columns}, ${m.size}px)`,
+        gap: m.gap,
+        justifyContent: 'center',
+        padding: m.glowBlur / 2,
       }}
     >
-      {error && (
-        <div style={{
-          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', zIndex: 2, pointerEvents: 'none',
-          fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#a33',
-          background: 'rgba(255,240,240,0.85)', borderRadius: 10, padding: 8,
-          textAlign: 'center', lineHeight: 1.5,
-        }}>
-          glass alphabet failed to start — {error}
-        </div>
-      )}
+      {tiles.map((tile, i) => {
+        const has = !available || available.has(tile.letter)
+        const [r, g, b] = tile.colour
+        const glowAlpha = m.glowStrength * (0.35 + tile.field * 0.65)
 
-      {gpuSupported && (
-        <canvas
-          ref={canvasRef}
-          aria-hidden="true"
-          style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%',
-            pointerEvents: 'none',
-            // 0, with the buttons explicitly above at 1. Nothing here relies on
-            // paint order between positioned and in-flow content.
-            zIndex: 0,
-          }}
-        />
-      )}
-
-      {LETTERS.map((letter, i) => {
-        const has = !available || available.has(letter)
         return (
           <button
-            key={letter}
+            key={tile.letter}
             ref={el => { buttonRefs.current[i] = el }}
             type="button"
             disabled={!has}
-            aria-label={`Show Landsat scenes for ${letter}`}
-            onClick={() => { press(i); onSelect?.(letter) }}
+            aria-label={`Show Landsat scenes for ${tile.letter}`}
+            onClick={() => { press(i); onSelect?.(tile.letter) }}
             onFocus={() => setFocused(i)}
             onBlur={() => setFocused(-1)}
             style={{
-              // Above the canvas, explicitly
-              position: 'relative',
-              zIndex: 1,
-              // Transparent: the canvas behind is the surface
-              background: 'none',
-              border: 'none',
-              padding: '0.7rem 0',
+              width: m.size,
+              height: m.size,
+              borderRadius: m.radius,
               cursor: has ? 'pointer' : 'default',
-              opacity: has ? 1 : 0.32,
-              fontFamily: "'Playfair Display', serif",
-              fontWeight: 700,
-              fontSize: '1rem',
-              color: 'rgba(28,26,16,0.72)',
-              textShadow: '0 1px 2px rgba(255,255,255,0.5)',
-              outline: focused === i ? '2px solid rgba(74,124,63,0.7)' : 'none',
-              outlineOffset: 2,
-              borderRadius: 10,
+              opacity: has ? 1 : 0.35,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              // The frost, over whatever the page puts behind it
+              backdropFilter: frost,
+              WebkitBackdropFilter: frost,
+              // Face: the tile's own colour rising from one corner, over a white
+              // wash. The wash is what reads as frosted.
+              backgroundImage: [
+                `radial-gradient(120% 120% at 25% 115%, ${rgb(r, g, b, m.tintStrength * 0.9)} 0%, transparent 62%)`,
+                `linear-gradient(${m.faceAngle}deg, rgba(255,255,255,${m.faceGradient}) 0%, rgba(255,255,255,0) 65%)`,
+                `linear-gradient(0deg, rgba(255,255,255,${m.fill}), rgba(255,255,255,${m.fill}))`,
+              ].join(', '),
+              border: `${m.borderWidth}px solid rgba(255,255,255,${m.border})`,
+              boxShadow: [
+                // Outer halo in the tile's own colour
+                `0 0 ${m.glowBlur}px ${rgb(r, g, b, glowAlpha)}`,
+                // Rim: bright along the top, shaded along the bottom
+                `inset 0 ${m.borderWidth}px 1px rgba(255,255,255,${m.innerTop})`,
+                `inset 0 -${m.borderWidth}px 2px ${rgb(90, 80, 170, m.innerBottom)}`,
+              ].join(', '),
+              color: rgb(m.letterR, m.letterG, m.letterB, m.letterOpacity),
+              fontFamily: "'Playfair Display', Georgia, serif",
+              fontWeight: m.letterWeight,
+              fontSize: m.letterSize,
+              lineHeight: 1,
+              outline: focused === i ? '2px solid rgba(74,124,63,0.8)' : 'none',
+              outlineOffset: 3,
               willChange: 'transform',
-              // The wobble is written straight to style.transform each frame
-              transition: 'opacity 0.2s',
+              // transform is written directly each frame by the spring loop
+              transition: 'opacity 0.2s, box-shadow 0.2s',
             }}
           >
-            {letter}
+            {tile.letter}
           </button>
         )
       })}
