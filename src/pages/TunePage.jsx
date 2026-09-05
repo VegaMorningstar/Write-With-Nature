@@ -11,7 +11,11 @@
  */
 import { useState, useRef, useEffect } from 'react'
 import { liquidGlass } from '../lib/liquid-glass'
+import { glassSupported } from '../hooks/usePanelGlass'
 import JellyWireframeButton from '../ui-elements/jelly-wireframe-button/JellyWireframeButton'
+import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
+import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
+import LiquidGlassControls from './controls/LiquidGlassControls.jsx'
 
 // Rebuilds the glass effect whenever opts change (slider-reactive)
 function useLiveGlass(ref, opts) {
@@ -187,6 +191,16 @@ const GLASS_DEF = {
 
 // Stiffness sets the wobble frequency, damping sets how fast it dies. The pair
 // that matters is the damping ratio, damping / (2 * sqrt(stiffness * mass)):
+const PANEL_GLASS_DEF = { ...PANEL_GLASS }
+
+// Read off index.css, so the sliders start where the app does
+const RADII_DEF = {
+  panel: 20,      // .compose-card, .board, .colophon
+  input: 10,      // textarea
+  tile: 7,        // .tile
+  alphaCell: 6,   // .alpha-cell
+}
+
 const TILE_COLORS = [
   '#6e9e7e','#5a8a62','#7aac72','#4a8e7e','#8aba88',
   '#6a9e6a','#5a7e8a','#7aaa98','#8ab08a','#6e8a5a',
@@ -222,9 +236,44 @@ export default function TunePage() {
   // The same shader laid over the real page
 
 
-  useLiveGlass(composeRef,  composeG)
-  useLiveGlass(boardRef,    boardG)
-  useLiveGlass(colophonRef, colophonG)
+  // Liquid glass — the shipped panel surface
+  const [panelGlass, setPanelGlass] = useState(PANEL_GLASS_DEF)
+  const setPanel = (k, v) => setPanelGlass(p => ({ ...p, [k]: v }))
+
+  // Edge curvature. The glass reads the element's computed border-radius, so
+  // moving the panel value reshapes the lens with it.
+  const [radii, setRadii] = useState(RADII_DEF)
+  const setRadius = (k, v) => setRadii(r => ({ ...r, [k]: v }))
+  const panelStyle = { borderRadius: radii.panel }
+
+  // Where the shader owns the surface, the panel's own background, border and
+  // outer glow have to go — they paint outside the canvas and would show as a
+  // second edge beside the glass one.
+  useEffect(() => {
+    if (!glassSupported) return
+    const els = [composeRef.current, boardRef.current, colophonRef.current].filter(Boolean)
+    const prev = els.map(el => ({
+      el,
+      background: el.style.background,
+      border: el.style.border,
+      boxShadow: el.style.boxShadow,
+      backdropFilter: el.style.backdropFilter,
+    }))
+    for (const el of els) {
+      el.style.background = 'transparent'
+      el.style.border = 'none'
+      el.style.boxShadow = 'none'
+      el.style.backdropFilter = el.style.webkitBackdropFilter = 'none'
+    }
+    return () => {
+      for (const p of prev) Object.assign(p.el.style, p)
+    }
+  }, [])
+
+  // Only where WebGPU is absent — otherwise LiquidGlassPanel has the surface
+  useLiveGlass(composeRef,  glassSupported ? null : composeG)
+  useLiveGlass(boardRef,    glassSupported ? null : boardG)
+  useLiveGlass(colophonRef, glassSupported ? null : colophonG)
 
 
   const setFluid = (k, v) => setPendingFluid(p => ({ ...p, [k]: v }))
@@ -239,6 +288,8 @@ export default function TunePage() {
     const cfg = {
       fluid:   { ...appliedFluid, blendMode },
       glass:   { compose: composeG, board: boardG, colophon: colophonG },
+      panelGlass,
+      radii,
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -247,6 +298,8 @@ export default function TunePage() {
   const resetAll = () => {
     setPendingFluid({ ...FLUID_DEF }); setAppliedFluid({ ...FLUID_DEF })
     setBlendMode(BLEND_DEF)
+    setPanelGlass({ ...PANEL_GLASS_DEF })
+    setRadii({ ...RADII_DEF })
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
     setFluidKey(k => k + 1)
   }
@@ -301,10 +354,11 @@ export default function TunePage() {
           {/* Compose card */}
           <section className="section">
             <div className="section-label">Compose · standard mode</div>
-            <div className="compose-card" ref={composeRef}>
+            <div className="compose-card" ref={composeRef} style={panelStyle}>
+              <LiquidGlassPanel params={panelGlass} />
               <textarea
                 rows={4}
-                style={{ width: '100%' }}
+                style={{ width: '100%', borderRadius: radii.input }}
                 defaultValue={'Rivers, glaciers & coastlines — shaped into letters from orbit.\nEach line becomes its own row of satellite tiles.'}
               />
               {/* The shipped button, with no props — exactly as App.jsx mounts
@@ -328,10 +382,11 @@ export default function TunePage() {
             <div className="collage-bar">
               <div className="section-label" style={{ marginBottom: 0 }}>Board · prominent mode &nbsp;<span style={{ opacity: 0.4, fontWeight: 300 }}>10 sample tiles</span></div>
             </div>
-            <div className="board" ref={boardRef}>
+            <div className="board" ref={boardRef} style={panelStyle}>
+              <LiquidGlassPanel params={panelGlass} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, position: 'relative', zIndex: 1, padding: '0.25rem 0' }}>
                 {TILE_COLORS.map((c, i) => (
-                  <div key={i} className="tile" style={{ width: 88, height: 88, background: c }}>
+                  <div key={i} className="tile" style={{ width: 88, height: 88, background: c, borderRadius: radii.tile }}>
                     <div className="tile-wash" />
                     <span className="tile-char">{String.fromCharCode(65 + i)}</span>
                     <div className="tile-swap">↺</div>
@@ -347,14 +402,15 @@ export default function TunePage() {
           </svg>
 
           {/* Colophon */}
-          <footer className="colophon" ref={colophonRef}>
+          <footer className="colophon" ref={colophonRef} style={panelStyle}>
+            <LiquidGlassPanel params={panelGlass} />
             <div className="colophon-text">
               <h3>About this tool</h3>
               <p>All imagery from NASA's public domain <a href="https://science.nasa.gov/mission/landsat/outreach/your-name-in-landsat/" target="_blank" rel="noreferrer">Your Name in Landsat</a> project — real Landsat 8 &amp; 9 satellite scenes where Earth's surface naturally forms letter shapes from orbit. Click any tile to cycle its satellite scene.</p>
             </div>
             <div className="alpha-grid">
               {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(ch => (
-                <div key={ch} className="alpha-cell has">{ch}</div>
+                <div key={ch} className="alpha-cell has" style={{ borderRadius: radii.alphaCell }}>{ch}</div>
               ))}
             </div>
           </footer>
@@ -478,9 +534,62 @@ export default function TunePage() {
 
         {/* ── Glass sections ── */}
 
-        <GlassSection title="GLASS — COMPOSE"  opts={composeG}  onChange={setComposeG}  open={openSection === 'compose'}  onToggle={() => toggle('compose')}  />
-        <GlassSection title="GLASS — BOARD"    opts={boardG}    onChange={setBoardG}    open={openSection === 'board'}    onToggle={() => toggle('board')}    />
-        <GlassSection title="GLASS — COLOPHON" opts={colophonG} onChange={setColophonG} open={openSection === 'colophon'} onToggle={() => toggle('colophon')} />
+        <AccordionSection title="PANEL GLASS" open={openSection === 'panelGlass'} onToggle={() => toggle('panelGlass')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6,
+            padding: '5px 7px', background: 'rgba(74,124,63,0.05)', borderRadius: 5 }}>
+            The shipped surface on all three panels. One set of values drives
+            them all; paste a result into panelPreset.js.
+          </div>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            The lens size is not among these. LiquidGlassPanel measures each
+            element and derives rectW, rectH and the corner radius from it, so
+            the placement sliders below do nothing — use EDGE CURVATURE to
+            change the shape.
+          </div>
+          <LiquidGlassControls
+            params={panelGlass}
+            set={setPanel}
+            mode="page"
+            setMode={() => {}}
+            follow={false}
+            setFollow={() => {}}
+          />
+        </AccordionSection>
+
+        <AccordionSection title="EDGE CURVATURE" open={openSection === 'radii'} onToggle={() => toggle('radii')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            The glass reads each panel&apos;s computed border-radius, so moving the
+            panel value reshapes the lens with it — the two cannot drift apart.
+          </div>
+
+          <Slider label="Panel Radius (px)" value={radii.panel} min={0} max={60} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setRadius('panel', v)}
+            description="Compose card, board and colophon. Also the outer curve of the liquid glass, since the lens is fitted to the element." />
+
+          <Slider label="Input Radius (px)" value={radii.input} min={0} max={60} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setRadius('input', v)}
+            description="The compose textarea. For its curve to nest cleanly inside the panel's, this wants to be the panel radius minus the gap between them — concentric corners share a centre, so equal radii read as too round at the inset edge." />
+
+          <Slider label="Tile Radius (px)" value={radii.tile} min={0} max={40} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setRadius('tile', v)}
+            description="The letter tiles on the board." />
+
+          <Slider label="Alpha Cell Radius (px)" value={radii.alphaCell} min={0} max={30} step={1}
+            fmt={v => v.toFixed(0)} onChange={v => setRadius('alphaCell', v)}
+            description="The small alphabet cells in the colophon." />
+        </AccordionSection>
+
+        <div style={{ borderTop: '1px solid rgba(74,124,63,0.08)', margin: '4px 0 6px' }} />
+
+        <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.3)', margin: '0 0 8px', lineHeight: 1.6 }}>
+          Below: the CSS glass, which now only runs where WebGPU is missing —
+          Safari, Firefox, iOS. Inert in this browser if the panels above are
+          rendering.
+        </div>
+
+        <GlassSection title="FALLBACK GLASS — COMPOSE"  opts={composeG}  onChange={setComposeG}  open={openSection === 'compose'}  onToggle={() => toggle('compose')}  />
+        <GlassSection title="FALLBACK GLASS — BOARD"    opts={boardG}    onChange={setBoardG}    open={openSection === 'board'}    onToggle={() => toggle('board')}    />
+        <GlassSection title="FALLBACK GLASS — COLOPHON" opts={colophonG} onChange={setColophonG} open={openSection === 'colophon'} onToggle={() => toggle('colophon')} />
 
         {/* Footer note */}
         <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid rgba(74,124,63,0.08)' }}>
