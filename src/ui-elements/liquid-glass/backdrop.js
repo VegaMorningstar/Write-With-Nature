@@ -59,6 +59,38 @@ function ellipticGrad(ctx, cw, ch, cxPct, cyPct, rxPct, ryPct, rgb, alpha, stopP
   ctx.restore()
 }
 
+/**
+ * One backdrop shared by every panel on the page.
+ *
+ * Each panel refracts the same thing — the page behind it — so rebuilding the
+ * composite once per panel would repaint the whole viewport three times a frame
+ * and upload it three times. update() is idempotent within a frame, so callers
+ * can each ask for it and only the first does the work.
+ */
+let _shared = null
+
+export function getSharedBackdrop({ scale = 0.5 } = {}) {
+  if (!_shared) {
+    const backdrop = createBackdrop({ scale })
+    let lastPaint = -1
+    _shared = {
+      canvas: backdrop.canvas,
+      resize: backdrop.resize,
+      update() {
+        // rAF callbacks in a frame land within a millisecond or two of each
+        // other; a repaint 8ms later is genuinely the next frame.
+        const now = performance.now()
+        if (now - lastPaint < 8) return backdrop.canvas
+        lastPaint = now
+        return backdrop.update()
+      },
+      get width() { return backdrop.width },
+      get height() { return backdrop.height },
+    }
+  }
+  return _shared
+}
+
 export function createBackdrop({ scale = 0.5 } = {}) {
   const composite = document.createElement('canvas')
   const ctx = composite.getContext('2d', { willReadFrequently: false })

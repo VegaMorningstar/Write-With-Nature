@@ -4,7 +4,9 @@ import Header from './components/Header'
 import Board from './components/Board'
 import Colophon from './components/Colophon'
 import { downloadCollage } from './utils/collage'
-import useLiquidGlass from './hooks/useLiquidGlass'
+import usePanelGlass, { glassSupported } from './hooks/usePanelGlass'
+import LiquidGlassPanel from './ui-elements/liquid-glass/LiquidGlassPanel'
+import { PANEL_GLASS } from './ui-elements/liquid-glass/panelPreset'
 import FluidCursor from './components/FluidCursor'
 import JellyWireframeButton from './ui-elements/jelly-wireframe-button/JellyWireframeButton'
 
@@ -54,7 +56,7 @@ export default function App() {
   const exportCanvasRef = useRef(null)
   const toastTimer    = useRef(null)
 
-  useLiquidGlass(composeRef, { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, mode: 'standard', aberrationIntensity: 6, elasticity: 0 })
+  usePanelGlass(composeRef, { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, mode: 'standard', aberrationIntensity: 6, elasticity: 0 })
 
   const showToast = useCallback((msg, ms = 2500) => {
     setToastMsg(msg)
@@ -202,6 +204,7 @@ export default function App() {
         <section className="section">
           <div className="section-label">Compose</div>
           <div className="compose-card" ref={composeRef}>
+            {glassSupported && <LiquidGlassPanel params={PANEL_GLASS} />}
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}

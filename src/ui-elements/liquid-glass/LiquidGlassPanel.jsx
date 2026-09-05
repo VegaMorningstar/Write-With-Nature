@@ -79,10 +79,13 @@ export default function LiquidGlassPanel({ params, fill = true, backdropScale = 
       try {
         const { tgpu } = await import('typegpu')
         const { setupOverlay } = await import('./overlay.ts')
-        const { createBackdrop } = await import('./backdrop.js')
+        const { getSharedBackdrop } = await import('./backdrop.js')
         if (cancelled) return
 
-        backdrop = createBackdrop({ scale: backdropScale })
+        // Shared: every panel refracts the same page, and repainting the whole
+        // viewport once per panel per frame is three times the work for one
+        // result. The shared one repaints at most once a frame.
+        backdrop = getSharedBackdrop({ scale: backdropScale })
 
         const sync = scene => {
           const rect = host.getBoundingClientRect()
@@ -140,13 +143,20 @@ export default function LiquidGlassPanel({ params, fill = true, backdropScale = 
     }
   }, [backdropScale])
 
+  if (!gpuSupported) return null
+
   return (
     <canvas
       ref={canvasRef}
       aria-hidden="true"
       style={{
         position: 'absolute', inset: 0, width: '100%', height: '100%',
-        borderRadius: 'inherit', pointerEvents: 'none', zIndex: 0,
+        borderRadius: 'inherit', pointerEvents: 'none',
+        // Negative, so in-flow content paints above it without needing a
+        // positioned wrapper — a wrapper would break the flex layout these
+        // panels use. Safe because each panel sets `isolation: isolate`, so the
+        // canvas cannot fall behind the page itself.
+        zIndex: -1,
       }}
     />
   )
