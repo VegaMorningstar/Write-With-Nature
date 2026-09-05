@@ -147,11 +147,7 @@ export default function UiTunePage() {
   const setAlphaMat = (k, v) => setAlpha(s => ({ ...s, material: { ...s.material, [k]: v } }))
   const setAlphaPtr = (k, v) => setAlpha(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
   const [lastLetter, setLastLetter] = useState(null)
-  // Not a look — a visibility switch. The fluid's multiply blend hides it from
-  // every backdrop-filter on the page, so with it on there is nothing behind
-  // the tiles but a smooth gradient and transparent glass is indistinguishable
-  // from a white chip.
-  const [fluidBlend, setFluidBlend] = useState('normal')
+  const [fluidBlend, setFluidBlend] = useState('multiply')
 
   // Liquid glass
   const [glass, setGlass] = useState(GLASS_DEF)
@@ -201,7 +197,7 @@ export default function UiTunePage() {
 
           <Bench
             name="Glass Alphabet"
-            summary="Twenty-six real buttons — click handlers, keyboard focus, disabled state, the letter as DOM text. The glass is a backdrop-filter running the component's own SVG filter: noise displaces the backdrop three times at three scales, one colour channel taken from each, which is the same construction as the WebGPU liquid glass sampling three refractive indices. Opacity lives at the rim rather than across the face, the way Fresnel puts it on the jelly. Sat directly on the page, with no stage behind it — a white panel under translucent tiles reads as the tiles' own opacity."
+            summary="TypeGPU's liquid glass, twenty-six times over: one canvas running their shader across a union of 26 rounded boxes, so every tile refracts in a single draw call. The letters are painted into the backdrop the shader reads, not laid over it, so they sit under the glass and are displaced and split by it the way RENDER is under the jelly. Twenty-six transparent buttons on top carry the behaviour — click, keyboard focus, disabled state — and the jelly's springs resize each tile's box in the shader uniform, so the wobble happens in the glass itself."
             wide
             bare
           >

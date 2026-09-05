@@ -3,19 +3,18 @@ import { useEffect } from 'react'
 let _booted = false
 
 /**
- * `blend` decides whether the glass on the page can see the fluid at all.
+ * `blend` decides whether CSS glass on the page can see the fluid.
  *
  * An element with mix-blend-mode forms its own backdrop root, and Chrome will
- * not let a backdrop-filter sample blended content. Under 'multiply' the fluid
- * stains the paper beautifully and is invisible to every frosted panel in the
- * app — those panels refract the background gradient alone, which is smooth,
- * so they have nothing to bend and read as flat white.
+ * not let a backdrop-filter sample blended content — so under 'multiply' the
+ * fluid stains the paper and is invisible to every CSS-frosted surface, which
+ * is left refracting a smooth gradient and reads as flat white.
  *
- * 'normal' is the default because the glass is the point: the fluid is the only
- * thing on the page with enough structure to refract. The cost is that the
- * colour now sits over the paper rather than sinking into it.
+ * The WebGPU glass is not affected either way: it cannot sample the DOM at all,
+ * so it rebuilds the page into a texture and reads this canvas directly. Hence
+ * 'multiply' as the default — the app's look, with nothing given up for it.
  */
-export default function FluidCursor({ blend = 'normal' }) {
+export default function FluidCursor({ blend = 'multiply' }) {
   useEffect(() => {
     if (_booted) return
     _booted = true

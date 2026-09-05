@@ -3,95 +3,61 @@ import type { SpringProperties } from './spring.ts';
 export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 /**
- * Frosted glass keys, built in CSS and SVG.
+ * TypeGPU's liquid glass, one lens per letter.
  *
- * The first version of this rendered the tiles in a WebGPU shader. It kept
- * failing silently — a uniform method that does not exist, a stacking context
- * that let the canvas paint behind the page — and none of it was buying
- * anything the reference actually shows.
+ * A CSS attempt came before this and was abandoned. backdrop-filter can blur a
+ * backdrop but not displace one, so there is no refraction available to it at
+ * any setting — the tiles came out as flat white chips however the tint was
+ * tuned, which is exactly what they were.
  *
- * The refraction is the same one the app's glass panels use: fractal noise,
- * blurred into a displacement map, warping the backdrop behind the tile. Doing
- * it three times at three scales and reassembling one channel from each gives
- * chromatic aberration, which is exactly how the WebGPU liquid glass samples
- * three refractive indices. Grain is a second, much finer displacement plus a
- * speckle painted over the fill — roughness and dust, the two halves of frost.
- *
- * Sized to match the colophon's alphabet grid in the app: 30px cells, 5px gaps,
- * 6px corners.
+ * Distances here are in pixels and converted to the shader's box space at write
+ * time. The shader works in canvas heights, which is right for it and useless
+ * for tuning a 30px tile: `end` at the panels' 0.09 would be 16px of inflation
+ * on a tile whose half-width is 15.
  */
 export const MATERIAL_DEFAULTS = {
   // ── Shape ─────────────────────────────────────────────────────────────────
-  size: 30,          // px, the tile's side — matches .alpha-cell
-  radius: 6,         // px
+  size: 30,          // px, the tile's side — matches .alpha-cell in the app
+  radius: 9,         // px, corner radius of the visible tile
   gap: 5,            // px between tiles
 
-  // ── Frost ─────────────────────────────────────────────────────────────────
-  // The jelly's rule, from its own constants: glass reads as glass when the
-  // tint is a suggestion, not a filter. Everything painted across the face is
-  // a suggestion; the opacity lives at the rim instead, which is what Fresnel
-  // does on the jelly and what `fresnel` below does here.
-  //
-  // These compound, too — fill, faceGradient, the speckle and whatever
-  // brightness lifts out of the backdrop all stack. Half opacity on each is an
-  // opaque tile.
-  blur: 2,
-  saturate: 118,
-  brightness: 1,
-  fill: 0.02,
+  // ── Lens ──────────────────────────────────────────────────────────────────
+  // The visible tile is the SDF box inflated by `edge`, and the ring between
+  // `ringStart` and `edge` is where the backdrop is displaced outward. Inside
+  // that ring the glass only blurs; outside it, nothing is drawn at all.
+  edge: 6,           // px the box is inflated by — the rim's width
+  ringStart: 0,      // px; above zero leaves a flat blurred band before the rim
 
-  // ── Refraction ────────────────────────────────────────────────────────────
-  // The lens. Noise displaces the backdrop behind the tile, the way
-  // #glass-element does for the compose card and the board.
-  refraction: 10,      // px of displacement
-  // Noise base frequency. The app's panels run 0.012, but their period is then
-  // ~80px — across a 30px tile that is one flat offset, which slides the
-  // backdrop rather than bending it. A tile this small needs the noise to vary
-  // within its own width before it reads as a lens.
-  refractionScale: 0.03,
-  // Three displacement passes at three scales, one channel taken from each.
-  // The WebGPU liquid glass does the same thing with three refractive indices.
-  chromatic: 0.35,     // fraction of `refraction` separating red from blue
+  // How far the ring drags the backdrop, as a fraction of the canvas. Their demo
+  // runs 0.1 across a full-screen lozenge; on a 30px tile that would haul in
+  // colour from the far side of the grid.
+  refractionStrength: 0.02,
+  // Splits that displacement across three refractive indices. Red bends least,
+  // blue most, so this is the width of the colour fringe at the rim.
+  chromaticStrength: 0.006,
+  // Exponent on the fringe's ramp across the ring. 1 is their linear version;
+  // higher pushes the colour into the outer rim.
+  chromaticFalloff: 1,
 
-  // ── Grain ─────────────────────────────────────────────────────────────────
-  grain: 0.5,          // speckle painted over the fill
-  roughness: 1.6,      // px of fine displacement — the refractive half of frost
+  // Mip bias for the blur seen through the body.
+  blur: 1.2,
+  // The rim is sharper than the body at anything below 1, which is what makes
+  // the edge read as a bevel rather than a smear.
+  edgeBlurMultiplier: 0.7,
+  edgeFeather: 2,
 
-  // ── Rim ───────────────────────────────────────────────────────────────────
-  // Where the opacity is supposed to live. The jelly gets this from Fresnel —
-  // a surface turning away from the eye goes opaque at its silhouette and stays
-  // clear where you look straight through it. An inset shadow with no offset
-  // hugs the rounded border the same way, so it is the same effect by other
-  // means: bright all the way round, nothing in the middle.
-  fresnel: 0.5,
-  fresnelWidth: 5,   // px the rim reaches inward
-  border: 0.34,
-  borderWidth: 1,
-  innerTop: 0.4,     // inset highlight along the top edge — the lit direction
-  innerBottom: 0.14, // inset shade along the bottom, for thickness
-
-  // ── Colour ────────────────────────────────────────────────────────────────
-  // Each tile takes one colour from a field centred on the grid, so the bloom
-  // runs through the middle instead of every tile looking identical.
-  glowStrength: 0.42,
-  glowSpread: 2.6,    // in tiles
-  glowBlur: 10,       // px, the outer halo
-  tintStrength: 0.1,  // how much of that colour lands in the tile's own face
-  nearR: 255, nearG: 150, nearB: 210,   // centre of the bloom
-  farR: 150, farG: 160, farB: 255,      // its edges
-
-  // The face gradient: a soft wash rising from one corner, which is what gives
-  // a flat rectangle the look of a solid with a lit face. It is the single
-  // largest source of opacity on the tile — a sheen across one corner, not a
-  // coat over the whole face.
-  faceGradient: 0.1,
-  faceAngle: 155,
+  // Glass reads as glass when the tint is a suggestion, not a filter — their
+  // example runs 0.05, and the jelly kept it.
+  tintStrength: 0.06,
+  tintR: 0.58, tintG: 0.44, tintB: 0.96,
 
   // ── Letter ────────────────────────────────────────────────────────────────
-  letterSize: 14,
+  // Painted into the backdrop rather than laid over the canvas, so it sits under
+  // the glass and gets refracted with everything else behind the tile.
+  letterSize: 15,
   letterWeight: 700,
-  letterR: 74, letterG: 62, letterB: 148,
-  letterOpacity: 0.85,
+  letterR: 28, letterG: 26, letterB: 16,
+  letterOpacity: 0.62,
 };
 
 export const POINTER_DEFAULTS = {
@@ -101,7 +67,7 @@ export const POINTER_DEFAULTS = {
   sensitivity: 40,
   gain: 0.35,
   throttleMs: 32,
-  // Crossing into a tile kicks it, whether or not the cursor is moving fast
+  // Crossing into a tile kicks it, whether or not the cursor was moving fast
   // enough for the travel-based nudge to fire.
   hoverImpulse: 0.35,
   hoverLift: 3,      // px a hovered tile holds itself above the grid

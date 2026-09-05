@@ -1,42 +1,28 @@
 /**
- * The alphabet as a grid of frosted glass keys.
+ * The alphabet as twenty-six lenses of liquid glass.
  *
- * Twenty-six real <button> elements: click handlers, keyboard focus, screen
- * reader labels, disabled state, and the letter as DOM text.
+ * One canvas runs TypeGPU's liquid-glass shader over a union of 26 rounded
+ * boxes (scene.ts), and twenty-six transparent <button> elements sit on top of
+ * it carrying the behaviour — click handlers, keyboard focus, disabled state,
+ * aria labels. The glass is drawn, the buttons are real; neither has to
+ * compromise for the other.
  *
- * The glass is a backdrop-filter running the component's own SVG filter. That
- * filter refracts the backdrop three times at three displacement scales and
- * takes one colour channel from each, which is the same construction as the
- * WebGPU liquid glass sampling three refractive indices — so the tiles show
- * real chromatic aberration on whatever is behind them, not a coloured outline
- * painted on. A second, much finer displacement roughens the result, and a
- * speckle over the fill supplies the dust: together, frost.
+ * The letters are painted into the backdrop the shader refracts, not laid over
+ * the canvas, so they sit *under* the glass and are displaced and split by it —
+ * the same way the word RENDER sits under the jelly button.
  *
- * Each tile takes its colour from a field centred on the grid, so the bloom
- * runs through the middle instead of 26 identical squares.
+ * Wobble comes from the jelly's springs. They resize and shift each tile's box
+ * in the uniform every frame, which is why the deformation is in the glass
+ * itself rather than a CSS transform of a picture of glass.
  *
- * Springs give the wobble. They drive a CSS transform on the button itself, so
- * the tile and its letter are the same element and cannot drift apart.
+ * Without WebGPU this renders the buttons with a plain frosted CSS fallback:
+ * the behaviour survives, the refraction does not.
  */
-import { useRef, useEffect, useState, useId } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { LETTERS, MATERIAL_DEFAULTS, POINTER_DEFAULTS, squashProperties, liftProperties } from './constants.ts'
 import { Spring } from './spring.ts'
 
-const rgb = (r, g, b, a) => `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`
-const mix = (a, b, t) => a + (b - a) * t
-
-// A channel isolator. Red-only and blue-only layers are recombined with `screen`
-// rather than added: for inputs whose channels are disjoint, screen is exact,
-// and it leaves alpha at 1 instead of tripling it the way an arithmetic add on
-// premultiplied colour would.
-const CHANNEL = {
-  R: '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0',
-  G: '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0',
-  B: '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0',
-}
-
-const speckle = opacity =>
-  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='${opacity.toFixed(3)}'/%3E%3C/svg%3E")`
+const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
 export default function GlassAlphabet({
   material = MATERIAL_DEFAULTS,
@@ -46,42 +32,36 @@ export default function GlassAlphabet({
   columns = 8,
 }) {
   const hostRef = useRef(null)
+  const canvasRef = useRef(null)
   const buttonRefs = useRef([])
   const springsRef = useRef(null)
+  const sceneRef = useRef(null)
   const [focused, setFocused] = useState(-1)
 
   const m = { ...MATERIAL_DEFAULTS, ...material }
   const p = { ...POINTER_DEFAULTS, ...pointer }
-  const pointerCfg = useRef(p)
-  useEffect(() => { pointerCfg.current = p })
 
-  // Filters live in this component, so an instance carries its own glass and
-  // does not depend on the host page having declared one.
-  const uid = useId().replace(/:/g, '')
-  const filterId = `${uid}-glass`
+  // The render loop reads these rather than closing over them, so tuning a
+  // slider does not tear down and rebuild the WebGPU pipeline.
+  const matRef = useRef(m)
+  const ptrRef = useRef(p)
+  const availRef = useRef(available)
+  useEffect(() => { matRef.current = m; ptrRef.current = p; availRef.current = available })
 
   const rows = Math.ceil(LETTERS.length / columns)
+  // Room for the lens: the visible tile is the box inflated by `edge`, so the
+  // grid needs that much clearance before the canvas would clip its own rim.
+  const pad = Math.ceil(m.edge) + 6
+  const stride = m.size + m.gap
+  const width = pad * 2 + columns * m.size + (columns - 1) * m.gap
+  const height = pad * 2 + rows * m.size + (rows - 1) * m.gap
 
-  // Grid position of each tile, and the colour the field gives it there
-  const tiles = LETTERS.map((letter, i) => {
-    const col = i % columns
-    const row = Math.floor(i / columns)
-    const dx = col - (columns - 1) / 2
-    const dy = row - (rows - 1) / 2
-    const field = Math.exp(-(dx * dx + dy * dy) / Math.max(m.glowSpread * m.glowSpread, 0.01))
-    return {
-      letter,
-      col,
-      row,
-      field,
-      colour: [
-        mix(m.farR, m.nearR, field),
-        mix(m.farG, m.nearG, field),
-        mix(m.farB, m.nearB, field),
-      ],
-    }
+  const cellAt = i => ({
+    x: pad + (i % columns) * stride,
+    y: pad + Math.floor(i / columns) * stride,
   })
 
+  // ── Springs, and the frame loop that feeds them to the shader ──────────────
   useEffect(() => {
     const squash = LETTERS.map(() => new Spring(squashProperties))
     const lift = LETTERS.map(() => new Spring(liftProperties))
@@ -109,21 +89,19 @@ export default function GlassAlphabet({
         }
       }
 
+      // The buttons follow the glass so the hit target stays under what is drawn
       for (let i = 0; i < LETTERS.length; i++) {
         const btn = buttonRefs.current[i]
         if (!btn) continue
         const sq = squash[i].value
-        const ly = lift[i].value
         btn.style.transform =
-          `translateY(${(-ly * 40).toFixed(2)}px) scale(${(1 + sq).toFixed(4)}, ${(1 - sq * 0.7).toFixed(4)})`
+          `translateY(${(-lift[i].value * 40).toFixed(2)}px) scale(${(1 + sq).toFixed(4)}, ${(1 - sq * 0.7).toFixed(4)})`
       }
     }
     raf = requestAnimationFrame(tick)
 
     const onMove = e => {
-      const host = hostRef.current
-      if (!host) return
-      const cfg = pointerCfg.current
+      const cfg = ptrRef.current
       const now = performance.now()
 
       const travelled = lastPointer
@@ -162,15 +140,122 @@ export default function GlassAlphabet({
     }
   }, [])
 
-  // Spreads an impulse from one tile across its neighbours, in tile widths.
+  // ── The glass ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!gpuSupported) return
+    const canvas = canvasRef.current
+    const host = hostRef.current
+    if (!canvas || !host) return
+
+    let cancelled = false
+    let cleanup = null
+
+    async function init() {
+      try {
+        const { tgpu } = await import('typegpu')
+        const { setupAlphabet } = await import('./scene.ts')
+        const { createTileBackdrop } = await import('./backdrop.js')
+        if (cancelled) return
+
+        const backdrop = createTileBackdrop()
+        const root = await tgpu.init()
+        const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
+        const scene = await setupAlphabet(root, context, backdrop.canvas)
+        if (cancelled) { scene.onCleanup(); root.destroy(); return }
+
+        scene.beforeFrame = () => {
+          const mm = matRef.current
+          const springs = springsRef.current
+          const rect = host.getBoundingClientRect()
+          if (!rect.width || !rect.height) return
+
+          const dpr = Math.min(window.devicePixelRatio || 1, 2)
+          const cw = Math.max(2, Math.round(rect.width * dpr))
+          const ch = Math.max(2, Math.round(rect.height * dpr))
+          if (canvas.width !== cw || canvas.height !== ch) {
+            canvas.width = cw
+            canvas.height = ch
+          }
+          scene.setShapeScale(rect.width, rect.height)
+          backdrop.resize(rect, dpr)
+
+          // Layout, in this canvas's own CSS pixels
+          const localPad = Math.ceil(mm.edge) + 6
+          const localStride = mm.size + mm.gap
+          const H = rect.height
+
+          const letters = []
+          const tiles = []
+          for (let i = 0; i < LETTERS.length; i++) {
+            const sq = springs ? springs.squash[i].value : 0
+            const ly = springs ? springs.lift[i].value : 0
+
+            const cx = localPad + (i % columns) * localStride + mm.size / 2
+            const cy = localPad + Math.floor(i / columns) * localStride + mm.size / 2 - ly * 40
+
+            // Squash the box itself, so the deformation happens in the glass
+            const halfPx = mm.size / 2
+            const hx = halfPx * (1 + sq) - mm.edge
+            const hy = halfPx * (1 - sq * 0.7) - mm.edge
+
+            // Into box space: canvas heights on both axes, which is what makes
+            // the shader's isotropic space line up with square pixels.
+            tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H })
+
+            const has = !availRef.current || availRef.current.has(LETTERS[i])
+            letters.push({ letter: LETTERS[i], x: cx, y: cy, alpha: has ? 1 : 0.3 })
+          }
+          scene.setTiles(tiles)
+
+          // Radius is measured on the box, which is inset by `edge`; the visible
+          // corner is that plus the inflation, so subtract to land on the value
+          // the user asked for. Never larger than the box it rounds.
+          const boxRadius = Math.max(0, mm.radius - mm.edge) / H
+          scene.setParams({
+            radius: Math.min(boxRadius, Math.max(mm.size / 2 - mm.edge, 0.5) / H),
+            start: mm.ringStart / H,
+            end: Math.max(mm.edge / H, 0.0005),
+            chromaticStrength: mm.chromaticStrength,
+            refractionStrength: mm.refractionStrength,
+            blur: mm.blur,
+            edgeFeather: mm.edgeFeather,
+            edgeBlurMultiplier: mm.edgeBlurMultiplier,
+            tintStrength: mm.tintStrength,
+            tintR: mm.tintR, tintG: mm.tintG, tintB: mm.tintB,
+            chromaticFalloff: mm.chromaticFalloff,
+          })
+
+          backdrop.update(letters, {
+            size: mm.letterSize,
+            weight: mm.letterWeight,
+            r: mm.letterR, g: mm.letterG, b: mm.letterB,
+            opacity: mm.letterOpacity,
+          })
+        }
+
+        sceneRef.current = scene
+        cleanup = () => { scene.onCleanup(); root.destroy() }
+      } catch (e) {
+        console.warn('[GlassAlphabet] init failed:', e)
+      }
+    }
+
+    init()
+    return () => {
+      cancelled = true
+      cleanup?.()
+      sceneRef.current = null
+    }
+  }, [columns])
+
+  // ── Impulses ───────────────────────────────────────────────────────────────
   const kick = (index, squashAmount, liftAmount, reach) => {
     const springs = springsRef.current
-    const origin = buttonRefs.current[index]?.getBoundingClientRect()
-    if (!springs || !origin) return
+    if (!springs) return
+    const oc = cellAt(index)
     for (let i = 0; i < LETTERS.length; i++) {
-      const r = buttonRefs.current[i]?.getBoundingClientRect()
-      if (!r) continue
-      const dist = Math.hypot(origin.left - r.left, origin.top - r.top) / Math.max(r.width, 1)
+      const c = cellAt(i)
+      const dist = Math.hypot(oc.x - c.x, oc.y - c.y) / Math.max(stride, 1)
       const falloff = Math.max(0, 1 - dist / reach)
       if (falloff <= 0) continue
       const f = falloff * falloff
@@ -179,142 +264,95 @@ export default function GlassAlphabet({
     }
   }
 
-  // Crossing into a tile wobbles it, whether or not the cursor was moving fast
-  // enough for the travel-based nudge above to fire — so a slow approach still
-  // gets a response.
+  // Crossing into a tile wobbles it whether or not the cursor was moving fast
+  // enough for the travel-based nudge to fire, so a slow approach still lands.
   const enter = index => {
-    const cfg = pointerCfg.current
+    const cfg = ptrRef.current
     kick(index, cfg.hoverImpulse * 6, cfg.hoverImpulse * 3, 2)
     const springs = springsRef.current
     if (springs) springs.lift[index].target = cfg.hoverLift / 40
   }
-
   const leave = index => {
     const springs = springsRef.current
     if (springs) springs.lift[index].target = 0
   }
-
   const press = index => {
-    const cfg = pointerCfg.current
+    const cfg = ptrRef.current
     kick(index, -cfg.clickImpulse * 8, cfg.clickImpulse * 4, 2.5)
   }
 
-  const frost = `url(#${filterId}) blur(${m.blur}px) saturate(${m.saturate}%) brightness(${m.brightness})`
-  // Red bends least, blue most — spread the three passes around `refraction`.
-  const rScale = m.refraction * (1 + m.chromatic)
-  const bScale = m.refraction * (1 - m.chromatic)
+  // Only when there is no WebGPU. With the shader running, the buttons are
+  // invisible hit targets and every pixel comes from the canvas.
+  const fallbackStyle = has => (gpuSupported ? null : {
+    background: 'rgba(255,255,255,0.14)',
+    backdropFilter: 'blur(8px) saturate(150%)',
+    WebkitBackdropFilter: 'blur(8px) saturate(150%)',
+    border: '1px solid rgba(255,255,255,0.4)',
+    color: `rgba(28,26,16,${has ? 0.6 : 0.25})`,
+    fontFamily: "'Playfair Display', Georgia, serif",
+    fontWeight: m.letterWeight,
+    fontSize: m.letterSize,
+  })
 
   return (
-    <>
-      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
-        <filter id={filterId} x="-30%" y="-30%" width="160%" height="160%" colorInterpolationFilters="sRGB">
-          {/* The lens: broad fractal noise, softened, used as a displacement map */}
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency={`${m.refractionScale} ${m.refractionScale}`}
-            numOctaves="2"
-            seed="47"
-            result="noise"
-          />
-          <feGaussianBlur in="noise" stdDeviation="2" result="map" />
-
-          {/* Three refractive indices, one channel kept from each */}
-          <feDisplacementMap in="SourceGraphic" in2="map" scale={rScale} xChannelSelector="R" yChannelSelector="G" result="rPass" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale={m.refraction} xChannelSelector="R" yChannelSelector="G" result="gPass" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale={bScale} xChannelSelector="R" yChannelSelector="G" result="bPass" />
-          <feColorMatrix in="rPass" type="matrix" values={CHANNEL.R} result="rOnly" />
-          <feColorMatrix in="gPass" type="matrix" values={CHANNEL.G} result="gOnly" />
-          <feColorMatrix in="bPass" type="matrix" values={CHANNEL.B} result="bOnly" />
-          <feBlend in="rOnly" in2="gOnly" mode="screen" result="rg" />
-          <feBlend in="rg" in2="bOnly" mode="screen" result="lens" />
-
-          {/* Grain: fine roughness on the refracted result. Distinct from the
-              lens above, which warps the whole surface rather than pitting it. */}
-          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="9" result="rough" />
-          <feDisplacementMap in="lens" in2="rough" scale={m.roughness} xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-      </svg>
-
-      <div
-        ref={hostRef}
+    <div
+      ref={hostRef}
+      style={{
+        position: 'relative',
+        width,
+        height,
+        margin: '0 auto',
+        // The canvas sits at the bottom of this element's own stacking context,
+        // so it cannot fall behind the page the way a negative z-index would.
+        isolation: 'isolate',
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
         style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${columns}, ${m.size}px)`,
-          gap: m.gap,
-          justifyContent: 'center',
-          padding: m.glowBlur / 2,
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          pointerEvents: 'none',
         }}
-      >
-        {tiles.map((tile, i) => {
-          const has = !available || available.has(tile.letter)
-          const [r, g, b] = tile.colour
-          const glowAlpha = m.glowStrength * (0.35 + tile.field * 0.65)
-
-          return (
-            <button
-              key={tile.letter}
-              ref={el => { buttonRefs.current[i] = el }}
-              type="button"
-              disabled={!has}
-              aria-label={`Show Landsat scenes for ${tile.letter}`}
-              onClick={() => { press(i); onSelect?.(tile.letter) }}
-              onPointerEnter={() => enter(i)}
-              onPointerLeave={() => leave(i)}
-              onFocus={() => { setFocused(i); enter(i) }}
-              onBlur={() => { setFocused(-1); leave(i) }}
-              style={{
-                width: m.size,
-                height: m.size,
-                borderRadius: m.radius,
-                cursor: has ? 'pointer' : 'default',
-                opacity: has ? 1 : 0.35,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                // Refraction, then frost, over whatever the page puts behind it
-                backdropFilter: frost,
-                WebkitBackdropFilter: frost,
-                // Face: speckle for the dust, the tile's own colour rising from
-                // one corner, a corner sheen, then the white fill. Every one of
-                // these adds opacity, so each stops well short of covering the
-                // tile — a sheen across a corner reads as glass, the same wash
-                // over the whole face reads as a painted chip.
-                backgroundImage: [
-                  speckle(m.grain * 0.12),
-                  `radial-gradient(110% 110% at 22% 118%, ${rgb(r, g, b, m.tintStrength * 0.9)} 0%, transparent 55%)`,
-                  `linear-gradient(${m.faceAngle}deg, rgba(255,255,255,${m.faceGradient}) 0%, rgba(255,255,255,0) 48%)`,
-                  `linear-gradient(0deg, rgba(255,255,255,${m.fill}), rgba(255,255,255,${m.fill}))`,
-                ].join(', '),
-                border: `${m.borderWidth}px solid rgba(255,255,255,${m.border})`,
-                boxShadow: [
-                  // Outer halo in the tile's own colour
-                  `0 0 ${m.glowBlur}px ${rgb(r, g, b, glowAlpha)}`,
-                  // Fresnel: no offset, so it hugs the whole rounded border and
-                  // fades to nothing at the centre. This is where the tile's
-                  // opacity is supposed to live — the face stays clear.
-                  `inset 0 0 ${m.fresnelWidth}px rgba(255,255,255,${m.fresnel})`,
-                  // Direction on top of that: lit from above, shaded below
-                  `inset 0 ${m.borderWidth}px 1px rgba(255,255,255,${m.innerTop})`,
-                  `inset 0 -${m.borderWidth}px 2px ${rgb(90, 80, 170, m.innerBottom)}`,
-                ].join(', '),
-                color: rgb(m.letterR, m.letterG, m.letterB, m.letterOpacity),
-                fontFamily: "'Playfair Display', Georgia, serif",
-                fontWeight: m.letterWeight,
-                fontSize: m.letterSize,
-                lineHeight: 1,
-                outline: focused === i ? '2px solid rgba(74,124,63,0.8)' : 'none',
-                outlineOffset: 3,
-                willChange: 'transform',
-                // transform is written directly each frame by the spring loop
-                transition: 'opacity 0.2s',
-              }}
-            >
-              {tile.letter}
-            </button>
-          )
-        })}
-      </div>
-    </>
+      />
+      {LETTERS.map((letter, i) => {
+        const has = !available || available.has(letter)
+        const cell = cellAt(i)
+        return (
+          <button
+            key={letter}
+            ref={el => { buttonRefs.current[i] = el }}
+            type="button"
+            disabled={!has}
+            aria-label={`Show Landsat scenes for ${letter}`}
+            onClick={() => { press(i); onSelect?.(letter) }}
+            onPointerEnter={() => enter(i)}
+            onPointerLeave={() => leave(i)}
+            onFocus={() => { setFocused(i); enter(i) }}
+            onBlur={() => { setFocused(-1); leave(i) }}
+            style={{
+              position: 'absolute',
+              left: cell.x,
+              top: cell.y,
+              width: m.size,
+              height: m.size,
+              padding: 0,
+              borderRadius: m.radius,
+              // The glass is the canvas underneath; this is behaviour only
+              background: 'transparent',
+              border: 'none',
+              color: 'transparent',
+              cursor: has ? 'pointer' : 'default',
+              outline: focused === i ? '2px solid rgba(74,124,63,0.75)' : 'none',
+              outlineOffset: 2,
+              willChange: 'transform',
+              ...fallbackStyle(has),
+            }}
+          >
+            {gpuSupported ? '' : letter}
+          </button>
+        )
+      })}
+    </div>
   )
 }

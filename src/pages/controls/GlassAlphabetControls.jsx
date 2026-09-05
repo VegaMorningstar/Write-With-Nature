@@ -1,34 +1,17 @@
 /**
  * Controls for the glass alphabet.
  *
- * Grouped the way the look is actually built: a frosted fill, a bright rim, a
- * colour field across the grid, and springs. All CSS — an earlier WebGPU build
- * bought nothing the reference needed and failed silently three times over.
+ * Grouped the way the shader is built: the lens shape, the ring that does the
+ * refracting, the tint, the letter under the glass, and the springs. Distances
+ * are in pixels — the shader works in canvas heights, which is right for it and
+ * hopeless for tuning a 30px tile.
  */
 import { Slider, Toggle, GroupLabel, Note } from './primitives.jsx'
 
 export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluidBlend, setFluidBlend }) {
   return (
     <>
-      <GroupLabel first>BACKDROP — what the tiles have to bend</GroupLabel>
-      <Note>
-        The fluid is the only thing on the page with enough structure to
-        refract; the background gradient is smooth, so bending it produces
-        nothing to see. An element with mix-blend-mode forms its own backdrop
-        root and Chrome will not let a backdrop-filter sample it, so the
-        fluid&apos;s old multiply blend hid it from every frosted panel in the
-        app. It now composites normally, which is what makes the refraction
-        below visible at all.
-      </Note>
-
-      <Toggle
-        label="Fluid visible to the glass"
-        value={fluidBlend === 'normal'}
-        onChange={v => setFluidBlend(v ? 'normal' : 'multiply')}
-        description="Off restores the multiply blend — the fluid sinks into the paper and vanishes from the glass. Kept here to compare the two; the tiles go flat with it off, and that is the backdrop, not the material."
-      />
-
-      <GroupLabel>SHAPE</GroupLabel>
+      <GroupLabel first>SHAPE</GroupLabel>
 
       <Slider label="Tile Size (px)" value={material.size} min={20} max={140} step={1}
         fmt={v => v.toFixed(0)} onChange={v => setMat('size', v)}
@@ -38,111 +21,62 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
       <Slider label="Gap (px)" value={material.gap} min={0} max={48} step={1}
         fmt={v => v.toFixed(0)} onChange={v => setMat('gap', v)} />
 
-      <GroupLabel>REFRACTION — the lens</GroupLabel>
+      <GroupLabel>LENS — the ring that refracts</GroupLabel>
       <Note>
-        The same construction as the app&apos;s glass panels: fractal noise,
-        blurred into a displacement map, bending the backdrop behind the tile.
+        The visible tile is an SDF box inflated by Edge Width, and the ring
+        between Ring Start and that edge is where the backdrop gets displaced
+        outward. Inside the ring the glass only blurs; outside it nothing is
+        drawn, so the gaps show the real page.
       </Note>
 
-      <Slider label="Refraction (px)" value={material.refraction} min={0} max={60} step={1}
-        fmt={v => v.toFixed(0)} onChange={v => setMat('refraction', v)}
-        description="How far the backdrop is pushed. Past roughly the tile's own width it stops reading as glass and starts reading as smear." />
-      <Slider label="Lens Scale" value={material.refractionScale} min={0.002} max={0.08} step={0.001}
-        fmt={v => v.toFixed(3)} onChange={v => setMat('refractionScale', v)}
-        description="Noise frequency. Low is one broad warp across the tile; high is many small ones." />
-      <Slider label="Chromatic Aberration" value={material.chromatic} min={0} max={1} step={0.01}
-        onChange={v => setMat('chromatic', v)}
-        description="Refracts three times at three scales and takes red, green and blue from each — the same trick the WebGPU liquid glass plays with three refractive indices. Needs some Refraction above zero to show." />
+      <Slider label="Edge Width (px)" value={material.edge} min={1} max={20} step={0.5}
+        onChange={v => setMat('edge', v)}
+        description="The rim's thickness, and how far the tile grows beyond its box. Most of what reads as glass happens in this band." />
+      <Slider label="Ring Start (px)" value={material.ringStart} min={0} max={12} step={0.5}
+        onChange={v => setMat('ringStart', v)}
+        description="Above zero leaves a flat blurred band before the rim begins." />
+      <Slider label="Refraction" value={material.refractionStrength} min={0} max={0.12} step={0.001}
+        fmt={v => v.toFixed(3)} onChange={v => setMat('refractionStrength', v)}
+        description="How far the ring drags the backdrop, as a fraction of the canvas. TypeGPU's demo runs 0.1 across a full-screen lozenge; on a 30px tile that hauls in colour from the far side of the grid." />
+      <Slider label="Chromatic Aberration" value={material.chromaticStrength} min={0} max={0.04} step={0.0005}
+        fmt={v => v.toFixed(4)} onChange={v => setMat('chromaticStrength', v)}
+        description="Splits that displacement across three refractive indices — red bends least, blue most. This is the width of the colour fringe at the rim." />
+      <Slider label="Fringe Falloff" value={material.chromaticFalloff} min={0.2} max={6} step={0.05}
+        onChange={v => setMat('chromaticFalloff', v)}
+        description="Exponent on the fringe's ramp across the ring. 1 is TypeGPU's linear version; higher pushes the colour into the outer rim." />
 
-      <GroupLabel>FROST</GroupLabel>
-      <Note>
-        From the jelly&apos;s own notes: glass reads as glass when the tint is a
-        suggestion, not a filter. Four white layers land on a tile — Fill, Face
-        Gradient, Grain, and whatever Brightness lifts out of the backdrop —
-        and they compound, so half opacity on each is an opaque tile. Every one
-        of these should stay a suggestion; the Fresnel rim above carries the
-        tile.
-      </Note>
+      <GroupLabel>BODY</GroupLabel>
 
-      <Slider label="Blur (px)" value={material.blur} min={0} max={40} step={0.5}
+      <Slider label="Blur" value={material.blur} min={0} max={5} step={0.05}
         onChange={v => setMat('blur', v)}
-        description="Blurs whatever the page puts behind the tile. On a 30px tile anything past about 6 averages the backdrop to a flat colour, which is its own kind of opaque." />
-      <Slider label="Fill" value={material.fill} min={0} max={1} step={0.01}
-        onChange={v => setMat('fill', v)}
-        description="A flat white wash over the whole face. The most direct way to kill transparency — small values only." />
-      <Slider label="Grain" value={material.grain} min={0} max={1} step={0.01}
-        onChange={v => setMat('grain', v)}
-        description="Speckle painted over the fill. The dust half of frost." />
-      <Slider label="Roughness (px)" value={material.roughness} min={0} max={6} step={0.1}
-        onChange={v => setMat('roughness', v)}
-        description="Fine displacement on the refracted backdrop — the other half. Pits the surface rather than warping it, so it stays legible where Refraction would not." />
-      <Slider label="Saturate (%)" value={material.saturate} min={50} max={320} step={5}
-        fmt={v => v.toFixed(0)} onChange={v => setMat('saturate', v)} />
-      <Slider label="Brightness" value={material.brightness} min={0.7} max={1.5} step={0.01}
-        onChange={v => setMat('brightness', v)} />
+        description="Mip bias for what you see through the middle of the tile." />
+      <Slider label="Edge Blur ×" value={material.edgeBlurMultiplier} min={0} max={2} step={0.05}
+        onChange={v => setMat('edgeBlurMultiplier', v)}
+        description="Below 1 the rim is sharper than the body, which is what makes the edge read as a bevel rather than a smear." />
+      <Slider label="Edge Feather" value={material.edgeFeather} min={0} max={8} step={0.1}
+        onChange={v => setMat('edgeFeather', v)}
+        description="Antialiasing on the lens boundary, in texels." />
 
-      <GroupLabel>RIM — where the opacity belongs</GroupLabel>
+      <GroupLabel>TINT</GroupLabel>
       <Note>
-        The jelly gets its glass from Fresnel: a surface turning away from the
-        eye goes opaque at its silhouette and stays clear where you look
-        straight through it. Spreading that opacity flat across the face
-        instead is what turns a pane into a painted chip. So push these up and
-        the face washes down, not the other way round.
+        From the jelly&apos;s notes, and TypeGPU&apos;s: glass reads as glass
+        when the tint is a suggestion, not a filter. Their example runs 0.05.
       </Note>
 
-      <Slider label="Fresnel Rim" value={material.fresnel} min={0} max={1} step={0.01}
-        onChange={v => setMat('fresnel', v)}
-        description="Bright the whole way round the border, fading to nothing at the centre. The tile's main source of presence." />
-      <Slider label="Fresnel Width (px)" value={material.fresnelWidth} min={0} max={20} step={0.5}
-        onChange={v => setMat('fresnelWidth', v)}
-        description="How far in it reaches. Past about a third of the tile it stops being a rim and becomes a fill." />
-      <Slider label="Border" value={material.border} min={0} max={1} step={0.01}
-        onChange={v => setMat('border', v)} />
-      <Slider label="Border Width (px)" value={material.borderWidth} min={0} max={4} step={0.5}
-        fmt={v => v.toFixed(1)} onChange={v => setMat('borderWidth', v)} />
-      <Slider label="Top Highlight" value={material.innerTop} min={0} max={1} step={0.01}
-        onChange={v => setMat('innerTop', v)}
-        description="Inset light along the top edge, as if lit from above." />
-      <Slider label="Bottom Shade" value={material.innerBottom} min={0} max={1} step={0.01}
-        onChange={v => setMat('innerBottom', v)}
-        description="Inset shade along the bottom. With the highlight above it, this is what gives the tile thickness." />
+      <Slider label="Tint Strength" value={material.tintStrength} min={0} max={1} step={0.01}
+        onChange={v => setMat('tintStrength', v)} />
+      <Slider label="Tint R" value={material.tintR} min={0} max={1} step={0.01} onChange={v => setMat('tintR', v)} />
+      <Slider label="Tint G" value={material.tintG} min={0} max={1} step={0.01} onChange={v => setMat('tintG', v)} />
+      <Slider label="Tint B" value={material.tintB} min={0} max={1} step={0.01} onChange={v => setMat('tintB', v)} />
 
-      <GroupLabel>COLOUR — the bloom across the grid</GroupLabel>
+      <GroupLabel>LETTER — painted under the glass</GroupLabel>
       <Note>
-        Each tile takes one colour from a field centred on the grid, so the
-        bloom runs through the middle. Colouring every tile the same is what
-        makes 26 of them read as wallpaper.
+        The letters go into the backdrop the shader refracts, not on top of the
+        canvas, so they are displaced and split by the lens the way RENDER is
+        under the jelly button. Sliding Refraction up moves them.
       </Note>
 
-      <Slider label="Glow Strength" value={material.glowStrength} min={0} max={1.5} step={0.01}
-        onChange={v => setMat('glowStrength', v)}
-        description="The halo each tile casts around itself, in its own colour." />
-      <Slider label="Glow Blur (px)" value={material.glowBlur} min={0} max={80} step={1}
-        fmt={v => v.toFixed(0)} onChange={v => setMat('glowBlur', v)} />
-      <Slider label="Spread (tiles)" value={material.glowSpread} min={0.4} max={8} step={0.05}
-        onChange={v => setMat('glowSpread', v)}
-        description="How far the field reaches from the grid's centre. Small keeps the bloom to a few tiles; large lights them all alike and loses it." />
-      <Slider label="Face Tint" value={material.tintStrength} min={0} max={1} step={0.01}
-        onChange={v => setMat('tintStrength', v)}
-        description="How much of that colour lands in the tile's own face, rather than only in its halo." />
-      <Slider label="Face Gradient" value={material.faceGradient} min={0} max={1} step={0.01}
-        onChange={v => setMat('faceGradient', v)}
-        description="A sheen across one corner — what gives a flat rectangle a lit surface. It fades out by halfway, so it stays a highlight rather than a coat; it is still the largest single source of opacity here." />
-      <Slider label="Face Angle" value={material.faceAngle} min={0} max={360} step={1}
-        fmt={v => v.toFixed(0)} onChange={v => setMat('faceAngle', v)} />
-
-      <GroupLabel>CENTRE COLOUR</GroupLabel>
-      <Slider label="R" value={material.nearR} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('nearR', v)} />
-      <Slider label="G" value={material.nearG} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('nearG', v)} />
-      <Slider label="B" value={material.nearB} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('nearB', v)} />
-
-      <GroupLabel>EDGE COLOUR</GroupLabel>
-      <Slider label="R" value={material.farR} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('farR', v)} />
-      <Slider label="G" value={material.farG} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('farG', v)} />
-      <Slider label="B" value={material.farB} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('farB', v)} />
-
-      <GroupLabel>LETTER</GroupLabel>
-      <Slider label="Size (px)" value={material.letterSize} min={10} max={60} step={1}
+      <Slider label="Size (px)" value={material.letterSize} min={6} max={60} step={1}
         fmt={v => v.toFixed(0)} onChange={v => setMat('letterSize', v)} />
       <Slider label="Weight" value={material.letterWeight} min={300} max={900} step={100}
         fmt={v => v.toFixed(0)} onChange={v => setMat('letterWeight', v)} />
@@ -154,8 +88,9 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
 
       <GroupLabel>WOBBLE</GroupLabel>
       <Note>
-        Springs written straight to each button&apos;s transform, so a tile and its
-        letter are the same element and cannot drift apart.
+        The jelly&apos;s springs, resizing each tile&apos;s box in the shader
+        uniform every frame — so the deformation is in the glass rather than a
+        CSS transform of a picture of glass.
       </Note>
 
       <Slider label="Reach (tiles)" value={pointer.radius} min={0.5} max={8} step={0.1}
@@ -179,6 +114,22 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
       <Slider label="Click Impulse" value={pointer.clickImpulse} min={0} max={2} step={0.02}
         onChange={v => setPtr('clickImpulse', v)}
         description="Kicks the clicked tile and its neighbours." />
+
+      <GroupLabel>BACKDROP</GroupLabel>
+      <Note>
+        The shader cannot sample the DOM, so the page behind the grid is rebuilt
+        into a texture each frame — paper gradients, the fluid canvas, then the
+        letters. That is why the fluid&apos;s multiply blend is no longer a
+        problem here: this reads the fluid canvas directly rather than relying on
+        backdrop-filter, which cannot see blended content.
+      </Note>
+
+      <Toggle
+        label="Fluid blend: multiply"
+        value={fluidBlend === 'multiply'}
+        onChange={v => setFluidBlend(v ? 'multiply' : 'normal')}
+        description="On is what the app ships — the colour stains the paper. Off lifts it into an overlay. Either way the glass here sees it."
+      />
     </>
   )
 }
