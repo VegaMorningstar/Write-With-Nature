@@ -44,7 +44,11 @@ export const MATERIAL_DEFAULTS = {
   // The lens. Noise displaces the backdrop behind the tile, the way
   // #glass-element does for the compose card and the board.
   refraction: 10,      // px of displacement
-  refractionScale: 0.012, // noise base frequency — low is a broad warp
+  // Noise base frequency. The app's panels run 0.012, but their period is then
+  // ~80px — across a 30px tile that is one flat offset, which slides the
+  // backdrop rather than bending it. A tile this small needs the noise to vary
+  // within its own width before it reads as a lens.
+  refractionScale: 0.03,
   // Three displacement passes at three scales, one channel taken from each.
   // The WebGPU liquid glass does the same thing with three refractive indices.
   chromatic: 0.35,     // fraction of `refraction` separating red from blue

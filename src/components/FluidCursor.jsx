@@ -3,15 +3,19 @@ import { useEffect } from 'react'
 let _booted = false
 
 /**
- * `blend` defaults to the app's look and should stay that way in the app. It is
- * a prop only because it decides whether glass elements can see the fluid at
- * all: an element with mix-blend-mode forms its own backdrop root, and Chrome
- * will not let a backdrop-filter sample blended content. So every frosted panel
- * on the page is refracting the background gradient alone — the fluid is
- * excluded from its backdrop, whatever the z-order says. 'normal' trades the
- * stain on the paper for a fluid the glass can actually pick up.
+ * `blend` decides whether the glass on the page can see the fluid at all.
+ *
+ * An element with mix-blend-mode forms its own backdrop root, and Chrome will
+ * not let a backdrop-filter sample blended content. Under 'multiply' the fluid
+ * stains the paper beautifully and is invisible to every frosted panel in the
+ * app — those panels refract the background gradient alone, which is smooth,
+ * so they have nothing to bend and read as flat white.
+ *
+ * 'normal' is the default because the glass is the point: the fluid is the only
+ * thing on the page with enough structure to refract. The cost is that the
+ * colour now sits over the paper rather than sinking into it.
  */
-export default function FluidCursor({ blend = 'multiply' }) {
+export default function FluidCursor({ blend = 'normal' }) {
   useEffect(() => {
     if (_booted) return
     _booted = true
@@ -80,9 +84,6 @@ export default function FluidCursor({ blend = 'multiply' }) {
         pointerEvents: 'none',
         // z-index 5: same layer as the old watercolor canvas — behind glass panels (z:20)
         zIndex: 5,
-        // multiply blend makes the fluid color stain the paper background
-        // rather than sit as a floating overlay above it — at the cost of
-        // hiding it from every backdrop-filter on the page. See above.
         mixBlendMode: blend,
       }}
     />

@@ -10,22 +10,22 @@ import { Slider, Toggle, GroupLabel, Note } from './primitives.jsx'
 export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluidBlend, setFluidBlend }) {
   return (
     <>
-      <GroupLabel first>BACKDROP — read this before judging the glass</GroupLabel>
+      <GroupLabel first>BACKDROP — what the tiles have to bend</GroupLabel>
       <Note>
-        The fluid cursor paints with mix-blend-mode: multiply. An element that
-        blends forms its own backdrop root, and Chrome will not let a
-        backdrop-filter sample blended content — so the tiles cannot see the
-        fluid however the z-order is arranged, and neither can any other frosted
-        panel in the app. All that is left behind them is the page gradient,
-        which is smooth and pale, and against that a perfectly clear pane and a
-        white chip look the same.
+        The fluid is the only thing on the page with enough structure to
+        refract; the background gradient is smooth, so bending it produces
+        nothing to see. An element with mix-blend-mode forms its own backdrop
+        root and Chrome will not let a backdrop-filter sample it, so the
+        fluid&apos;s old multiply blend hid it from every frosted panel in the
+        app. It now composites normally, which is what makes the refraction
+        below visible at all.
       </Note>
 
       <Toggle
         label="Fluid visible to the glass"
         value={fluidBlend === 'normal'}
         onChange={v => setFluidBlend(v ? 'normal' : 'multiply')}
-        description="Drops the fluid's multiply blend on this page only, so it enters the tiles' backdrop and you can see what is actually being refracted. Off is what the app ships."
+        description="Off restores the multiply blend — the fluid sinks into the paper and vanishes from the glass. Kept here to compare the two; the tiles go flat with it off, and that is the backdrop, not the material."
       />
 
       <GroupLabel>SHAPE</GroupLabel>
