@@ -75,6 +75,9 @@ export default function LiquidGlassDemo({
             scene?.resizeBackdrop(backdrop.width, backdrop.height)
             const r = canvas.getBoundingClientRect()
             scene?.setViewportRect({ x: r.left, y: r.top, w: r.width, h: r.height }, vw, vh)
+            // Same isotropic shape space the panels use, so a value tuned here
+            // means the same thing there
+            scene?.setShapeScale(r.width, r.height)
           }
           syncRect(null)
           backdrop.update()

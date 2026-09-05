@@ -27,22 +27,34 @@ export default function LiquidGlassPanel({ params, fill = true, backdropScale = 
 
   useEffect(() => { fillRef.current = fill }, [fill])
 
-  // Lens sized to the panel: the box has to be inset by `end`, since the shader
-  // inflates it by that much to make the visible shape.
+  /**
+   * Lens sized to the panel.
+   *
+   * The scene's shape space is isotropic and measured in canvas heights, so the
+   * panel is 1 tall and `aspect` wide. The box is inset by `end` on both axes,
+   * because the shader inflates it by that much to make the visible shape — and
+   * the corner radius converts straight from pixels, which is what lines the
+   * glass up with the panel's own rounding instead of an ellipse.
+   */
   const resolveParams = (p, el) => {
     if (!fillRef.current || !el) return p
     const rect = el.getBoundingClientRect()
     if (!rect.width || !rect.height) return p
 
+    const aspect = rect.width / rect.height
     const radiusPx = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
+
+    const halfW = Math.max(0.01, 0.5 * aspect - p.end)
+    const halfH = Math.max(0.01, 0.5 - p.end)
+
     return {
       ...p,
       centerX: 0.5,
       centerY: 0.5,
-      rectW: Math.max(0.01, 0.5 - p.end),
-      rectH: Math.max(0.01, 0.5 - p.end),
-      // In the canvas's own uv, which is what the SDF works in
-      radius: Math.max(0, Math.min(radiusPx / rect.width, 0.45)),
+      rectW: halfW,
+      rectH: halfH,
+      // Also in canvas heights, and never larger than the box it rounds
+      radius: Math.max(0, Math.min(radiusPx / rect.height, halfW, halfH)),
     }
   }
 
@@ -78,6 +90,8 @@ export default function LiquidGlassPanel({ params, fill = true, backdropScale = 
           const dpr = Math.min(window.devicePixelRatio || 1, 2)
           canvas.width = Math.max(2, Math.round(rect.width * dpr))
           canvas.height = Math.max(2, Math.round(rect.height * dpr))
+
+          scene?.setShapeScale(rect.width, rect.height)
 
           const vw = window.innerWidth
           const vh = window.innerHeight

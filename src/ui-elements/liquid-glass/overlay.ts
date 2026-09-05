@@ -102,6 +102,15 @@ export async function setupOverlay(
   // OURS: static, rather than following the pointer
   const centerUniform = root.createUniform(d.vec2f, d.vec2f(0.5, 0.5));
 
+  // OURS: uv is 0..1 on both axes, so on a non-square canvas one unit of x is a
+  // different number of pixels from one unit of y. Their demo lives with that —
+  // the lozenge floats and nothing has to line up with it. Fitting the lens to a
+  // panel does: an anisotropic space gives elliptical corners and inflates the
+  // edge by different amounts horizontally and vertically, so the glass edge
+  // drifts off the panel's own. Scaling x by the aspect makes the shape space
+  // isotropic, and every distance below is then in units of canvas height.
+  const shapeScaleUniform = root.createUniform(d.vec2f, d.vec2f(1, 1));
+
   // OURS: the backdrop covers the whole viewport, but this canvas may only
   // occupy part of it. These map the canvas's own uv onto the slice of the
   // backdrop sitting behind it, so the glass refracts what is genuinely there
@@ -159,7 +168,7 @@ export async function setupOverlay(
     in: { uv: d.vec2f },
     out: d.vec4f,
   })(({ uv }) => {
-    const posInBoxSpace = uv.sub(centerUniform.$);
+    const posInBoxSpace = uv.sub(centerUniform.$).mul(shapeScaleUniform.$);
     const sdfDist = sdRoundedBox2d(posInBoxSpace, paramsUniform.$.rectDims, paramsUniform.$.radius);
     const dir = std.normalize(posInBoxSpace.mul(paramsUniform.$.rectDims.yx));
     const normalizedDist =
@@ -231,6 +240,14 @@ export async function setupOverlay(
     /** Called at the top of each frame, to repaint the backdrop canvas. */
     set beforeFrame(fn: (() => void) | null) {
       onFrame = fn;
+    },
+    /**
+     * Aspect correction for the lens shape. Pass the canvas's CSS size; every
+     * distance in the params is then measured in canvas heights, and corners
+     * come out circular rather than stretched.
+     */
+    setShapeScale(w: number, h: number) {
+      shapeScaleUniform.write(d.vec2f(h > 0 ? w / h : 1, 1));
     },
     /** Which slice of the viewport-sized backdrop sits behind this canvas. */
     setViewportRect(rect: { x: number; y: number; w: number; h: number }, vw: number, vh: number) {
