@@ -37,16 +37,24 @@ function TuneFluid({ opts, blendMode }) {
   useEffect(() => {
     if (bootedRef.current) return
     bootedRef.current = true
-    const _origAdd = document.addEventListener.bind(document)
-    document.addEventListener = (type, fn, opts) => {
-      if (type === 'touchstart' || type === 'touchmove') {
-        opts = typeof opts === 'object' ? { ...opts, passive: true } : { passive: true }
-      }
-      _origAdd(type, fn, opts)
-    }
     import('smokey-fluid-cursor').then(({ initFluid }) => {
-      document.addEventListener = _origAdd
-      initFluid({ transparent: true, id: 'tune-fluid-canvas', ...opts })
+      // See FluidCursor.jsx — the library registers a non-passive touchmove
+      // listener on window and preventDefaults every one, which kills scrolling
+      // on touch devices. Force those listeners passive around the init call.
+      const originalAdd = window.addEventListener
+      window.addEventListener = function (type, listener, options) {
+        if (type === 'touchstart' || type === 'touchmove') {
+          options = typeof options === 'object' && options !== null
+            ? { ...options, passive: true }
+            : { passive: true }
+        }
+        return originalAdd.call(this, type, listener, options)
+      }
+      try {
+        initFluid({ transparent: true, id: 'tune-fluid-canvas', ...opts })
+      } finally {
+        window.addEventListener = originalAdd
+      }
     })
   }, []) // eslint-disable-line
   return (

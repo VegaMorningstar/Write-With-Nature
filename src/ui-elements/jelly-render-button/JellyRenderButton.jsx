@@ -180,6 +180,12 @@ export default function JellyRenderButton({
     }
   }, []) // eslint-disable-line
 
+  // iOS synthesises mousedown/mouseup after a tap. The touch handlers no longer
+  // preventDefault (that blocked scrolling from the button), so the synthesised
+  // pair arrives and would fire twice. Swallow anything just after a touch.
+  const lastTouchAt = useRef(0)
+  const fromTouch = () => performance.now() - lastTouchAt.current < 700
+
   function clearTimers() {
     timersRef.current.forEach(clearTimeout)
     timersRef.current = []
@@ -221,14 +227,21 @@ export default function JellyRenderButton({
         ref={canvasRef}
         width={480}
         height={220}
-        onMouseDown={press}
-        onMouseUp={() => release(true)}
-        onMouseEnter={() => sceneRef.current?.switchBehavior.jiggle(hoverRef.current.enterImpulse)}
+        onMouseDown={() => { if (!fromTouch()) press() }}
+        onMouseUp={() => { if (!fromTouch()) release(true) }}
+        onMouseEnter={() => {
+          if (!fromTouch()) sceneRef.current?.switchBehavior.jiggle(hoverRef.current.enterImpulse)
+        }}
         onMouseLeave={() => {
           if (sceneRef.current) sceneRef.current.switchBehavior.pressed = false
         }}
-        onTouchStart={e => { e.preventDefault(); press() }}
-        onTouchEnd={e => { e.preventDefault(); release(true) }}
+        // No preventDefault — it would cancel a scroll starting on the button
+        onTouchStart={() => { lastTouchAt.current = performance.now(); press() }}
+        onTouchEnd={() => { lastTouchAt.current = performance.now(); release(true) }}
+        onTouchCancel={() => {
+          lastTouchAt.current = performance.now()
+          if (sceneRef.current) sceneRef.current.switchBehavior.pressed = false
+        }}
         style={{
           cursor: 'pointer',
           borderRadius: 16,
@@ -240,6 +253,8 @@ export default function JellyRenderButton({
           background: 'transparent',
           userSelect: 'none',
           WebkitUserSelect: 'none',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
         }}
       />
       {/* The word itself lives in the scene now, under the jelly */}

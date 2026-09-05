@@ -231,6 +231,13 @@ export default function JellyWireframeButton({
     }
   }, []) // eslint-disable-line
 
+  // iOS synthesises mousedown/mouseup/click after a tap. We no longer
+  // preventDefault on the touch handlers — that would block a scroll gesture
+  // starting on the button — so the synthesised pair arrives and would fire the
+  // render a second time. Swallow anything that lands just after a touch.
+  const lastTouchAt = useRef(0)
+  const fromTouch = () => performance.now() - lastTouchAt.current < 700
+
   function clearTimers() {
     timersRef.current.forEach(clearTimeout)
     timersRef.current = []
@@ -272,14 +279,22 @@ export default function JellyWireframeButton({
         ref={canvasRef}
         width={480}
         height={220}
-        onMouseDown={press}
-        onMouseUp={() => release(true)}
-        onMouseEnter={() => sceneRef.current?.switchBehavior.jiggle(hoverRef.current.enterImpulse)}
+        onMouseDown={() => { if (!fromTouch()) press() }}
+        onMouseUp={() => { if (!fromTouch()) release(true) }}
+        onMouseEnter={() => {
+          if (!fromTouch()) sceneRef.current?.switchBehavior.jiggle(hoverRef.current.enterImpulse)
+        }}
         onMouseLeave={() => {
           if (sceneRef.current) sceneRef.current.switchBehavior.pressed = false
         }}
-        onTouchStart={e => { e.preventDefault(); press() }}
-        onTouchEnd={e => { e.preventDefault(); release(true) }}
+        // No preventDefault here — it would cancel a scroll that starts on the
+        // button. touch-action below lets the browser take the gesture instead.
+        onTouchStart={() => { lastTouchAt.current = performance.now(); press() }}
+        onTouchEnd={() => { lastTouchAt.current = performance.now(); release(true) }}
+        onTouchCancel={() => {
+          lastTouchAt.current = performance.now()
+          if (sceneRef.current) sceneRef.current.switchBehavior.pressed = false
+        }}
         style={{
           cursor: 'pointer',
           borderRadius: 16,
@@ -291,6 +306,10 @@ export default function JellyWireframeButton({
           background: 'transparent',
           userSelect: 'none',
           WebkitUserSelect: 'none',
+          // Hands scrolling and pinch back to the browser while still
+          // delivering taps, and drops the 300ms double-tap-zoom delay
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
         }}
       />
       {/* The word itself lives in the scene now, under the jelly */}
