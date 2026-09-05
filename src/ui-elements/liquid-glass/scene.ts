@@ -59,21 +59,26 @@ const TintParams = d.struct({
 });
 // ── end PARAMS ───────────────────────────────────────────────────────────────
 
+type Source = ImageBitmap | HTMLCanvasElement;
+
 export async function setupLiquidGlass(
   root: TgpuRoot,
   context: GPUCanvasContext,
-  imageBitmap: ImageBitmap,
+  source: Source,
+  // A canvas source changes every frame and has to be re-uploaded; a bitmap is
+  // written once. The shader below does not care either way.
+  options: { animated?: boolean; beforeFrame?: () => void } = {},
 ) {
   const canvas = context.canvas as HTMLCanvasElement;
 
   const imageTexture = root
     .createTexture({
-      size: [imageBitmap.width, imageBitmap.height, 1],
+      size: [Math.max(2, source.width), Math.max(2, source.height), 1],
       format: 'rgba8unorm',
       mipLevelCount: 6,
     })
     .$usage('sampled', 'render');
-  imageTexture.write(imageBitmap);
+  imageTexture.write(source, { fit: 'stretch' });
   imageTexture.generateMipmaps();
 
   const sampledView = imageTexture.createView();
@@ -175,12 +180,25 @@ export async function setupLiquidGlass(
   let frameId = 0;
   function render() {
     frameId = requestAnimationFrame(render);
-    pipeline.withColorAttachment({ view: context }).draw(3);
+    try {
+      if (options.animated) {
+        options.beforeFrame?.();
+        imageTexture.write(source, { fit: 'stretch' });
+        imageTexture.generateMipmaps();
+      }
+      pipeline.withColorAttachment({ view: context }).draw(3);
+    } catch (e) {
+      console.error('[LiquidGlass] render error:', e);
+    }
   }
   frameId = requestAnimationFrame(render);
 
   return {
     updatePosition,
+    /** Park the lens at a fixed spot in the canvas, in 0..1 UV. */
+    setCenter(x: number, y: number) {
+      mousePosUniform.write(std.clamp(d.vec2f(x, y), d.vec2f(), d.vec2f(1)));
+    },
     toggleFixed(clientX: number, clientY: number) {
       fixed = !fixed;
       const wasFixed = fixed;

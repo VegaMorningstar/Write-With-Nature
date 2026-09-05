@@ -201,6 +201,8 @@ const GLASS_3D_DEF = { ...GLASS_3D_DEFAULTS }
 // plain numbers here; the component turns them back into the vectors the
 // uniform wants.
 const TGPU_GLASS_DEF = {
+  centerX: 0.5,
+  centerY: 0.5,
   rectW: 0.13,
   rectH: 0.01,
   radius: 0.003,
@@ -482,6 +484,8 @@ export default function TunePage() {
 
   // Their shader, their parameters
   const [tg, setTg] = useState(TGPU_GLASS_DEF)
+  const [tgMode, setTgMode] = useState('page')
+  const [tgFollow, setTgFollow] = useState(false)
   const setTgParam = (k, v) => setTg(p => ({ ...p, [k]: v }))
 
   // The same shader laid over the real page
@@ -535,6 +539,8 @@ export default function TunePage() {
     setGlass3d({ ...GLASS_3D_DEF })
     setUse3d(true)
     setTg({ ...TGPU_GLASS_DEF })
+    setTgMode('page')
+    setTgFollow(false)
     setOv({ ...OVERLAY_DEF })
     setOvOn(true)
     setOvTop(false)
@@ -613,9 +619,11 @@ export default function TunePage() {
           <section className="section">
             <div className="section-label">
               TypeGPU liquid-glass · their shader verbatim
-              &nbsp;<span style={{ opacity: 0.4, fontWeight: 300 }}>move the cursor · click to pin</span>
+              &nbsp;<span style={{ opacity: 0.4, fontWeight: 300 }}>
+                backdrop: {tgMode} · {tgFollow ? 'follows cursor' : 'static'}
+              </span>
             </div>
-            <LiquidGlassDemo params={tg} />
+            <LiquidGlassDemo params={tg} mode={tgMode} follow={tgFollow} />
           </section>
 
           {/* Compose card */}
@@ -890,6 +898,24 @@ export default function TunePage() {
             Their shader, their parameters, their ranges. Drives the panel at the
             top of the page.
           </div>
+
+          <Chips label="Backdrop" value={tgMode} options={['page', 'image', 'none']} onChange={setTgMode} />
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.30)', marginBottom: 10, lineHeight: 1.6 }}>
+            page = no photo, the canvas is transparent and the glass refracts the
+            real page background and fluid · image = their demo photo · none =
+            an empty texture, which shows why the photo was there: the shader
+            samples a texture, so with nothing in it there is nothing to bend
+            and only the tint survives.
+          </div>
+
+          <Toggle label="Follow cursor" value={tgFollow} onChange={setTgFollow}
+            description="Off pins the lens at the Centre X/Y below, which is what makes it a static element with the background moving under it." />
+
+          <Slider label="Centre X" value={tg.centerX} min={0} max={1} step={0.005}
+            onChange={v => setTgParam('centerX', v)} />
+          <Slider label="Centre Y" value={tg.centerY} min={0} max={1} step={0.005}
+            onChange={v => setTgParam('centerY', v)}
+            description="Position within the panel, ignored while Follow cursor is on." />
 
           <Slider label="Rect Width" value={tg.rectW} min={0.01} max={0.5} step={0.01}
             onChange={v => setTgParam('rectW', v)}

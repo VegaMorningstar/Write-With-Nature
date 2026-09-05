@@ -1,13 +1,19 @@
 /**
- * TypeGPU's liquid-glass example running in this app, unchanged.
+ * TypeGPU's liquid-glass example running in this app, shader untouched.
  *
- * Their demo is a photograph with a glass lozenge that follows the cursor, so
- * that is what this is — only the photo is one of ours instead of their plums.
- * Move the pointer over it; click to pin the lozenge in place.
+ * Three things can sit behind it, which is the useful part:
  *
- * This exists to judge the effect itself. It is not yet wired to the compose,
- * board or colophon panels, and that is a genuinely different problem: a shader
- * needs its backdrop as a texture, and those panels have live DOM behind them.
+ *   'image' — their demo: a photograph. Refraction is obvious because a photo
+ *             is full of detail to bend.
+ *   'page'  — no photo. The page's own background, rebuilt into a canvas every
+ *             frame from the index.css gradients and the fluid cursor, so the
+ *             glass refracts what is actually on screen.
+ *   'none'  — nothing at all. Worth looking at once: the shader samples a
+ *             texture, so with an empty one there is nothing to refract and the
+ *             lens shows only its tint. That is not a bug, it is the constraint
+ *             the whole exercise runs into.
+ *
+ * The lens is static by default. `follow` puts it back on the cursor.
  */
 import { useRef, useEffect } from 'react'
 
@@ -16,6 +22,8 @@ const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
 export default function LiquidGlassDemo({
   params,
+  mode = 'page',
+  follow = false,
   image = `${BASE}images/A/a-1-FarmIsland-Maine.webp`,
   width = 900,
   height = 520,
@@ -24,11 +32,16 @@ export default function LiquidGlassDemo({
   const sceneRef = useRef(null)
   const cleanupRef = useRef(null)
   const paramsRef = useRef(params)
+  const followRef = useRef(follow)
+
+  useEffect(() => { followRef.current = follow }, [follow])
 
   useEffect(() => {
     paramsRef.current = params
-    if (params && sceneRef.current) sceneRef.current.setParams(params)
-  }, [params])
+    if (!params || !sceneRef.current) return
+    sceneRef.current.setParams(params)
+    if (!followRef.current) sceneRef.current.setCenter(params.centerX, params.centerY)
+  }, [params, follow])
 
   useEffect(() => {
     if (!gpuSupported) return
@@ -36,23 +49,49 @@ export default function LiquidGlassDemo({
     if (!canvas) return
 
     let cancelled = false
+    let backdrop = null
 
     async function init() {
       try {
         const { tgpu } = await import('typegpu')
         const { setupLiquidGlass } = await import('./scene.ts')
 
-        const response = await fetch(image)
-        if (!response.ok) throw new Error(`image ${response.status}`)
-        const bitmap = await createImageBitmap(await response.blob())
+        let source
+        let animated = false
+        let beforeFrame
+
+        if (mode === 'image') {
+          const response = await fetch(image)
+          if (!response.ok) throw new Error(`image ${response.status}`)
+          source = await createImageBitmap(await response.blob())
+        } else if (mode === 'page') {
+          const { createBackdrop } = await import('./backdrop.js')
+          backdrop = createBackdrop({ scale: 0.5 })
+          backdrop.resize(width, height)
+          backdrop.update()
+          source = backdrop.canvas
+          animated = true
+          beforeFrame = () => backdrop.update()
+        } else {
+          // Deliberately empty — a texture with nothing in it
+          const blank = document.createElement('canvas')
+          blank.width = 64
+          blank.height = 64
+          source = blank
+        }
         if (cancelled) return
 
         const root = await tgpu.init()
         const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
-        const scene = await setupLiquidGlass(root, context, bitmap)
+        const scene = await setupLiquidGlass(root, context, source, { animated, beforeFrame })
         if (cancelled) { scene.onCleanup(); root.destroy(); return }
 
-        if (paramsRef.current) scene.setParams(paramsRef.current)
+        if (paramsRef.current) {
+          scene.setParams(paramsRef.current)
+          if (!followRef.current) {
+            scene.setCenter(paramsRef.current.centerX, paramsRef.current.centerY)
+          }
+        }
 
         sceneRef.current = scene
         cleanupRef.current = () => { scene.onCleanup(); root.destroy() }
@@ -69,14 +108,14 @@ export default function LiquidGlassDemo({
       cleanupRef.current = null
       sceneRef.current = null
     }
-  }, [image])
+  }, [mode, image, width, height])
 
-  // They listen on window, so the lozenge keeps tracking past the canvas edge
   useEffect(() => {
+    if (!follow) return
     const onMove = e => sceneRef.current?.updatePosition(e.clientX, e.clientY)
     window.addEventListener('mousemove', onMove, { passive: true })
     return () => window.removeEventListener('mousemove', onMove)
-  }, [])
+  }, [follow])
 
   if (!gpuSupported) {
     return (
@@ -96,11 +135,14 @@ export default function LiquidGlassDemo({
       ref={canvasRef}
       width={width}
       height={height}
-      onClick={e => sceneRef.current?.toggleFixed(e.clientX, e.clientY)}
+      onClick={e => follow && sceneRef.current?.toggleFixed(e.clientX, e.clientY)}
       style={{
         width: '100%', height: 'auto', display: 'block',
         aspectRatio: `${width} / ${height}`,
-        borderRadius: 10, cursor: 'crosshair',
+        borderRadius: 10,
+        cursor: follow ? 'crosshair' : 'default',
+        // Transparent without a photo, so the page shows through
+        background: 'transparent',
       }}
     />
   )
