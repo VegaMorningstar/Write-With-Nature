@@ -52,23 +52,53 @@ const TILE_COLORS = [
   '#6a9e6a', '#5a7e8a', '#7aaa98', '#8ab08a', '#6e8a5a',
 ]
 
-function useCssGlass(ref, opts, enabled) {
+/**
+ * Who owns the panel's surface.
+ *
+ * 'css' is the shipped look. 'liquid' hands it to the shader and, when `bare`,
+ * also strips the panel's own chrome — index.css gives each one a white 1px
+ * border and a `-4px -4px 10px rgba(255,255,255,0.62)` outer glow, and both of
+ * those paint outside the canvas (which only covers the padding box). That is
+ * the second edge sitting next to the glass edge.
+ *
+ * The inset highlights need no handling: they paint under the element's
+ * children, so the canvas already covers them.
+ */
+function usePanelSurface(ref, opts, useLiquid, bare) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    if (!enabled) {
-      // The liquid glass has the surface — leave no filter stacked under it
-      el.style.backdropFilter = el.style.webkitBackdropFilter = 'none'
-      return () => { el.style.backdropFilter = el.style.webkitBackdropFilter = '' }
+
+    if (!useLiquid) {
+      const glass = liquidGlass(el, opts)
+      return () => glass.destroy()
     }
-    const glass = liquidGlass(el, opts)
-    return () => glass.destroy()
-  }, [ref, enabled, JSON.stringify(opts)]) // eslint-disable-line
+
+    const prev = {
+      backdropFilter: el.style.backdropFilter,
+      webkitBackdropFilter: el.style.webkitBackdropFilter,
+      background: el.style.background,
+      border: el.style.border,
+      boxShadow: el.style.boxShadow,
+    }
+
+    // Nothing stacked under the shader
+    el.style.backdropFilter = el.style.webkitBackdropFilter = 'none'
+
+    if (bare) {
+      el.style.background = 'transparent'
+      el.style.border = 'none'
+      el.style.boxShadow = 'none'
+    }
+
+    return () => Object.assign(el.style, prev)
+  }, [ref, useLiquid, bare, JSON.stringify(opts)]) // eslint-disable-line
 }
 
 export default function GlassPreviewPage() {
   const [useLiquid, setUseLiquid] = useState(true)
+  const [bare, setBare] = useState(true)
   const [glass, setGlass] = useState(PANEL_GLASS_DEF)
   const [openSection, setOpenSection] = useState('glass')
   const setParam = (k, v) => setGlass(p => ({ ...p, [k]: v }))
@@ -78,9 +108,9 @@ export default function GlassPreviewPage() {
   const boardRef = useRef(null)
   const colophonRef = useRef(null)
 
-  useCssGlass(composeRef, CSS_GLASS.compose, !useLiquid)
-  useCssGlass(boardRef, CSS_GLASS.board, !useLiquid)
-  useCssGlass(colophonRef, CSS_GLASS.colophon, !useLiquid)
+  usePanelSurface(composeRef, CSS_GLASS.compose, useLiquid, bare)
+  usePanelSurface(boardRef, CSS_GLASS.board, useLiquid, bare)
+  usePanelSurface(colophonRef, CSS_GLASS.colophon, useLiquid, bare)
 
   const [copied, setCopied] = useState(false)
   const copyConfig = () => {
@@ -111,7 +141,9 @@ export default function GlassPreviewPage() {
                 ))}
             </div>
             <p className="sub">
-              {useLiquid ? 'Panels running TypeGPU liquid glass' : 'Panels running the shipped CSS glass'}
+              {useLiquid
+                ? `Panels running TypeGPU liquid glass${bare ? ', chrome stripped' : ', CSS chrome still on'}`
+                : 'Panels running the shipped CSS glass'}
               {' · '}flip between them in the panel
             </p>
           </div>
@@ -204,6 +236,9 @@ export default function GlassPreviewPage() {
         <AccordionSection title="PANEL GLASS" open={openSection === 'glass'} onToggle={() => toggle('glass')}>
           <Toggle label="Liquid glass" value={useLiquid} onChange={setUseLiquid}
             description="OFF puts all three panels back on the shipped CSS glass, so you can flip between them on the same page." />
+
+          <Toggle label="Strip panel chrome" value={bare} onChange={setBare}
+            description="Removes each panel's own background, 1px white border and outer white glow, leaving the shader as the only surface. Those paint outside the canvas, so with this off you see the CSS edge and the glass edge side by side — which is the doubled outline. Text and layout are untouched either way." />
 
           <Note>
             One set of values drives all three panels. The lens size is not among
