@@ -96,7 +96,7 @@ const GLASS_DEF = {
 }
 
 // ── Stage each element sits on ───────────────────────────────────────────────
-function Bench({ name, summary, children, wide = false }) {
+function Bench({ name, summary, children, wide = false, bare = false }) {
   return (
     <section style={{ marginBottom: 46 }}>
       <div style={{
@@ -114,8 +114,11 @@ function Bench({ name, summary, children, wide = false }) {
       <div style={{
         padding: wide ? 0 : '28px 20px',
         borderRadius: 12,
-        border: '1px solid rgba(74,124,63,0.12)',
-        background: 'rgba(255,255,255,0.16)',
+        // Anything translucent has to be judged against the page, not against
+        // the stage. A white-ish panel behind a glass element gets read as the
+        // element's own opacity.
+        border: bare ? 'none' : '1px solid rgba(74,124,63,0.12)',
+        background: bare ? 'transparent' : 'rgba(255,255,255,0.16)',
         display: 'flex', justifyContent: 'center',
       }}>
         {children}
@@ -193,8 +196,9 @@ export default function UiTunePage() {
 
           <Bench
             name="Glass Alphabet"
-            summary="Twenty-six real buttons — click handlers, keyboard focus, disabled state, the letter as DOM text. The glass is CSS: a backdrop-filter frost, a white fill, a bright rim and a coloured halo, which is exactly what the look is made of. Each tile takes its colour from a field centred on the grid so the bloom runs through the middle. Springs write straight to each button's transform, so a tile and its letter are the same element."
+            summary="Twenty-six real buttons — click handlers, keyboard focus, disabled state, the letter as DOM text. The glass is a backdrop-filter running the component's own SVG filter: noise displaces the backdrop three times at three scales, one colour channel taken from each, which is the same construction as the WebGPU liquid glass sampling three refractive indices. Opacity lives at the rim rather than across the face, the way Fresnel puts it on the jelly. Sat directly on the page, with no stage behind it — a white panel under translucent tiles reads as the tiles' own opacity."
             wide
+            bare
           >
             <div style={{ width: '100%', maxWidth: 560 }}>
               <GlassAlphabet

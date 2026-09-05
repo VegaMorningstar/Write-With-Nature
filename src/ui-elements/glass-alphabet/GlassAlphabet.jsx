@@ -290,7 +290,11 @@ export default function GlassAlphabet({
                 boxShadow: [
                   // Outer halo in the tile's own colour
                   `0 0 ${m.glowBlur}px ${rgb(r, g, b, glowAlpha)}`,
-                  // Rim: bright along the top, shaded along the bottom
+                  // Fresnel: no offset, so it hugs the whole rounded border and
+                  // fades to nothing at the centre. This is where the tile's
+                  // opacity is supposed to live — the face stays clear.
+                  `inset 0 0 ${m.fresnelWidth}px rgba(255,255,255,${m.fresnel})`,
+                  // Direction on top of that: lit from above, shaded below
                   `inset 0 ${m.borderWidth}px 1px rgba(255,255,255,${m.innerTop})`,
                   `inset 0 -${m.borderWidth}px 2px ${rgb(90, 80, 170, m.innerBottom)}`,
                 ].join(', '),

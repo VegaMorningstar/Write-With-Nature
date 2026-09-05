@@ -27,14 +27,18 @@ export const MATERIAL_DEFAULTS = {
   gap: 5,            // px between tiles
 
   // ── Frost ─────────────────────────────────────────────────────────────────
-  // Four separate white layers land on a tile — fill, faceGradient, the
-  // speckle, and whatever brightness lifts out of the backdrop — and they
-  // compound. Half-opacity on each is an opaque tile, not a translucent one.
-  // Kept low deliberately: the tile should be a pane, not a chiclet.
-  blur: 4,
-  saturate: 130,
-  brightness: 1.02,
-  fill: 0.06,
+  // The jelly's rule, from its own constants: glass reads as glass when the
+  // tint is a suggestion, not a filter. Everything painted across the face is
+  // a suggestion; the opacity lives at the rim instead, which is what Fresnel
+  // does on the jelly and what `fresnel` below does here.
+  //
+  // These compound, too — fill, faceGradient, the speckle and whatever
+  // brightness lifts out of the backdrop all stack. Half opacity on each is an
+  // opaque tile.
+  blur: 2,
+  saturate: 118,
+  brightness: 1,
+  fill: 0.02,
 
   // ── Refraction ────────────────────────────────────────────────────────────
   // The lens. Noise displaces the backdrop behind the tile, the way
@@ -50,12 +54,17 @@ export const MATERIAL_DEFAULTS = {
   roughness: 1.6,      // px of fine displacement — the refractive half of frost
 
   // ── Rim ───────────────────────────────────────────────────────────────────
-  // A bright outline the whole way round is the clearest single cue that a tile
-  // is its own pane of glass, and it is what the reference leans on hardest.
-  border: 0.4,
+  // Where the opacity is supposed to live. The jelly gets this from Fresnel —
+  // a surface turning away from the eye goes opaque at its silhouette and stays
+  // clear where you look straight through it. An inset shadow with no offset
+  // hugs the rounded border the same way, so it is the same effect by other
+  // means: bright all the way round, nothing in the middle.
+  fresnel: 0.5,
+  fresnelWidth: 5,   // px the rim reaches inward
+  border: 0.34,
   borderWidth: 1,
-  innerTop: 0.55,    // inset highlight along the top edge
-  innerBottom: 0.16, // inset shade along the bottom, for thickness
+  innerTop: 0.4,     // inset highlight along the top edge — the lit direction
+  innerBottom: 0.14, // inset shade along the bottom, for thickness
 
   // ── Colour ────────────────────────────────────────────────────────────────
   // Each tile takes one colour from a field centred on the grid, so the bloom
@@ -63,7 +72,7 @@ export const MATERIAL_DEFAULTS = {
   glowStrength: 0.42,
   glowSpread: 2.6,    // in tiles
   glowBlur: 10,       // px, the outer halo
-  tintStrength: 0.2,  // how much of that colour lands in the tile's own face
+  tintStrength: 0.1,  // how much of that colour lands in the tile's own face
   nearR: 255, nearG: 150, nearB: 210,   // centre of the bloom
   farR: 150, farG: 160, farB: 255,      // its edges
 
@@ -71,7 +80,7 @@ export const MATERIAL_DEFAULTS = {
   // a flat rectangle the look of a solid with a lit face. It is the single
   // largest source of opacity on the tile — a sheen across one corner, not a
   // coat over the whole face.
-  faceGradient: 0.2,
+  faceGradient: 0.1,
   faceAngle: 155,
 
   // ── Letter ────────────────────────────────────────────────────────────────

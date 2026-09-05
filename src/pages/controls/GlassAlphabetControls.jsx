@@ -38,10 +38,12 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr }) {
 
       <GroupLabel>FROST</GroupLabel>
       <Note>
-        Four white layers land on a tile — Fill, Face Gradient, Grain, and
-        whatever Brightness lifts out of the backdrop — and they compound. Half
-        opacity on each is an opaque tile. Keep them low or the glass turns
-        into a painted chip.
+        From the jelly&apos;s own notes: glass reads as glass when the tint is a
+        suggestion, not a filter. Four white layers land on a tile — Fill, Face
+        Gradient, Grain, and whatever Brightness lifts out of the backdrop —
+        and they compound, so half opacity on each is an opaque tile. Every one
+        of these should stay a suggestion; the Fresnel rim above carries the
+        tile.
       </Note>
 
       <Slider label="Blur (px)" value={material.blur} min={0} max={40} step={0.5}
@@ -61,13 +63,21 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr }) {
       <Slider label="Brightness" value={material.brightness} min={0.7} max={1.5} step={0.01}
         onChange={v => setMat('brightness', v)} />
 
-      <GroupLabel>RIM — what makes each tile a pane</GroupLabel>
+      <GroupLabel>RIM — where the opacity belongs</GroupLabel>
       <Note>
-        A bright outline the whole way round is the clearest cue that a tile is
-        its own piece of glass rather than a patch of a larger surface. The
-        reference leans on this harder than on anything else.
+        The jelly gets its glass from Fresnel: a surface turning away from the
+        eye goes opaque at its silhouette and stays clear where you look
+        straight through it. Spreading that opacity flat across the face
+        instead is what turns a pane into a painted chip. So push these up and
+        the face washes down, not the other way round.
       </Note>
 
+      <Slider label="Fresnel Rim" value={material.fresnel} min={0} max={1} step={0.01}
+        onChange={v => setMat('fresnel', v)}
+        description="Bright the whole way round the border, fading to nothing at the centre. The tile's main source of presence." />
+      <Slider label="Fresnel Width (px)" value={material.fresnelWidth} min={0} max={20} step={0.5}
+        onChange={v => setMat('fresnelWidth', v)}
+        description="How far in it reaches. Past about a third of the tile it stops being a rim and becomes a fill." />
       <Slider label="Border" value={material.border} min={0} max={1} step={0.01}
         onChange={v => setMat('border', v)} />
       <Slider label="Border Width (px)" value={material.borderWidth} min={0} max={4} step={0.5}
