@@ -1,98 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { LETTERS, TITLE_LINES } from '../data/letters'
-
-const SP_RATIO = 0.5
-const GAP = 4
-
-function titleTileSize(container) {
-  if (!container) return 64
-  const availW = container.clientWidth
-  if (availW <= 0) return 64
-  let minFit = 64
-  TITLE_LINES.forEach(line => {
-    const letters = [...line].filter(c => c !== ' ' && LETTERS[c]).length
-    const spaces  = [...line].filter(c => c === ' ').length
-    const n = letters + spaces
-    if (n < 1) return
-    const fit = (availW - (n - 1) * GAP) / (letters + spaces * SP_RATIO)
-    if (fit > 0) minFit = Math.min(minFit, fit)
-  })
-  return Math.max(36, Math.min(84, Math.floor(minFit)))
-}
-
-function initTitleVs() {
-  const vs = {}
-  TITLE_LINES.forEach((line, li) => {
-    ;[...line].forEach((ch, i) => {
-      if (ch !== ' ' && LETTERS[ch]) {
-        const key = `title-${li}-${i}-${ch}`
-        vs[key] = Math.floor(Math.random() * LETTERS[ch].length)
-      }
-    })
-  })
-  return vs
-}
+/**
+ * The masthead.
+ *
+ * WRITE WITH NATURE used to be laid out here as a flex collage of .title-tile
+ * divs, with its own tile sizing, variant state and hover CSS. All of that moved
+ * into GlassTitle, which needs to own the layout anyway: the glass is drawn on a
+ * canvas from box positions in its own coordinate space, so the DOM and the
+ * shader cannot each compute the layout separately without drifting apart.
+ *
+ * Without WebGPU it falls back to the same images in the same places, so the
+ * masthead still reads as it always did.
+ */
+import GlassTitle from '../ui-elements/glass-title/GlassTitle'
 
 export default function Header() {
-  const containerRef = useRef(null)
-  const [tSize, setTSize] = useState(84)
-  const [vs, setVs] = useState(initTitleVs)
-
-  const recalcSize = useCallback(() => {
-    setTSize(titleTileSize(containerRef.current))
-  }, [])
-
-  useEffect(() => {
-    recalcSize()
-    let timer
-    const handler = () => { clearTimeout(timer); timer = setTimeout(recalcSize, 80) }
-    window.addEventListener('resize', handler)
-    return () => { window.removeEventListener('resize', handler); clearTimeout(timer) }
-  }, [recalcSize])
-
-  function cycleTitle(key, ch) {
-    setVs(prev => ({
-      ...prev,
-      [key]: ((prev[key] || 0) + 1) % LETTERS[ch].length
-    }))
-  }
-
   return (
     <header className="masthead">
       <span className="over">NASA Landsat · Satellite Imagery Collage</span>
 
-      <div className="title-collage" ref={containerRef}>
-        {TITLE_LINES.map((line, li) => (
-          <div key={li} className="title-row">
-            {[...line].map((ch, i) => {
-              if (ch === ' ') {
-                return (
-                  <div
-                    key={`sp-${li}-${i}`}
-                    style={{ width: Math.round(tSize * SP_RATIO), flexShrink: 0 }}
-                  />
-                )
-              }
-              const variants = LETTERS[ch]
-              if (!variants) return null
-              const key = `title-${li}-${i}-${ch}`
-              const vi  = (vs[key] || 0) % variants.length
-              const { url, label } = variants[vi]
-              return (
-                <TitleTile
-                  key={key}
-                  tileKey={key}
-                  ch={ch}
-                  url={url}
-                  label={label}
-                  tSize={tSize}
-                  onClick={() => cycleTitle(key, ch)}
-                />
-              )
-            })}
-          </div>
-        ))}
-      </div>
+      <GlassTitle />
 
       <p className="sub">Rivers, glaciers &amp; coastlines — shaped into letters from orbit</p>
 
@@ -112,26 +37,5 @@ export default function Header() {
         <div className="ornament-rule" />
       </div>
     </header>
-  )
-}
-
-function TitleTile({ ch, url, label, tSize, onClick }) {
-  const [loaded, setLoaded] = useState(false)
-  return (
-    <div
-      className="title-tile"
-      style={{ width: tSize, height: tSize }}
-      onClick={onClick}
-    >
-      <img
-        src={url}
-        alt={`${ch} — ${label}`}
-        className={loaded ? '' : 'loading'}
-        onLoad={() => setLoaded(true)}
-      />
-      <div className="t-wash" />
-      <div className="t-char">{ch}</div>
-      <div className="t-tip">{label}</div>
-    </div>
   )
 }

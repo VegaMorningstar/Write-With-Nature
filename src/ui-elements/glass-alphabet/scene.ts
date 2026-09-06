@@ -1,5 +1,5 @@
 /**
- * TypeGPU's liquid glass, twenty-six times over.
+ * TypeGPU's liquid glass, once per tile.
  *
  * The shader body is theirs, by way of our own overlay.ts — calculateWeights,
  * applyTint, sampleWithChromaticAberration and the sampling in the fragment
@@ -8,13 +8,14 @@
  *
  * Four things are ours, each marked OURS below:
  *
- *   1. Their SDF is a single rounded box; ours is the union of twenty-six, which
- *      is their minimum. One loop over a uniform array gives every tile the same
- *      lens in one draw call. The loop has to carry `dir` and the glow along
- *      with the distance, since with a union the fragment must use the values
- *      belonging to whichever tile actually won.
+ *   1. Their SDF is a single rounded box; ours is the union of however many
+ *      tiles the caller asks for, which is their minimum. One loop over a
+ *      uniform array gives every tile the same lens in one draw call. The loop
+ *      has to carry `dir` and the glow along with the distance, since with a
+ *      union the fragment must use the values belonging to whichever tile
+ *      actually won.
  *   2. The letters live in their own texture rather than in the backdrop. Two
- *      reasons: the backdrop is sampled at a mip bias to blur the glass body,
+ *      reasons: the backdrop is sampled at a mip level to blur the glass body,
  *      which turns a 15px letter to mush, and a separate texture can be given
  *      its own dispersion so the letter fringes like the word under the jelly.
  *      It carries a mask in its alpha and takes its colour from a uniform, so
@@ -28,6 +29,9 @@
  *      inside the tile and decaying outside it, so a pressed tile both brightens
  *      and throws light into the gaps around it.
  *
+ * Shared: the glass alphabet and the masthead both run this. They differ only
+ * in what they paint into the two backdrops and how many boxes they ask for.
+ *
  * Everything reaching setTiles and setParams is in box space: canvas heights,
  * with x scaled by the aspect so corners come out circular. GlassAlphabet.jsx
  * converts from pixels, which is the only sane unit to tune a 46px tile in.
@@ -37,9 +41,35 @@ import { tgpu, common, d, std, type TgpuRoot } from 'typegpu';
 
 export const TILE_COUNT = 26;
 
-/** The letter texture's size, matched by the canvas that feeds it. */
+/** The letter texture's default size, matched by the canvas that feeds it. */
 export const LETTER_TEX_W = 1024;
 export const LETTER_TEX_H = 512;
+
+/**
+ * Default backdrop size. Textures here are a fixed size for the life of the
+ * pipeline: the shader captures its view when it is built, so recreating one on
+ * resize would leave the compiled pipeline holding a view of a destroyed
+ * texture. Sampling is in uv space, so a stretch on upload undoes itself
+ * geometrically — but not in detail, which is why callers should pass a size
+ * matching their canvas rather than take this square one.
+ */
+const TEX_SIZE = 1024;
+
+export type TileGlassOptions = {
+  /** How many boxes the union covers. Baked into the uniform array and the
+   *  shader's loop, so it is fixed for the life of the pipeline. */
+  tileCount?: number;
+  /** Size of the overlay texture — the letters here, the corner glyphs on the
+   *  masthead. Match the canvas feeding it to its aspect or the upload
+   *  stretches and the shader squeezes it back, losing detail on the way. */
+  maskW?: number;
+  maskH?: number;
+  /** Size of the backdrop texture. Match it to the canvas's aspect: this is
+   *  where the refracted content lives, and a square texture fed from a wide
+   *  canvas throws away horizontal detail before the shader ever reads it. */
+  paperW?: number;
+  paperH?: number;
+};
 
 const Params = d.struct({
   radius: d.f32,
@@ -53,6 +83,7 @@ const Params = d.struct({
   tintStrength: d.f32,
   tintColor: d.vec3f,
   chromaticFalloff: d.f32,
+  edgeCurve: d.f32,
   // OURS
   bodyChromatic: d.f32,
   bodyDepth: d.f32,
@@ -61,6 +92,13 @@ const Params = d.struct({
   glowStrength: d.f32,
   glowHalo: d.f32,
   glowColor: d.vec3f,
+  // Unit vector toward the light, in screen space with y downward like uv.
+  // Built on the CPU from an azimuth and an elevation, which are what a person
+  // can actually reason about.
+  lightDir: d.vec3f,
+  specularStrength: d.f32,
+  specularPower: d.f32,
+  specularColor: d.vec3f,
 });
 
 export type SceneParams = {
@@ -77,6 +115,7 @@ export type SceneParams = {
   tintG: number;
   tintB: number;
   chromaticFalloff: number;
+  edgeCurve: number;
   bodyChromatic: number;
   bodyDepth: number;
   letterBlur: number;
@@ -88,12 +127,14 @@ export type SceneParams = {
   glowR: number;
   glowG: number;
   glowB: number;
+  lightAzimuth: number;
+  lightElevation: number;
+  specularStrength: number;
+  specularPower: number;
+  specR: number;
+  specG: number;
+  specB: number;
 };
-
-/** xy = centre in box space, zw = half-extents in box space. */
-const Tiles = d.arrayOf(d.vec4f, TILE_COUNT);
-/** x = glow, from residual wobble energy. The rest is padding. */
-const Glows = d.arrayOf(d.vec4f, TILE_COUNT);
 
 const Weights = d.struct({
   inside: d.f32,
@@ -106,33 +147,39 @@ const TintParams = d.struct({
   strength: d.f32,
 });
 
-export async function setupAlphabet(
+export async function setupTileGlass(
   root: TgpuRoot,
   context: GPUCanvasContext,
   paperCanvas: HTMLCanvasElement,
   letterCanvas: HTMLCanvasElement,
+  options: TileGlassOptions = {},
 ) {
-  // Fixed size, written with fit: 'stretch'. Recreating it on resize would leave
-  // the compiled pipeline holding a view of a destroyed texture — the shader
-  // captures the view when it is built, not on every frame. Sampling is in uv
-  // space, so the stretch undoes itself.
-  //
-  // Both backdrops cover only the grid's own rectangle rather than the whole
-  // viewport, so 1024 across a few hundred CSS pixels is oversampled — which is
-  // the point for the letters, which are read through a lens at mip 0.
-  const TEX_SIZE = 1024;
+  // Fixed for the life of the pipeline: the uniform array's length and the
+  // shader's loop bound are both compile-time, so changing the count means a new
+  // scene rather than a new uniform.
+  const COUNT = options.tileCount ?? TILE_COUNT;
+  const maskW = options.maskW ?? LETTER_TEX_W;
+  const maskH = options.maskH ?? LETTER_TEX_H;
+  const paperW = options.paperW ?? TEX_SIZE;
+  const paperH = options.paperH ?? TEX_SIZE;
+
+  /** xy = centre in box space, zw = half-extents in box space. */
+  const Tiles = d.arrayOf(d.vec4f, COUNT);
+  /** x = glow, from residual wobble energy. The rest is padding. */
+  const Glows = d.arrayOf(d.vec4f, COUNT);
 
   const makeTexture = (w: number, h: number) =>
     root
       .createTexture({
         size: [w, h, 1],
-        // 6 levels, because textureSampleBias needs a mip chain for the blur
+        // 6 levels: the blur reads an explicit mip level, so the chain has to
+        // exist for anything above zero to have somewhere to come from
         format: 'rgba8unorm',
         mipLevelCount: 6,
       })
       .$usage('sampled', 'render');
 
-  const paperTexture = makeTexture(TEX_SIZE, TEX_SIZE);
+  const paperTexture = makeTexture(paperW, paperH);
   // OURS: the letters get a 2:1 texture, and their canvas is drawn at exactly
   // that size. Both matter for sharpness. A square texture fed from a grid twice
   // as wide as it is tall stretches the glyphs 2x vertically on upload and the
@@ -140,7 +187,7 @@ export async function setupAlphabet(
   // undoes the first only in geometry, not in the detail lost to the first.
   // 8 columns by 4 rows is close to 2:1 whatever the tile size, since both
   // dimensions scale together, so this stays right across the size slider.
-  const letterTexture = makeTexture(LETTER_TEX_W, LETTER_TEX_H);
+  const letterTexture = makeTexture(maskW, maskH);
   const paperView = paperTexture.createView();
   const letterView = letterTexture.createView();
 
@@ -154,11 +201,11 @@ export async function setupAlphabet(
 
   const tilesUniform = root.createUniform(
     Tiles,
-    Array.from({ length: TILE_COUNT }, () => d.vec4f(0.5, 0.5, 0.02, 0.02)),
+    Array.from({ length: COUNT }, () => d.vec4f(0.5, 0.5, 0.02, 0.02)),
   );
   const glowsUniform = root.createUniform(
     Glows,
-    Array.from({ length: TILE_COUNT }, () => d.vec4f(0, 0, 0, 0)),
+    Array.from({ length: COUNT }, () => d.vec4f(0, 0, 0, 0)),
   );
 
   const paramsUniform = root.createUniform(Params, {
@@ -173,6 +220,7 @@ export async function setupAlphabet(
     tintStrength: 0.05,
     tintColor: d.vec3f(0.58, 0.44, 0.96),
     chromaticFalloff: 1,
+    edgeCurve: 1,
     bodyChromatic: 0.01,
     bodyDepth: 0.05,
     letterBlur: 0,
@@ -180,6 +228,10 @@ export async function setupAlphabet(
     glowStrength: 0,
     glowHalo: 0.03,
     glowColor: d.vec3f(0.68, 0.85, 0.45),
+    lightDir: d.vec3f(0, -0.57, 0.82),
+    specularStrength: 0,
+    specularPower: 40,
+    specularColor: d.vec3f(1, 1, 1),
   });
 
   // ── theirs, unchanged ───────────────────────────────────────────────────────
@@ -202,13 +254,19 @@ export async function setupAlphabet(
     uv: d.v2f,
     offset: number,
     dir: d.v2f,
-    blur: number,
+    level: number,
   ) => {
     'use gpu';
     const samples = d.arrayOf(d.vec3f, 3)();
     for (const i of tgpu.unroll(std.range(3))) {
       const channelOffset = dir * (d.f32(i) - 1) * offset;
-      samples[i] = std.textureSampleBias(tex, samp, uv - channelOffset, blur).rgb;
+      // OURS: textureSampleLevel, where theirs is textureSampleBias. A bias is
+      // added to a level the hardware derives from the uv derivatives, and this
+      // texture is nearly always read across fewer pixels than it has texels —
+      // so a blur of zero was still coming back from a mip a full step down, and
+      // no setting could ask for the sharpest one. An explicit level says what
+      // is meant, and the slider drives it directly.
+      samples[i] = std.textureSampleLevel(tex, samp, uv - channelOffset, level).rgb;
     }
     return d.vec3f(samples[0].x, samples[1].y, samples[2].z);
   };
@@ -258,7 +316,7 @@ export async function setupAlphabet(
     let dir = d.vec2f(0, 1);
     let glow = d.f32(0);
 
-    for (const i of std.range(TILE_COUNT)) {
+    for (const i of std.range(COUNT)) {
       const tile = tilesUniform.$[i];
       const half = d.vec2f(tile.z, tile.w);
       const rel = p.sub(d.vec2f(tile.x, tile.y));
@@ -283,12 +341,25 @@ export async function setupAlphabet(
     const featherUV = paramsUniform.$.edgeFeather / std.max(texDim.x, texDim.y);
     const weights = calculateWeights(sdfDist, paramsUniform.$.start, paramsUniform.$.end, featherUV);
 
+    // OURS: an exponent on the ring's displacement ramp. Theirs is linear across
+    // the band, which is a flat chamfer — the surface tilts at a constant rate
+    // from the body to the rim. A rounded lip does not: its normal barely turns
+    // near the body and then sweeps fast at the outer edge, so the view through
+    // it stays still and then compresses hard. Above 1 gives that fillet; below
+    // 1 front-loads the bend into a dome. 1 is theirs exactly.
+    //
+    // Saturated before the power for the same reason the fringe ramp is:
+    // normalizedDist runs negative inside the ring, and a fractional exponent on
+    // a negative base is not a number. The weights discard that region, but a
+    // NaN survives multiplication by zero and would punch a hole through it.
+    const edgeRamp = std.saturate(normalizedDist) ** paramsUniform.$.edgeCurve;
+
     // OURS: dir is a unit vector in box space, and uv is not — on a canvas wider
     // than it is tall, adding one to the other displaces further horizontally
     // than vertically. Dividing by the shape scale converts back, so the
     // strength is a distance in canvas heights like every other param here.
     const ringUv = uv.add(
-      dir.mul(paramsUniform.$.refractionStrength * normalizedDist).div(shapeScaleUniform.$),
+      dir.mul(paramsUniform.$.refractionStrength * edgeRamp).div(shapeScaleUniform.$),
     );
 
     // Their ramp: no fringing at the inner edge of the ring, most at the outer.
@@ -349,8 +420,32 @@ export async function setupAlphabet(
       std.exp(-std.max(sdfDist - paramsUniform.$.end, 0) / std.max(paramsUniform.$.glowHalo, 1e-5)) *
       glow * paramsUniform.$.glowStrength;
 
+    // OURS: a lit highlight, which the ring gives us almost for free. The bevel
+    // already has an implied surface — flat across the body, rolling over to
+    // vertical by the outer rim — so its normal is the tilt `edgeRamp` describes
+    // swung along `dir`, the same outward direction the refraction uses. That
+    // makes the highlight and the bending agree about the shape of the glass,
+    // which is what stops it reading as a decal.
+    //
+    // Blinn-Phong against an orthographic view: the body's normal points
+    // straight at the camera, so it only catches a light nearly overhead, while
+    // somewhere on the bevel the normal bisects light and view exactly and lights
+    // up. Moving the light sweeps that band around the tile.
+    const theta = edgeRamp * 1.5707964;
+    const normal = d.vec3f(
+      dir.x * std.sin(theta),
+      dir.y * std.sin(theta),
+      std.cos(theta),
+    );
+    const halfVector = std.normalize(paramsUniform.$.lightDir.add(d.vec3f(0, 0, 1)));
+    const specular =
+      std.saturate(std.dot(normal, halfVector)) ** std.max(paramsUniform.$.specularPower, 1) *
+      paramsUniform.$.specularStrength * cover;
+
     return d.vec4f(
-      glass.add(paramsUniform.$.glowColor.mul(halo)),
+      glass
+        .add(paramsUniform.$.glowColor.mul(halo))
+        .add(paramsUniform.$.specularColor.mul(specular)),
       std.saturate(cover + halo),
     );
   });
@@ -414,6 +509,7 @@ export async function setupAlphabet(
         tintStrength: p.tintStrength,
         tintColor: d.vec3f(p.tintR, p.tintG, p.tintB),
         chromaticFalloff: Math.max(p.chromaticFalloff ?? 1, 0.05),
+        edgeCurve: Math.max(p.edgeCurve ?? 1, 0.05),
         bodyChromatic: p.bodyChromatic,
         bodyDepth: Math.max(p.bodyDepth, 1e-4),
         letterBlur: p.letterBlur,
@@ -421,6 +517,20 @@ export async function setupAlphabet(
         glowStrength: p.glowStrength,
         glowHalo: Math.max(p.glowHalo, 1e-5),
         glowColor: d.vec3f(p.glowR / 255, p.glowG / 255, p.glowB / 255),
+        // Azimuth is measured on screen with 90 straight down from the top, and
+        // y grows downward in uv — so a light "from above" has a negative y.
+        lightDir: (() => {
+          const a = (p.lightAzimuth * Math.PI) / 180;
+          const e = (p.lightElevation * Math.PI) / 180;
+          return d.vec3f(
+            Math.cos(e) * Math.cos(a),
+            -Math.cos(e) * Math.sin(a),
+            Math.sin(e),
+          );
+        })(),
+        specularStrength: p.specularStrength,
+        specularPower: Math.max(p.specularPower, 1),
+        specularColor: d.vec3f(p.specR / 255, p.specG / 255, p.specB / 255),
       });
     },
     onCleanup() {

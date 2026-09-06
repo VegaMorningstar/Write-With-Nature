@@ -163,14 +163,14 @@ export default function GlassAlphabet({
     async function init() {
       try {
         const { tgpu } = await import('typegpu')
-        const { setupAlphabet } = await import('./scene.ts')
+        const { setupTileGlass } = await import('./scene.ts')
         const { createTileBackdrop } = await import('./backdrop.js')
         if (cancelled) return
 
         const backdrop = createTileBackdrop()
         const root = await tgpu.init()
         const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
-        const scene = await setupAlphabet(root, context, backdrop.paper, backdrop.letters)
+        const scene = await setupTileGlass(root, context, backdrop.paper, backdrop.letters)
         if (cancelled) { scene.onCleanup(); root.destroy(); return }
 
         scene.beforeFrame = () => {
@@ -244,6 +244,7 @@ export default function GlassAlphabet({
             tintStrength: mm.tintStrength,
             tintR: mm.tintR, tintG: mm.tintG, tintB: mm.tintB,
             chromaticFalloff: mm.chromaticFalloff,
+            edgeCurve: mm.edgeCurve,
             bodyChromatic: mm.bodyChromatic,
             // The body's dispersion ramps over the box's own half-width, so it
             // scales with the tile instead of needing a second slider.
@@ -253,6 +254,11 @@ export default function GlassAlphabet({
             glowStrength: mm.glowStrength,
             glowHalo: mm.glowHalo / H,
             glowR: mm.glowR, glowG: mm.glowG, glowB: mm.glowB,
+            lightAzimuth: mm.lightAzimuth,
+            lightElevation: mm.lightElevation,
+            specularStrength: mm.specularStrength,
+            specularPower: mm.specularPower,
+            specR: mm.specR, specG: mm.specG, specB: mm.specB,
           })
 
           backdrop.update(glyphs, {

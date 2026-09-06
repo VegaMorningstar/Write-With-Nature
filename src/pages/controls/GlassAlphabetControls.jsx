@@ -44,6 +44,9 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
       <Slider label="Fringe Falloff" value={material.chromaticFalloff} min={0.2} max={6} step={0.05}
         onChange={v => setMat('chromaticFalloff', v)}
         description="Exponent on the fringe's ramp across the ring. 1 is TypeGPU's linear version; higher pushes the colour into the outer rim." />
+      <Slider label="Edge Curve" value={material.edgeCurve} min={0.2} max={8} step={0.05}
+        onChange={v => setMat('edgeCurve', v)}
+        description="The same exponent, on the displacement itself. 1 is TypeGPU's linear ramp — a flat chamfer. Above it the bend holds off near the body and sweeps fast at the rim, which reads as a rounded lip rather than a slope." />
       <Slider label="Body Dispersion" value={material.bodyChromatic} min={0} max={0.06} step={0.0005}
         fmt={v => v.toFixed(4)} onChange={v => setMat('bodyChromatic', v)}
         description="The jelly's dispersion rather than the rim's: splits what you see through the middle of the tile, letter included. Strongest against the tile's own edge and fading to nothing at its centre, since a slab splits light where you look through it at an angle and not head on." />
@@ -92,6 +95,31 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
       <Slider label="R" value={material.letterR} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('letterR', v)} />
       <Slider label="G" value={material.letterG} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('letterG', v)} />
       <Slider label="B" value={material.letterB} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('letterB', v)} />
+
+      <GroupLabel>LIGHT — the highlight</GroupLabel>
+      <Note>
+        A directional source, lit off the bevel the ring already implies: its
+        normal is flat across the body and rolls over to vertical by the outer
+        rim, swung along the same outward direction the refraction uses. So the
+        highlight and the bending agree about the shape of the glass, and
+        moving Edge Curve moves the highlight with it.
+        Off by default here, so the shipped alphabet is unchanged until Strength is raised.
+      </Note>
+
+      <Slider label="Strength" value={material.specularStrength} min={0} max={2} step={0.02}
+        onChange={v => setMat('specularStrength', v)} />
+      <Slider label="Azimuth (deg)" value={material.lightAzimuth} min={0} max={360} step={1}
+        fmt={v => v.toFixed(0)} onChange={v => setMat('lightAzimuth', v)}
+        description="Where the light comes from, on screen. 90 is straight down from the top; sweeping it walks the highlight around the tile." />
+      <Slider label="Elevation (deg)" value={material.lightElevation} min={0} max={90} step={1}
+        fmt={v => v.toFixed(0)} onChange={v => setMat('lightElevation', v)}
+        description="Degrees above the surface. Low grazes the rim; at 90 the light is overhead and catches the flat body instead of the edge, which reads as a wash rather than a highlight." />
+      <Slider label="Tightness" value={material.specularPower} min={1} max={200} step={1}
+        fmt={v => v.toFixed(0)} onChange={v => setMat('specularPower', v)}
+        description="High keeps it to a thin bright line along the lip; low spreads it into a broad sheen across the whole bevel." />
+      <Slider label="R" value={material.specR} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('specR', v)} />
+      <Slider label="G" value={material.specG} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('specG', v)} />
+      <Slider label="B" value={material.specB} min={0} max={255} step={1} fmt={v => v.toFixed(0)} onChange={v => setMat('specB', v)} />
 
       <GroupLabel>GLOW — the press</GroupLabel>
       <Note>
