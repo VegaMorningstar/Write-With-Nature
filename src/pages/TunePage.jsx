@@ -19,9 +19,12 @@ import LiquidGlassControls from './controls/LiquidGlassControls.jsx'
 import GlassAlphabetControls from './controls/GlassAlphabetControls.jsx'
 import GlassTitleControls from './controls/GlassTitleControls.jsx'
 import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
+import GlassSheet from '../ui-elements/glass-sheet/GlassSheet'
+import { LETTERS as SCENES } from '../data/letters'
 import {
   MATERIAL_DEFAULTS as ALPHA_MATERIAL,
   POINTER_DEFAULTS as ALPHA_POINTER,
+  LETTERS as ALPHA_MATERIAL_LETTERS,
 } from '../ui-elements/glass-alphabet/constants.ts'
 import GlassTitle from '../ui-elements/glass-title/GlassTitle'
 import {
@@ -307,6 +310,10 @@ export default function TunePage() {
   const [frost, setFrost] = useState(FROST_DEF)
   const setFrostParam = (k, v) => setFrost(f => ({ ...f, [k]: v }))
 
+  // The sheet the colophon's alphabet opens, as it ships
+  const [openChar, setOpenChar] = useState(null)
+  const openScenes = openChar ? SCENES[openChar] ?? [] : []
+
   const [alpha, setAlpha] = useState(ALPHA_DEF)
   const setAlphaMat = (k, v) => setAlpha(s => ({ ...s, material: { ...s.material, [k]: v } }))
   const setAlphaPtr = (k, v) => setAlpha(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
@@ -504,11 +511,22 @@ export default function TunePage() {
             {/* Twenty-six lenses of liquid glass, each a real button. Clicking
                 one only wobbles it for now; onSelect is where the Landsat grid
                 for that letter will open. */}
-            <GlassAlphabet material={alpha.material} pointer={alpha.pointer} />
+            <GlassAlphabet material={alpha.material} pointer={alpha.pointer} onSelect={setOpenChar} />
           </footer>
 
         </div>
       </div>
+
+      <GlassSheet
+        open={openChar !== null}
+        title={openChar ? `The letter ${openChar}` : ''}
+        subtitle={`${openScenes.length} Landsat ${openScenes.length === 1 ? 'scene' : 'scenes'}`}
+        items={openScenes}
+        onClose={() => setOpenChar(null)}
+        sequence={ALPHA_MATERIAL_LETTERS}
+        current={openChar}
+        onNavigate={setOpenChar}
+      />
 
       {/* ── Floating control panel ── */}
       <aside style={{
