@@ -47,6 +47,8 @@ import {
 import LiquidGlassDemo from '../ui-elements/liquid-glass/LiquidGlassDemo'
 import { overlayDefaults } from '../ui-elements/liquid-glass/overlay.ts'
 import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
+import GlassSheet from '../ui-elements/glass-sheet/GlassSheet'
+import { LETTERS as SCENES } from '../data/letters'
 import {
   MATERIAL_DEFAULTS as ALPHA_MATERIAL,
   POINTER_DEFAULTS as ALPHA_POINTER,
@@ -159,6 +161,10 @@ export default function UiTunePage() {
   const setAlphaPtr = (k, v) => setAlpha(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
   const [lastLetter, setLastLetter] = useState(null)
 
+  // Glass sheet — the overlay the colophon opens when a letter is clicked
+  const [sheetChar, setSheetChar] = useState(null)
+  const sheetScenes = sheetChar ? SCENES[sheetChar] ?? [] : []
+
   // Glazed masthead
   const [title, setTitle] = useState(TITLE_DEF)
   const setTitleMat = (k, v) => setTitle(s => ({ ...s, material: { ...s.material, [k]: v } }))
@@ -212,6 +218,29 @@ export default function UiTunePage() {
               then wire it in.
             </p>
           </div>
+
+          <Bench
+            name="Glass Sheet"
+            summary="The overlay the colophon opens when an alphabet tile is clicked. Wears the same LiquidGlassPanel surface as the compose card, board and colophon, but floating above the page. Three ways out — Escape, the close button, or the scrim — and the scrim listens on pointerdown so a drag that starts inside and ends outside does not dismiss it. The close button is the panel preset with the tint pushed to red; the glow around it is doing as much work as the tint inside."
+            wide
+            bare
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', padding: '8px 0' }}>
+              {['A', 'G', 'M', '8', 'Q'].map(ch => (
+                <button
+                  key={ch}
+                  onClick={() => setSheetChar(ch)}
+                  style={{
+                    ...mono, fontSize: 11, padding: '7px 14px', cursor: 'pointer', borderRadius: 7,
+                    border: '1px solid rgba(74,124,63,0.28)', background: 'rgba(74,124,63,0.10)',
+                    color: '#1a3a0a', letterSpacing: '0.08em',
+                  }}
+                >
+                  open {ch} · {(SCENES[ch] || []).length}
+                </button>
+              ))}
+            </div>
+          </Bench>
 
           <Bench
             name="Glazed Masthead"
@@ -292,6 +321,14 @@ export default function UiTunePage() {
           </div>
         </div>
       </div>
+
+      <GlassSheet
+        open={sheetChar !== null}
+        title={sheetChar ? `The letter ${sheetChar}` : ''}
+        subtitle={`${sheetScenes.length} Landsat ${sheetScenes.length === 1 ? 'scene' : 'scenes'}`}
+        items={sheetScenes}
+        onClose={() => setSheetChar(null)}
+      />
 
       <ControlPanel
         title="UI ELEMENTS"

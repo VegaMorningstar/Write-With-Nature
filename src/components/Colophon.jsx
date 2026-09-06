@@ -1,9 +1,10 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useState } from 'react'
 import { LETTERS } from '../data/letters'
 import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
 import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
+import GlassSheet from '../ui-elements/glass-sheet/GlassSheet'
 
 export default function Colophon() {
   const colophonRef = useRef(null)
@@ -13,6 +14,10 @@ export default function Colophon() {
   // grid but sit disabled, so the alphabet reads as an alphabet rather than a
   // gappy subset of one.
   const available = useMemo(() => new Set(Object.keys(LETTERS)), [])
+
+  // Which character's scenes are on show. null is closed.
+  const [openChar, setOpenChar] = useState(null)
+  const scenes = openChar ? LETTERS[openChar] ?? [] : []
 
   return (
     <footer className="colophon" ref={colophonRef}>
@@ -33,9 +38,16 @@ export default function Colophon() {
         </p>
       </div>
       {/* Twenty-six lenses of liquid glass, each a real button. Clicking one
-          only wobbles it for now; onSelect is where the Landsat grid for that
-          letter will open. */}
-      <GlassAlphabet available={available} />
+          opens every Landsat scene mapped to that character. */}
+      <GlassAlphabet available={available} onSelect={setOpenChar} />
+
+      <GlassSheet
+        open={openChar !== null}
+        title={openChar ? `The letter ${openChar}` : ''}
+        subtitle={`${scenes.length} Landsat ${scenes.length === 1 ? 'scene' : 'scenes'}`}
+        items={scenes}
+        onClose={() => setOpenChar(null)}
+      />
     </footer>
   )
 }
