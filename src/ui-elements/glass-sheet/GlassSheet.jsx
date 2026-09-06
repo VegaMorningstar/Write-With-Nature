@@ -135,12 +135,19 @@ export default function GlassSheet({
           display: 'flex', flexDirection: 'column',
           borderRadius: 24,
           padding: '1.6rem 1.8rem 1.8rem',
-          // Only where the shader is not running. With it, this would stack.
+          // Chrome only where the shader is not running, the same rule
+          // usePanelGlass applies to the app's panels. The canvas covers the
+          // padding box, so a border and an outer shadow sit outside it and
+          // read as a second edge beside the glass one — which is exactly what
+          // they did here, a rounded rectangle running a few pixels wide of the
+          // lens. The scrim behind is what lifts the sheet off the page instead.
           background: glassSupported ? 'transparent' : 'rgba(255,255,255,0.16)',
           backdropFilter: glassSupported ? 'none' : 'blur(18px) saturate(150%)',
           WebkitBackdropFilter: glassSupported ? 'none' : 'blur(18px) saturate(150%)',
-          border: '1px solid rgba(255,255,255,0.34)',
-          boxShadow: '0 24px 70px rgba(28,26,16,0.34), inset 0 1px 0 rgba(255,255,255,0.42)',
+          border: glassSupported ? 'none' : '1px solid rgba(255,255,255,0.34)',
+          boxShadow: glassSupported
+            ? 'none'
+            : '0 24px 70px rgba(28,26,16,0.34), inset 0 1px 0 rgba(255,255,255,0.42)',
         }}
       >
         {glassSupported && <LiquidGlassPanel params={PANEL_GLASS} />}
@@ -223,6 +230,17 @@ export default function GlassSheet({
  * much of that work as the tint inside.
  */
 const CloseButton = forwardRef(function CloseButton({ onClick }, ref) {
+  // The glow stays under the shader — it is a soft halo outside the lens, not a
+  // hard rim beside it, so it reads as light rather than as a second edge. The
+  // border and the inset highlight do not get that pass: both draw a crisp
+  // outline the glass then repeats a pixel inside.
+  const shadow = hover => {
+    const glow = hover
+      ? '0 0 26px rgba(226,70,60,0.72)'
+      : '0 0 18px rgba(226,70,60,0.45)'
+    return glassSupported ? glow : `${glow}, inset 0 1px 0 rgba(255,255,255,0.45)`
+  }
+
   return (
     <button
       ref={ref}
@@ -238,21 +256,13 @@ const CloseButton = forwardRef(function CloseButton({ onClick }, ref) {
         cursor: 'pointer',
         display: 'grid', placeItems: 'center',
         background: glassSupported ? 'transparent' : 'rgba(232,84,72,0.16)',
-        border: '1px solid rgba(255,148,140,0.55)',
-        boxShadow: '0 0 18px rgba(226,70,60,0.45), inset 0 1px 0 rgba(255,255,255,0.45)',
+        border: glassSupported ? 'none' : '1px solid rgba(255,148,140,0.55)',
+        boxShadow: shadow(false),
         color: 'rgba(120,26,20,0.9)',
-        transition: 'box-shadow 0.16s, border-color 0.16s',
+        transition: 'box-shadow 0.16s',
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow =
-          '0 0 26px rgba(226,70,60,0.72), inset 0 1px 0 rgba(255,255,255,0.55)'
-        e.currentTarget.style.borderColor = 'rgba(255,170,162,0.85)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.boxShadow =
-          '0 0 18px rgba(226,70,60,0.45), inset 0 1px 0 rgba(255,255,255,0.45)'
-        e.currentTarget.style.borderColor = 'rgba(255,148,140,0.55)'
-      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = shadow(true) }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = shadow(false) }}
     >
       {glassSupported && <LiquidGlassPanel params={CLOSE_GLASS} />}
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"
