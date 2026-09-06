@@ -5,6 +5,7 @@ import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
 import GlassSheet from '../ui-elements/glass-sheet/GlassSheet'
+import { LETTERS as ALPHABET } from '../ui-elements/glass-alphabet/constants.ts'
 
 export default function Colophon() {
   const colophonRef = useRef(null)
@@ -47,6 +48,9 @@ export default function Colophon() {
         subtitle={`${scenes.length} Landsat ${scenes.length === 1 ? 'scene' : 'scenes'}`}
         items={scenes}
         onClose={() => setOpenChar(null)}
+        sequence={ALPHABET}
+        current={openChar}
+        onNavigate={setOpenChar}
       />
     </footer>
   )

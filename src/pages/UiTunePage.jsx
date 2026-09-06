@@ -49,6 +49,9 @@ import { overlayDefaults } from '../ui-elements/liquid-glass/overlay.ts'
 import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
 import GlassSheet from '../ui-elements/glass-sheet/GlassSheet'
 import { LETTERS as SCENES } from '../data/letters'
+
+// Everything the library holds, numerals included, so the pager can reach them
+const SHEET_SEQUENCE = Object.keys(SCENES)
 import {
   MATERIAL_DEFAULTS as ALPHA_MATERIAL,
   POINTER_DEFAULTS as ALPHA_POINTER,
@@ -328,6 +331,9 @@ export default function UiTunePage() {
         subtitle={`${sheetScenes.length} Landsat ${sheetScenes.length === 1 ? 'scene' : 'scenes'}`}
         items={sheetScenes}
         onClose={() => setSheetChar(null)}
+        sequence={SHEET_SEQUENCE}
+        current={sheetChar}
+        onNavigate={setSheetChar}
       />
 
       <ControlPanel

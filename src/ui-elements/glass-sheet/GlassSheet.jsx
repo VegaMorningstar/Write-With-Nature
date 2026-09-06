@@ -34,6 +34,7 @@ import { squashProperties, liftProperties } from '../glass-alphabet/constants.ts
  */
 export const SHEET_OPACITY = 0.66
 export const CLOSE_OPACITY = 0.78
+export const NAV_OPACITY = 0.72
 
 /**
  * Lighter than the app's panels. Those sit on the page's own background, where a
@@ -67,9 +68,17 @@ export default function GlassSheet({
   subtitle,
   items = [],
   onClose,
+  // The characters the pager steps through, and where we are in them. Passing
+  // the sequence rather than prev/next callbacks keeps the order the caller's
+  // business — the colophon walks A-Z because that is what its grid shows,
+  // while the workbench walks everything including the numerals.
+  sequence = [],
+  current = null,
+  onNavigate,
   labelledBy = 'glass-sheet-title',
 }) {
   const sheetRef = useRef(null)
+  const gridRef = useRef(null)
   const closeRef = useRef(null)
   const restoreRef = useRef(null)
   // Whether the gesture that is ending began on the scrim. A pointerdown inside
@@ -77,6 +86,17 @@ export default function GlassSheet({
   const downOnScrim = useRef(false)
 
   const close = useCallback(() => onClose?.(), [onClose])
+
+  const idx = sequence.indexOf(current)
+  const canPage = idx >= 0 && sequence.length > 1 && typeof onNavigate === 'function'
+  // Wraps rather than stopping at the ends. The sequence is a closed alphabet,
+  // so there is no meaningful last item to be stranded on, and a dead arrow at
+  // Z invites a click that does nothing.
+  const step = useCallback(delta => {
+    if (!canPage) return
+    const n = sequence.length
+    onNavigate(sequence[(idx + delta + n) % n])
+  }, [canPage, idx, sequence, onNavigate])
 
   useEffect(() => {
     if (!open) return
@@ -90,6 +110,13 @@ export default function GlassSheet({
       if (e.key === 'Escape') {
         e.stopPropagation()
         close()
+        return
+      }
+      // Arrow keys page, which is the reason the buttons exist at all — a
+      // reader working through the alphabet should not have to aim.
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        step(e.key === 'ArrowLeft' ? -1 : 1)
         return
       }
       // Keep Tab inside the sheet. Without this, tabbing walks into the page
@@ -122,7 +149,12 @@ export default function GlassSheet({
       const el = restoreRef.current
       if (el && typeof el.focus === 'function') el.focus()
     }
-  }, [open, close])
+  }, [open, close, step])
+
+  // Paging keeps the sheet mounted, so the grid keeps its scroll offset — step
+  // from a nine-scene letter to a two-scene one and the new grid opens already
+  // scrolled past its own content.
+  useEffect(() => { if (gridRef.current) gridRef.current.scrollTop = 0 }, [current])
 
   if (!open) return null
 
@@ -203,10 +235,18 @@ export default function GlassSheet({
               </p>
             )}
           </div>
-          <CloseButton ref={closeRef} onClick={close} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {canPage && (
+              <>
+                <NavButton dir={-1} label={`Previous — ${sequence[(idx - 1 + sequence.length) % sequence.length]}`} onClick={() => step(-1)} />
+                <NavButton dir={1} label={`Next — ${sequence[(idx + 1) % sequence.length]}`} onClick={() => step(1)} />
+              </>
+            )}
+            <CloseButton ref={closeRef} onClick={close} />
+          </div>
         </header>
 
-        <div style={{
+        <div ref={gridRef} style={{
           position: 'relative', zIndex: 1,
           overflowY: 'auto', overscrollBehavior: 'contain',
           display: 'grid',
@@ -253,21 +293,78 @@ export default function GlassSheet({
 }
 
 /**
+ * The close button and the pager arrows, as the shared SheetButton wearing
+ * different glass. Keeping them one component keeps the wobble, the focus
+ * handling and the chrome rules in one place rather than three.
+ */
+function CloseButtonImpl({ onClick }, ref) {
+  return (
+    <SheetButton
+      ref={ref}
+      label="Close"
+      onClick={onClick}
+      glass={CLOSE_GLASS}
+      opacity={CLOSE_OPACITY}
+      glow="0 0 20px rgba(232,32,26,0.58)"
+      glowHover="0 0 30px rgba(232,32,26,0.85), 0 0 10px rgba(255,90,80,0.6)"
+      fallbackBg="rgba(226,40,32,0.2)"
+      fallbackBorder="rgba(255,120,110,0.65)"
+      ink="rgba(150,14,8,0.95)"
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor"
+          strokeWidth="1.9" strokeLinecap="round" />
+      </svg>
+    </SheetButton>
+  )
+}
+const CloseButton = forwardRef(CloseButtonImpl)
+
+function NavButton({ dir, label, onClick }) {
+  return (
+    <SheetButton
+      label={label}
+      onClick={onClick}
+      glass={NAV_GLASS}
+      opacity={NAV_OPACITY}
+      glow="0 0 14px rgba(74,124,63,0.30)"
+      glowHover="0 0 22px rgba(74,124,63,0.52)"
+      fallbackBg="rgba(255,255,255,0.16)"
+      fallbackBorder="rgba(255,255,255,0.42)"
+      ink="rgba(28,46,10,0.82)"
+    >
+      <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true"
+        style={{ transform: dir < 0 ? 'none' : 'scaleX(-1)' }}>
+        <path d="M8.5 1.5 L3.5 6.5 L8.5 11.5" stroke="currentColor"
+          strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </svg>
+    </SheetButton>
+  )
+}
+
+/** Neutral twin, for the pager arrows: the sheet's own glass, a little firmer. */
+export const NAV_GLASS = {
+  ...SHEET_GLASS,
+  tintStrength: 0.06,
+}
+
+/**
  * Glass, tinted and lit red. The tint runs far above the panels' 0.05 on
  * purpose: a suggestion of violet is right for a surface you look through, but
  * this one has to say "close" at a glance, and the glow outside it is doing as
  * much of that work as the tint inside.
  */
-const CloseButton = forwardRef(function CloseButton({ onClick }, ref) {
+const SheetButton = forwardRef(function SheetButton(
+  { onClick, label, glass, opacity, glow, glowHover, fallbackBg, fallbackBorder, ink, children },
+  ref,
+) {
   // The glow stays under the shader — it is a soft halo outside the lens, not a
   // hard rim beside it, so it reads as light rather than as a second edge. The
   // border and the inset highlight do not get that pass: both draw a crisp
   // outline the glass then repeats a pixel inside.
   const shadow = hover => {
-    const glow = hover
-      ? '0 0 30px rgba(232,32,26,0.85), 0 0 10px rgba(255,90,80,0.6)'
-      : '0 0 20px rgba(232,32,26,0.58)'
-    return glassSupported ? glow : `${glow}, inset 0 1px 0 rgba(255,255,255,0.45)`
+    const g = hover ? glowHover : glow
+    return glassSupported ? g : `${g}, inset 0 1px 0 rgba(255,255,255,0.45)`
   }
 
   const localRef = useRef(null)
@@ -332,7 +429,7 @@ const CloseButton = forwardRef(function CloseButton({ onClick }, ref) {
       onPointerLeave={e => { e.currentTarget.style.boxShadow = shadow(false) }}
       onFocus={e => { kick(1.9, 1.1); e.currentTarget.style.boxShadow = shadow(true) }}
       onBlur={e => { e.currentTarget.style.boxShadow = shadow(false) }}
-      aria-label="Close"
+      aria-label={label}
       style={{
         position: 'relative',
         isolation: 'isolate',
@@ -341,20 +438,18 @@ const CloseButton = forwardRef(function CloseButton({ onClick }, ref) {
         borderRadius: 12,
         cursor: 'pointer',
         display: 'grid', placeItems: 'center',
-        background: glassSupported ? 'transparent' : 'rgba(226,40,32,0.2)',
-        border: glassSupported ? 'none' : '1px solid rgba(255,120,110,0.65)',
+        background: glassSupported ? 'transparent' : fallbackBg,
+        border: glassSupported ? 'none' : `1px solid ${fallbackBorder}`,
         boxShadow: shadow(false),
-        color: 'rgba(150,14,8,0.95)',
+        color: ink,
         transition: 'box-shadow 0.16s',
         willChange: 'transform',
       }}
     >
-      {glassSupported && <LiquidGlassPanel params={CLOSE_GLASS} opacity={CLOSE_OPACITY} />}
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"
-        style={{ position: 'relative', zIndex: 1 }}>
-        <path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor"
-          strokeWidth="1.9" strokeLinecap="round" />
-      </svg>
+      {glassSupported && <LiquidGlassPanel params={glass} opacity={opacity} />}
+      <span style={{ position: 'relative', zIndex: 1, display: 'grid', placeItems: 'center' }}>
+        {children}
+      </span>
     </button>
   )
 })
