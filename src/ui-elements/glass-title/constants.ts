@@ -20,8 +20,14 @@ export const MATERIAL_DEFAULTS = {
   // The masthead sizes its own tiles to the container; these are the bounds it
   // works between. `size` here means the image — a tile occupies size + 2*edge,
   // and `gap` is the space between visible tiles.
-  maxSize: 140,
-  minSize: 28,
+  //
+  // 84 is Header.jsx's own ceiling, and on a full-width page the fit lands above
+  // it, so the glazed tiles come out exactly the size the CSS ones are. Left
+  // higher they would render larger than the masthead they replace. The bench is
+  // narrower than the app — a 288px control panel — so tiles there are smaller
+  // than this whatever the ceiling; the app page is where the size is judged.
+  maxSize: 84,
+  minSize: 52,
   gap: 4,
   rowGap: 7,
   spaceRatio: 0.3,   // the break between WRITE and WITH, as a fraction of a tile
@@ -39,17 +45,17 @@ export const MATERIAL_DEFAULTS = {
   // sample outward, so the rim shows what lies beyond the tile; negative pulls
   // the image out into the rim instead, which reads as glass thicker than the
   // picture magnifying its own edge.
-  refractionStrength: 0.248,
+  refractionStrength: 0.192,
   chromaticStrength: 0.08,
   chromaticFalloff: 5.7,
   // Dispersion through the body, on photographic detail rather than a glyph.
-  bodyChromatic: 0,
+  bodyChromatic: 0.0008,
 
   // Zero is a mip level, not a bias — the body reads the sharpest mip, which is
   // what keeps the image at full clarity through the glass.
   blur: 0,
   edgeBlurMultiplier: 2,
-  edgeFeather: 3.8,
+  edgeFeather: 8,
 
   // Off. The tiles carry their own colour and a tint fights it.
   tintStrength: 0,
@@ -60,15 +66,15 @@ export const MATERIAL_DEFAULTS = {
   // refracts it with the image underneath. Positioned against the body's corner
   // rather than the visible tile's: the glaze extends past the picture, and a
   // glyph set against its outer edge would float off into the bevel.
-  letterSize: 16,
+  letterSize: 15,
   letterWeight: 900,
   letterBlur: 0,
   letterAlign: 'right',      // which corner, horizontally
   letterBaseline: 'bottom',  // and vertically
-  letterInsetX: 5,           // px in from the body's edge
-  letterInsetY: 4,
+  letterInsetX: 4,           // px in from the body's edge
+  letterInsetY: 1.5,
   letterR: 240, letterG: 234, letterB: 216,
-  letterOpacity: 0.85,
+  letterOpacity: 1,
 
   // ── Glow ──────────────────────────────────────────────────────────────────
   glowStrength: 0.6,
@@ -78,7 +84,7 @@ export const MATERIAL_DEFAULTS = {
 
 export const POINTER_DEFAULTS = {
   // Falls off over this many tiles
-  radius: 2.2,
+  radius: 8,
   strength: 1,
   sensitivity: 40,
   gain: 0.35,
