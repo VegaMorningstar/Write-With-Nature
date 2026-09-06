@@ -36,7 +36,7 @@ def convert(png_path: Path) -> None:
                 img = img.convert("RGB")
 
         img.save(webp_path, "WEBP", quality=QUALITY, method=6)
-    print(f"  {png_path.name}  →  {webp_path.name}  ({webp_path.stat().st_size // 1024} KB)")
+    print(f"  {png_path.name}  ->  {webp_path.name}  ({webp_path.stat().st_size // 1024} KB)")
 
 
 def main():
@@ -57,7 +57,7 @@ def main():
             total += 1
             before_webp = png.with_suffix(".webp")
             if before_webp.exists():
-                print(f"  {png.name}  →  already exists, skipping")
+                print(f"  {png.name}  ->  already exists, skipping")
                 continue
             convert(png)
             converted += 1

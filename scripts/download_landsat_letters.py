@@ -2,36 +2,96 @@
 """
 scripts/download_landsat_letters.py
 ────────────────────────────────────
-Downloads all NASA 'Your Name in Landsat' letter images into:
-  ../images/{LETTER}/{filename}
+Downloads NASA's 'Your Name in Landsat' images into ../images/{KEY}/,
+where KEY is A-Z or 0-9 — the gallery gained numerals in the 2026 refresh.
 
-After running, set USE_LOCAL = true in index.html.
+The manifest below is scraped from the gallery rather than hand-kept:
+
+  for p in "" "page/2/" "page/3/"; do
+    curl -s "https://science.nasa.gov/gallery/your-name-in-landsat-gallery/$p"       | grep -oE 'your-name-in-landsat-images/[^"?]+.png' | sed 's|.*/||'
+  done | sort -u
+
+Two things that scrape turns up are not scenes and are excluded: a
+cq5dam.web.*.png AEM rendition path, and a percent-encoded twin of a file we
+already hold under its decoded name.
 
 Usage:
-  pip install requests beautifulsoup4
-  python3 download_landsat_letters.py
+  pip install requests
+  python scripts/download_landsat_letters.py
+  python scripts/convert_to_webp.py
 """
 
 import os
 import time
 import requests
 
-NASA_BASE   = "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/landsat/your-name-in-landsat-images/"
+# The gallery moved its assets under /update/ in the 2026 refresh. The old base
+# still serves the original letters but 404s on everything added since, which is
+# the failure to look for first if a download stops working.
+NASA_BASE = (
+    "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/"
+    "landsat/your-name-in-landsat-images/update/"
+)
 GALLERY_URL = "https://science.nasa.gov/gallery/your-name-in-landsat-gallery/"
 
-# Output root — one subfolder per letter
+# Output root — one subfolder per letter or digit
 OUT_ROOT = os.path.join(os.path.dirname(__file__), "..", "images")
 
-# ── Known filenames (confirmed from NASA gallery) ───────────────────────────
-# Filenames scraped from https://science.nasa.gov/gallery/your-name-in-landsat-gallery/
-# (both pages). Case-sensitive — use exactly as shown.
+# ── Scraped from the gallery, all three pages ───────────────────────────────
 KNOWN_FILES = {
+    "0": [
+        "0-0-LakeWaccamaw-NorthCarolina-USA-NIR.png",
+        "0-1-LakeWaccamaw-NorthCarolina-USA-SWIR.png",
+    ],
+    "1": [
+        "1-0-ConsensusLake-NewYork-US.png",
+    ],
+    "2": [
+        "2-0-PennsylvaniaHills-US.png",
+        "2-1-PennsylvaniaHills-US-NIR.png",
+        "2-2-GreatFishRiverNatureReserve-SouthAfrica.png",
+        "2-3-GreatFishRiverNatureReserve-SouthAfrica-NIR.png",
+    ],
+    "3": [
+        "3-0-LakeMassinger-Mozmbique.png",
+        "3-1-LakeMassinger-Mozmbique-NIR.png",
+        "3-2-ProvinceOfSondrio-Italy.png",
+        "3-3-ProvinceOfSondrio-Italy-NIR.png",
+    ],
+    "4": [
+        "4-0-LacAssinica-Quebec-Canada-NIR.png",
+        "4-1-LacAssinica-Quebec-Canada-SWIR.png",
+    ],
+    "5": [
+        "5-0-Yukon-Canada.png",
+        "5-1-Yukon-Canada-NIR.png",
+    ],
+    "6": [
+        "6-AmazonRiver-Peru-NIR.png",
+        "6-AmazonRiver-Peru.png",
+    ],
+    "7": [
+        "7-0-Regina-Saskatchewan-Canada.png",
+        "7-1-Regina-Saskatchewan-Canada.png",
+    ],
+    "8": [
+        "8-0-HudsanBay-Ontario-Canada.png",
+        "8-1-HudsanBay-Ontario-Canada-NIR.png",
+        "8-2-HudsanBay-Ontario-Canada-SWIR.png",
+    ],
+    "9": [
+        "9-0-HollaBend-Arkansas.png",
+    ],
     "A": [
         "a-0-hickman-Kentucky.png",
         "a-1-FarmIsland-Maine.png",
+        "a-1-Hickman-Kentucky-NIR.png",
         "a-2-guakhmaz-azerbaijan.png",
         "a-3-YukonDelta-Alaska.png",
         "a-4-Lake-Mjøsa-Norway.png",
+        "a-6-AmazonRiver-Peru.png",
+        "a-7-AmazonRiver-Peru-NIR.png",
+        "a-8-AmazonRiver-Peru-SWIR.png",
     ],
     "B": [
         "b-0-HollaBend-Arkansas.png",
@@ -54,17 +114,27 @@ KNOWN_FILES = {
     ],
     "F": [
         "f-0-MatoGrosso-Brazil.png",
-        "f-1-KrugerNationalPark-SouthAfrica.png",
+        "f-1-WoodstockDam-SouthAfrica-NIR.png",
+        "f-2-WoodstockDam-SouthAfrica-SWIR.png",
     ],
     "G": [
         "g-0-FonteBoa-Amazonas.png",
+        "g-1-FonteBoa-Amazonas-Brazil-NIR.png",
+        "g-2-DenmarkStrait-Greenland.png",
+        "g-3-AmazonRiver-Peru.png",
+        "g-4-AmazonRiver-Peru-NIR.png",
+        "g-5-AmazonRiver-Brazil.png",
+        "g-6-AmazonRiver-Brazil-NIR.png",
+        "g-7-AmazonRiver-Brazil-SWIR.png",
     ],
     "H": [
         "h-0-southwestern-kyrgystan.png",
         "h-1-khorinsky-district-russia.png",
+        "h-2-Brunswick-Maryland.png",
     ],
     "I": [
-        "i-0-Borgarbyggð-Iceland.png",
+        "i-0-Borgarbyggð-Iceland-NIR.png",
+        "i-1-Borgarbyggð-Iceland-SWIR.png",
         "i-1-Canandaigua-Lake-NewYork.png",
         "i-2-EtoshaNationalPark-Namibia.png",
         "i-3-djebelOuarkziz-morocco.png",
@@ -88,7 +158,11 @@ KNOWN_FILES = {
     "M": [
         "m-0-ShenandoahRiver-Virginia.png",
         "m-1-PotomacRiver.png",
+        "m-1-ShenandoahRiver-Virginia-SWIR.png",
+        "m-2-ShenandoahRiver-Virginia-NIR.png",
         "m-2-TianShanMountains-Kyrgyzstan.png",
+        "m-3-PawPawBends-PotomacRiver-NIR.png",
+        "m-4-PawPawBends-PotomacRiver-NIR.png",
     ],
     "N": [
         "n-0-YapacaniBolivia.png",
@@ -109,7 +183,6 @@ KNOWN_FILES = {
     ],
     "R": [
         "r-0-LagoMenendez-Argentina.png",
-        "r-1-ProvinceofSondrio-Italy.png",
         "r-2-florida-keys.png",
         "r-3-canyonlandsNationalPark-utah.png",
     ],
@@ -117,24 +190,29 @@ KNOWN_FILES = {
         "s-0-MackenzieRiver.png",
         "s-1-nDjamena-chad.png",
         "s-2-RioChapare-Bolivia.png",
+        "s-3-AraguaiaRiver-Brazil.png",
+        "s-4-AraguaiaRiver-Brazil-NIR.png",
     ],
     "T": [
-        "t-0-Liwa-United-Arab-Emirates.png",
         "t-1-LenaRiverDelta.png",
     ],
     "U": [
         "u-0-CanyonlandsNationalPark-Utah.png",
         "u-1-BamforthNationalWildlifeRefuge-Wyoming.png",
+        "u-2-BamforthNationalWildlifeRefuge-Wyoming-NIR.png",
+        "u-3-SouthernCoast-Greenland.png",
+        "u-4-SouthernCoast-Greenland-SWIR.png",
     ],
     "V": [
         "v-0-CellinaandMedunaRivers-Italy.png",
         "v-1-NewSouthWales-Australia.png",
-        "v-2-PadmaRiver-Bangladesh.png",
         "v-3-Mapleton-Maine.png",
     ],
     "W": [
+        "w-0-PonoyRiver-Russia-NIR.png",
         "w-0-PonoyRiver-Russia.png",
         "w-1-LaPrimavera-Columbia.png",
+        "w-3-BogdaMountains.png",
     ],
     "X": [
         "x-0-WolstenholmeFjord-Greenland.png",
@@ -152,22 +230,22 @@ KNOWN_FILES = {
     ],
 }
 
-
 # Filenames where the CDN URL differs from the local saved name
 CDN_URL_OVERRIDES = {
     "t-0-Liwa-United-Arab-Emirates.png": "t-0-Liwa-United%20Arab%20Emirates.png",
 }
 
-def download_file(filename, letter):
+
+def download_file(filename, key):
     cdn_name = CDN_URL_OVERRIDES.get(filename, filename)
     url = NASA_BASE + cdn_name
-    out_dir = os.path.join(OUT_ROOT, letter)
+    out_dir = os.path.join(OUT_ROOT, key)
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, filename)
 
     if os.path.exists(out_path):
-        print(f"  skip  {letter}/{filename}")
-        return True
+        print(f"  skip  {key}/{filename}")
+        return "skip"
 
     try:
         r = requests.get(url, timeout=30,
@@ -175,31 +253,28 @@ def download_file(filename, letter):
         if r.status_code == 200:
             with open(out_path, "wb") as f:
                 f.write(r.content)
-            print(f"  OK  {letter}/{filename}  ({len(r.content)//1024} KB)")
-            return True
-        else:
-            print(f"  FAIL  {letter}/{filename}  -> HTTP {r.status_code}")
-            return False
+            print(f"  OK    {key}/{filename}  ({len(r.content)//1024} KB)")
+            return "ok"
+        print(f"  FAIL  {key}/{filename}  -> HTTP {r.status_code}")
+        return "fail"
     except Exception as e:
-        print(f"  FAIL  {letter}/{filename}  -> {e}")
-        return False
+        print(f"  FAIL  {key}/{filename}  -> {e}")
+        return "fail"
 
 
 def main():
     total = sum(len(v) for v in KNOWN_FILES.values())
-    print(f"Downloading {total} images into images/{{LETTER}}/ ...\n")
+    print("Checking %d images into images/{KEY}/ ...\n" % total)
 
-    ok, fail = 0, 0
-    for letter in sorted(KNOWN_FILES):
-        for fname in KNOWN_FILES[letter]:
-            if download_file(fname, letter):
-                ok += 1
-            else:
-                fail += 1
-            time.sleep(0.3)   # be polite to NASA servers
+    counts = {"ok": 0, "skip": 0, "fail": 0}
+    for key in sorted(KNOWN_FILES):
+        for fname in KNOWN_FILES[key]:
+            counts[download_file(fname, key)] += 1
+            time.sleep(0.25)   # be polite to NASA servers
 
-    print(f"\n-- Done: {ok} downloaded, {fail} failed --")
-    print(f"\nNext step: in index.html, set  USE_LOCAL = true")
+    print("\n-- %d downloaded, %d already present, %d failed --"
+          % (counts["ok"], counts["skip"], counts["fail"]))
+    print("\nNext: python scripts/convert_to_webp.py")
 
 
 if __name__ == "__main__":

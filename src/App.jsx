@@ -12,7 +12,9 @@ import JellyWireframeButton from './ui-elements/jelly-wireframe-button/JellyWire
 
 function parseLines(rawText) {
   return rawText.split('\n').map((line, lineIdx) => {
-    const cleaned = line.toUpperCase().replace(/[^A-Z ]/g, '').replace(/ {2,}/g, ' ').trim()
+    // Digits are kept as well as letters — NASA's gallery gained numerals in its
+    // 2026 refresh, so a year or a house number has scenes behind it now.
+    const cleaned = line.toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/ {2,}/g, ' ').trim()
     if (!cleaned) return { type: 'break', lineIdx }
     const chars = cleaned.split('').map((ch, charIdx) => ({
       ch,

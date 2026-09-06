@@ -1,3 +1,12 @@
 node_modules/
 dist/
 .DS_Store
+
+# Source scans from NASA's gallery. Only the WebPs are shipped — the app never
+# references a .png — and these run to hundreds of megabytes, so they are kept
+# out of history. scripts/download_landsat_letters.py re-fetches them and
+# scripts/convert_to_webp.py rebuilds the WebPs, so nothing here is unrecoverable.
+#
+# The 72 PNGs committed before this rule stay tracked; git honours the index over
+# .gitignore, and removing them would not shrink history anyway.
+images/**/*.png
