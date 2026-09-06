@@ -17,11 +17,17 @@ import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 import LiquidGlassControls from './controls/LiquidGlassControls.jsx'
 import GlassAlphabetControls from './controls/GlassAlphabetControls.jsx'
+import GlassTitleControls from './controls/GlassTitleControls.jsx'
 import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
 import {
   MATERIAL_DEFAULTS as ALPHA_MATERIAL,
   POINTER_DEFAULTS as ALPHA_POINTER,
 } from '../ui-elements/glass-alphabet/constants.ts'
+import GlassTitle from '../ui-elements/glass-title/GlassTitle'
+import {
+  MATERIAL_DEFAULTS as TITLE_MATERIAL,
+  POINTER_DEFAULTS as TITLE_POINTER,
+} from '../ui-elements/glass-title/constants.ts'
 
 // Rebuilds the glass effect whenever opts change (slider-reactive)
 function useLiveGlass(ref, opts) {
@@ -210,6 +216,12 @@ const RADII_DEF = {
 // The colophon's A-Z, now twenty-six lenses of liquid glass rather than CSS
 // cells. Its corner radius lives in here and not in RADII_DEF, because the
 // shader insets it by the edge width instead of applying it to a border box.
+// The masthead, now the glazed element rather than a flex collage of divs.
+const TITLE_DEF = {
+  material: { ...TITLE_MATERIAL },
+  pointer: { ...TITLE_POINTER },
+}
+
 const ALPHA_DEF = {
   material: { ...ALPHA_MATERIAL },
   pointer: { ...ALPHA_POINTER },
@@ -299,6 +311,10 @@ export default function TunePage() {
   const setAlphaMat = (k, v) => setAlpha(s => ({ ...s, material: { ...s.material, [k]: v } }))
   const setAlphaPtr = (k, v) => setAlpha(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
 
+  const [title, setTitle] = useState(TITLE_DEF)
+  const setTitleMat = (k, v) => setTitle(s => ({ ...s, material: { ...s.material, [k]: v } }))
+  const setTitlePtr = (k, v) => setTitle(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
+
   // Scatter goes last so it roughens the blurred backdrop rather than being
   // smoothed away by the blur that follows it.
   const frostFilter =
@@ -365,6 +381,7 @@ export default function TunePage() {
       radii,
       frost,
       glassAlphabet: alpha,
+      glassTitle: title,
     }
     navigator.clipboard.writeText(JSON.stringify(cfg, null, 2))
     setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -377,6 +394,7 @@ export default function TunePage() {
     setRadii({ ...RADII_DEF })
     setFrost({ ...FROST_DEF })
     setAlpha(structuredClone(ALPHA_DEF))
+    setTitle(structuredClone(TITLE_DEF))
     setComposeG({ ...GLASS_DEF.compose }); setBoardG({ ...GLASS_DEF.board }); setColophonG({ ...GLASS_DEF.colophon })
     setFluidKey(k => k + 1)
   }
@@ -416,19 +434,7 @@ export default function TunePage() {
           {/* Header */}
           <div className="masthead">
             <span className="over">UI Tuning Mode · Write With Nature</span>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 5, flexWrap: 'wrap', marginTop: '1.25rem' }}>
-              {'WRITE WITH NATURE'.split('').map((ch, i) =>
-                ch === ' ' ? <div key={i} style={{ width: 18 }} /> :
-                <div key={i} style={{
-                  width: 54, height: 54, borderRadius: 7, background: 'var(--paper3)',
-                  border: '1px solid rgba(255,255,255,0.38)',
-                  boxShadow: '0 5px 15px rgba(28,26,16,0.24), inset 0 1.5px 0 rgba(255,255,255,0.65)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'Playfair Display, serif', fontWeight: 700, fontSize: 20,
-                  color: 'rgba(28,26,16,0.52)',
-                }}>{ch}</div>
-              )}
-            </div>
+            <GlassTitle material={title.material} pointer={title.pointer} />
             <p className="sub">Move sliders → glass updates live · move cursor over panels for elasticity</p>
           </div>
 
@@ -639,6 +645,19 @@ export default function TunePage() {
             setMode={() => {}}
             follow={false}
             setFollow={() => {}}
+          />
+        </AccordionSection>
+
+        <AccordionSection title="GLAZED MASTHEAD" open={openSection === 'title'} onToggle={() => toggle('title')}>
+          <div style={{ ...mono, fontSize: 9, color: 'rgba(0,0,0,0.32)', marginBottom: 10, lineHeight: 1.6 }}>
+            WRITE WITH NATURE. The same shader as the alphabet, refracting the
+            Landsat imagery itself rather than the page behind it.
+          </div>
+          <GlassTitleControls
+            material={title.material}
+            setMat={setTitleMat}
+            pointer={title.pointer}
+            setPtr={setTitlePtr}
           />
         </AccordionSection>
 
