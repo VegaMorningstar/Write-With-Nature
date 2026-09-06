@@ -23,10 +23,31 @@ import LiquidGlassPanel from '../liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../liquid-glass/panelPreset'
 import { glassSupported } from '../../hooks/usePanelGlass'
 
-/** Red-tinted twin of the panel preset, for the close button. */
-export const CLOSE_GLASS = {
+/**
+ * How much of the glass layer is composited. The shader is opaque inside its
+ * lens — it paints a reconstruction of the page's background, which by
+ * definition cannot show what is actually behind the sheet — so this is what
+ * makes the surface see-through, and it is the scrim and the page under it that
+ * come through.
+ */
+export const SHEET_OPACITY = 0.66
+export const CLOSE_OPACITY = 0.78
+
+/**
+ * Lighter than the app's panels. Those sit on the page's own background, where a
+ * frosted middle reads as depth; this one floats over content, so the same blur
+ * reads as a slab. Less of it, and less tint, leaves more of what is behind.
+ */
+export const SHEET_GLASS = {
   ...PANEL_GLASS,
-  tintStrength: 0.22,
+  blur: 0.55,
+  tintStrength: 0.03,
+}
+
+/** Red-tinted twin, for the close button. */
+export const CLOSE_GLASS = {
+  ...SHEET_GLASS,
+  tintStrength: 0.2,
   tintR: 0.95,
   tintG: 0.22,
   tintB: 0.24,
@@ -115,11 +136,11 @@ export default function GlassSheet({
         position: 'fixed', inset: 0, zIndex: 10000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '3vh 4vw',
-        background: 'rgba(28,26,16,0.34)',
+        background: 'rgba(28,26,16,0.22)',
         // The shader cannot see the DOM it covers, so the separation between
         // sheet and page has to come from here.
-        backdropFilter: 'blur(7px) saturate(115%)',
-        WebkitBackdropFilter: 'blur(7px) saturate(115%)',
+        backdropFilter: 'blur(10px) saturate(118%)',
+        WebkitBackdropFilter: 'blur(10px) saturate(118%)',
       }}
     >
       <div
@@ -150,7 +171,7 @@ export default function GlassSheet({
             : '0 24px 70px rgba(28,26,16,0.34), inset 0 1px 0 rgba(255,255,255,0.42)',
         }}
       >
-        {glassSupported && <LiquidGlassPanel params={PANEL_GLASS} />}
+        {glassSupported && <LiquidGlassPanel params={SHEET_GLASS} opacity={SHEET_OPACITY} />}
 
         <header style={{
           display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
@@ -264,7 +285,7 @@ const CloseButton = forwardRef(function CloseButton({ onClick }, ref) {
       onMouseEnter={e => { e.currentTarget.style.boxShadow = shadow(true) }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = shadow(false) }}
     >
-      {glassSupported && <LiquidGlassPanel params={CLOSE_GLASS} />}
+      {glassSupported && <LiquidGlassPanel params={CLOSE_GLASS} opacity={CLOSE_OPACITY} />}
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"
         style={{ position: 'relative', zIndex: 1 }}>
         <path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor"

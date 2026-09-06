@@ -18,7 +18,15 @@ import { useRef, useEffect } from 'react'
 
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
-export default function LiquidGlassPanel({ params, fill = true, backdropScale = 0.5 }) {
+/**
+ * `opacity` composites the whole glass layer, which is the only way to make this
+ * surface genuinely see-through. The shader's own output is opaque inside the
+ * lens by construction — it paints a reconstruction of the page's background,
+ * and a reconstruction cannot show what is actually behind the element. Fading
+ * the canvas lets the real DOM through instead, which matters wherever the glass
+ * floats over content rather than sitting on the page's own background.
+ */
+export default function LiquidGlassPanel({ params, fill = true, backdropScale = 0.5, opacity = 1 }) {
   const canvasRef = useRef(null)
   const sceneRef = useRef(null)
   const cleanupRef = useRef(null)
@@ -151,7 +159,7 @@ export default function LiquidGlassPanel({ params, fill = true, backdropScale = 
       aria-hidden="true"
       style={{
         position: 'absolute', inset: 0, width: '100%', height: '100%',
-        borderRadius: 'inherit', pointerEvents: 'none',
+        borderRadius: 'inherit', pointerEvents: 'none', opacity,
         // Negative, so in-flow content paints above it without needing a
         // positioned wrapper — a wrapper would break the flex layout these
         // panels use. Safe because each panel sets `isolation: isolate`, so the
