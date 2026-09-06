@@ -21,6 +21,7 @@ import {
 } from './controls/JellyControls.jsx'
 import LiquidGlassControls from './controls/LiquidGlassControls.jsx'
 import GlassAlphabetControls from './controls/GlassAlphabetControls.jsx'
+import GlassTitleControls from './controls/GlassTitleControls.jsx'
 
 import JellyRenderButton, { HOVER_DEFAULTS } from '../ui-elements/jelly-render-button/JellyRenderButton'
 import {
@@ -50,6 +51,11 @@ import {
   MATERIAL_DEFAULTS as ALPHA_MATERIAL,
   POINTER_DEFAULTS as ALPHA_POINTER,
 } from '../ui-elements/glass-alphabet/constants.ts'
+import GlassTitle from '../ui-elements/glass-title/GlassTitle'
+import {
+  MATERIAL_DEFAULTS as TITLE_MATERIAL,
+  POINTER_DEFAULTS as TITLE_POINTER,
+} from '../ui-elements/glass-title/constants.ts'
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 const RENDER_DEF = {
@@ -77,6 +83,11 @@ const WIRE_DEF = {
     wiggleX: WIRE_JIGGLE_W,
     delayMs: 1100,
   },
+}
+
+const TITLE_DEF = {
+  material: { ...TITLE_MATERIAL },
+  pointer: { ...TITLE_POINTER },
 }
 
 const ALPHA_DEF = {
@@ -147,6 +158,11 @@ export default function UiTunePage() {
   const setAlphaMat = (k, v) => setAlpha(s => ({ ...s, material: { ...s.material, [k]: v } }))
   const setAlphaPtr = (k, v) => setAlpha(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
   const [lastLetter, setLastLetter] = useState(null)
+
+  // Glazed masthead
+  const [title, setTitle] = useState(TITLE_DEF)
+  const setTitleMat = (k, v) => setTitle(s => ({ ...s, material: { ...s.material, [k]: v } }))
+  const setTitlePtr = (k, v) => setTitle(s => ({ ...s, pointer: { ...s.pointer, [k]: v } }))
   const [fluidBlend, setFluidBlend] = useState('multiply')
 
   // Liquid glass
@@ -162,6 +178,7 @@ export default function UiTunePage() {
       jellyWireframeButton: wire,
       liquidGlass: { mode: glassMode, follow: glassFollow, params: glass },
       glassAlphabet: alpha,
+      glassTitle: title,
     }, null, 2))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -171,6 +188,7 @@ export default function UiTunePage() {
     setRender(structuredClone(RENDER_DEF))
     setWire(structuredClone(WIRE_DEF))
     setAlpha(structuredClone(ALPHA_DEF))
+    setTitle(structuredClone(TITLE_DEF))
     setGlass({ ...GLASS_DEF })
     setGlassMode('page')
     setGlassFollow(false)
@@ -194,6 +212,17 @@ export default function UiTunePage() {
               then wire it in.
             </p>
           </div>
+
+          <Bench
+            name="Glazed Masthead"
+            summary="WRITE WITH NATURE as Landsat tiles under a sheet of liquid glass — the same shader as the alphabet and the same springs as the jelly. What differs is the backdrop: the alphabet refracts the page and a letter, this refracts the satellite imagery itself, redrawn into a texture from the very img elements the masthead loads. A DOM image under a hole in the canvas would stay flat, since the shader cannot sample the page. Hover wobbles a tile and its neighbours; clicking cycles the scene."
+            wide
+            bare
+          >
+            <div style={{ width: '100%' }}>
+              <GlassTitle material={title.material} pointer={title.pointer} />
+            </div>
+          </Bench>
 
           <Bench
             name="Glass Alphabet"
@@ -283,6 +312,15 @@ export default function UiTunePage() {
         }
       >
         {/* ── Glass alphabet ── */}
+        <AccordionSection title="GLAZED MASTHEAD" open={openSection === 'title'} onToggle={() => toggle('title')}>
+          <GlassTitleControls
+            material={title.material}
+            setMat={setTitleMat}
+            pointer={title.pointer}
+            setPtr={setTitlePtr}
+          />
+        </AccordionSection>
+
         <AccordionSection title="GLASS ALPHABET" open={openSection === 'alphabet'} onToggle={() => toggle('alphabet')}>
           <GlassAlphabetControls
             material={alpha.material}

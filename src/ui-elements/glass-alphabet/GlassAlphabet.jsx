@@ -163,14 +163,14 @@ export default function GlassAlphabet({
     async function init() {
       try {
         const { tgpu } = await import('typegpu')
-        const { setupAlphabet } = await import('./scene.ts')
+        const { setupTileGlass } = await import('./scene.ts')
         const { createTileBackdrop } = await import('./backdrop.js')
         if (cancelled) return
 
         const backdrop = createTileBackdrop()
         const root = await tgpu.init()
         const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
-        const scene = await setupAlphabet(root, context, backdrop.paper, backdrop.letters)
+        const scene = await setupTileGlass(root, context, backdrop.paper, backdrop.letters)
         if (cancelled) { scene.onCleanup(); root.destroy(); return }
 
         scene.beforeFrame = () => {

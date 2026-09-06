@@ -1,5 +1,5 @@
 /**
- * TypeGPU's liquid glass, twenty-six times over.
+ * TypeGPU's liquid glass, once per tile.
  *
  * The shader body is theirs, by way of our own overlay.ts — calculateWeights,
  * applyTint, sampleWithChromaticAberration and the sampling in the fragment
@@ -8,11 +8,12 @@
  *
  * Four things are ours, each marked OURS below:
  *
- *   1. Their SDF is a single rounded box; ours is the union of twenty-six, which
- *      is their minimum. One loop over a uniform array gives every tile the same
- *      lens in one draw call. The loop has to carry `dir` and the glow along
- *      with the distance, since with a union the fragment must use the values
- *      belonging to whichever tile actually won.
+ *   1. Their SDF is a single rounded box; ours is the union of however many
+ *      tiles the caller asks for, which is their minimum. One loop over a
+ *      uniform array gives every tile the same lens in one draw call. The loop
+ *      has to carry `dir` and the glow along with the distance, since with a
+ *      union the fragment must use the values belonging to whichever tile
+ *      actually won.
  *   2. The letters live in their own texture rather than in the backdrop. Two
  *      reasons: the backdrop is sampled at a mip bias to blur the glass body,
  *      which turns a 15px letter to mush, and a separate texture can be given
@@ -28,6 +29,9 @@
  *      inside the tile and decaying outside it, so a pressed tile both brightens
  *      and throws light into the gaps around it.
  *
+ * Shared: the glass alphabet and the masthead both run this. They differ only
+ * in what they paint into the two backdrops and how many boxes they ask for.
+ *
  * Everything reaching setTiles and setParams is in box space: canvas heights,
  * with x scaled by the aspect so corners come out circular. GlassAlphabet.jsx
  * converts from pixels, which is the only sane unit to tune a 46px tile in.
@@ -37,9 +41,20 @@ import { tgpu, common, d, std, type TgpuRoot } from 'typegpu';
 
 export const TILE_COUNT = 26;
 
-/** The letter texture's size, matched by the canvas that feeds it. */
+/** The letter texture's default size, matched by the canvas that feeds it. */
 export const LETTER_TEX_W = 1024;
 export const LETTER_TEX_H = 512;
+
+export type TileGlassOptions = {
+  /** How many boxes the union covers. Baked into the uniform array and the
+   *  shader's loop, so it is fixed for the life of the pipeline. */
+  tileCount?: number;
+  /** Size of the overlay texture — the letters here, the corner glyphs on the
+   *  masthead. Match the canvas feeding it to its aspect or the upload
+   *  stretches and the shader squeezes it back, losing detail on the way. */
+  maskW?: number;
+  maskH?: number;
+};
 
 const Params = d.struct({
   radius: d.f32,
@@ -90,11 +105,6 @@ export type SceneParams = {
   glowB: number;
 };
 
-/** xy = centre in box space, zw = half-extents in box space. */
-const Tiles = d.arrayOf(d.vec4f, TILE_COUNT);
-/** x = glow, from residual wobble energy. The rest is padding. */
-const Glows = d.arrayOf(d.vec4f, TILE_COUNT);
-
 const Weights = d.struct({
   inside: d.f32,
   ring: d.f32,
@@ -106,12 +116,25 @@ const TintParams = d.struct({
   strength: d.f32,
 });
 
-export async function setupAlphabet(
+export async function setupTileGlass(
   root: TgpuRoot,
   context: GPUCanvasContext,
   paperCanvas: HTMLCanvasElement,
   letterCanvas: HTMLCanvasElement,
+  options: TileGlassOptions = {},
 ) {
+  // Fixed for the life of the pipeline: the uniform array's length and the
+  // shader's loop bound are both compile-time, so changing the count means a new
+  // scene rather than a new uniform.
+  const COUNT = options.tileCount ?? TILE_COUNT;
+  const maskW = options.maskW ?? LETTER_TEX_W;
+  const maskH = options.maskH ?? LETTER_TEX_H;
+
+  /** xy = centre in box space, zw = half-extents in box space. */
+  const Tiles = d.arrayOf(d.vec4f, COUNT);
+  /** x = glow, from residual wobble energy. The rest is padding. */
+  const Glows = d.arrayOf(d.vec4f, COUNT);
+
   // Fixed size, written with fit: 'stretch'. Recreating it on resize would leave
   // the compiled pipeline holding a view of a destroyed texture — the shader
   // captures the view when it is built, not on every frame. Sampling is in uv
@@ -140,7 +163,7 @@ export async function setupAlphabet(
   // undoes the first only in geometry, not in the detail lost to the first.
   // 8 columns by 4 rows is close to 2:1 whatever the tile size, since both
   // dimensions scale together, so this stays right across the size slider.
-  const letterTexture = makeTexture(LETTER_TEX_W, LETTER_TEX_H);
+  const letterTexture = makeTexture(maskW, maskH);
   const paperView = paperTexture.createView();
   const letterView = letterTexture.createView();
 
@@ -154,11 +177,11 @@ export async function setupAlphabet(
 
   const tilesUniform = root.createUniform(
     Tiles,
-    Array.from({ length: TILE_COUNT }, () => d.vec4f(0.5, 0.5, 0.02, 0.02)),
+    Array.from({ length: COUNT }, () => d.vec4f(0.5, 0.5, 0.02, 0.02)),
   );
   const glowsUniform = root.createUniform(
     Glows,
-    Array.from({ length: TILE_COUNT }, () => d.vec4f(0, 0, 0, 0)),
+    Array.from({ length: COUNT }, () => d.vec4f(0, 0, 0, 0)),
   );
 
   const paramsUniform = root.createUniform(Params, {
@@ -258,7 +281,7 @@ export async function setupAlphabet(
     let dir = d.vec2f(0, 1);
     let glow = d.f32(0);
 
-    for (const i of std.range(TILE_COUNT)) {
+    for (const i of std.range(COUNT)) {
       const tile = tilesUniform.$[i];
       const half = d.vec2f(tile.z, tile.w);
       const rel = p.sub(d.vec2f(tile.x, tile.y));
