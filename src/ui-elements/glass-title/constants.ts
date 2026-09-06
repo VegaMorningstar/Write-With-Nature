@@ -92,15 +92,20 @@ export const MATERIAL_DEFAULTS = {
   // ── Light ─────────────────────────────────────────────────────────────────
   // A highlight from a directional source, off the bevel the ring already
   // implies. Azimuth is measured on screen with 90 straight down from the top;
-  // elevation is degrees above the surface, so 90 is directly overhead and
-  // lights the flat body rather than the edge.
-  lightAzimuth: 90,
-  lightElevation: 35,
-  specularStrength: 0.55,
+  // elevation is degrees above the surface.
+  //
+  // Elevation 0 puts the light in the surface's own plane, which is the useful
+  // setting rather than a degenerate one: the half-vector then sits at 45
+  // degrees, so the highlight lands exactly halfway up the bevel and the flat
+  // body answers it with almost nothing. That separation is what lets the
+  // strength run this high without washing the photograph out.
+  lightAzimuth: 144,
+  lightElevation: 0,
+  specularStrength: 2,
   // Tightness. High keeps the highlight to a thin bright line along the lip;
   // low spreads it into a broad sheen across the whole bevel.
-  specularPower: 40,
-  specR: 255, specG: 252, specB: 240,
+  specularPower: 46,
+  specR: 255, specG: 255, specB: 84,
 };
 
 export const POINTER_DEFAULTS = {
