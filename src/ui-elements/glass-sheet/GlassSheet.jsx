@@ -22,6 +22,8 @@ import { createPortal } from 'react-dom'
 import LiquidGlassPanel from '../liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../liquid-glass/panelPreset'
 import { glassSupported } from '../../hooks/usePanelGlass'
+import { Spring } from '../glass-alphabet/spring.ts'
+import { squashProperties, liftProperties } from '../glass-alphabet/constants.ts'
 
 /**
  * How much of the glass layer is composited. The shader is opaque inside its
@@ -44,13 +46,19 @@ export const SHEET_GLASS = {
   tintStrength: 0.03,
 }
 
-/** Red-tinted twin, for the close button. */
+/**
+ * Red-tinted twin, for the close button. The tint runs far above the sheet's
+ * 0.03: a suggestion is right for a surface you look through, but this one has
+ * to say "close" at a glance. Pulling green and blue most of the way down is
+ * what makes it read as red rather than pink — raising the strength alone just
+ * washes the whole thing lighter.
+ */
 export const CLOSE_GLASS = {
   ...SHEET_GLASS,
-  tintStrength: 0.2,
-  tintR: 0.95,
-  tintG: 0.22,
-  tintB: 0.24,
+  tintStrength: 0.52,
+  tintR: 1,
+  tintG: 0.08,
+  tintB: 0.1,
 }
 
 export default function GlassSheet({
@@ -257,16 +265,73 @@ const CloseButton = forwardRef(function CloseButton({ onClick }, ref) {
   // outline the glass then repeats a pixel inside.
   const shadow = hover => {
     const glow = hover
-      ? '0 0 26px rgba(226,70,60,0.72)'
-      : '0 0 18px rgba(226,70,60,0.45)'
+      ? '0 0 30px rgba(232,32,26,0.85), 0 0 10px rgba(255,90,80,0.6)'
+      : '0 0 20px rgba(232,32,26,0.58)'
     return glassSupported ? glow : `${glow}, inset 0 1px 0 rgba(255,255,255,0.45)`
+  }
+
+  const localRef = useRef(null)
+  const setRefs = node => {
+    localRef.current = node
+    if (typeof ref === 'function') ref(node)
+    else if (ref) ref.current = node
+  }
+
+  // The jelly's springs, on the button. The transform carries the canvas with
+  // it, so the glass squashes rather than a picture of glass sliding under a
+  // static lens — which is why LiquidGlassPanel sizes itself from layout rather
+  // than from its measured rect.
+  const squash = useRef(null)
+  const lift = useRef(null)
+  useEffect(() => {
+    squash.current = new Spring(squashProperties)
+    lift.current = new Spring(liftProperties)
+
+    let raf = 0
+    let last = 0
+    const tick = now => {
+      raf = requestAnimationFrame(tick)
+      const dt = Math.min(last ? (now - last) / 1000 : 0, 0.1)
+      last = now
+      if (dt <= 0) return
+
+      // Fixed substeps — explicit Euler on springs this stiff diverges past
+      // roughly 60ms, and one stalled frame would blow them up.
+      const steps = Math.min(Math.ceil(dt / (1 / 240)), 32)
+      for (let s = 0; s < steps; s++) {
+        squash.current.step(dt / steps)
+        lift.current.step(dt / steps)
+      }
+
+      const el = localRef.current
+      if (!el) return
+      const sq = squash.current.value
+      el.style.transform =
+        `translateY(${(-lift.current.value * 26).toFixed(2)}px) ` +
+        `scale(${(1 + sq).toFixed(4)}, ${(1 - sq * 0.7).toFixed(4)})`
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  const kick = (sq, ly) => {
+    if (!squash.current) return
+    squash.current.velocity += sq
+    lift.current.velocity += ly
   }
 
   return (
     <button
-      ref={ref}
+      ref={setRefs}
       type="button"
-      onClick={onClick}
+      onClick={e => { kick(-4.2, 2.4); onClick?.(e) }}
+      onPointerEnter={e => {
+        kick(1.9, 1.1)
+        e.currentTarget.style.boxShadow = shadow(true)
+      }}
+      onPointerLeave={e => { e.currentTarget.style.boxShadow = shadow(false) }}
+      onFocus={e => { kick(1.9, 1.1); e.currentTarget.style.boxShadow = shadow(true) }}
+      onBlur={e => { e.currentTarget.style.boxShadow = shadow(false) }}
       aria-label="Close"
       style={{
         position: 'relative',
@@ -276,14 +341,13 @@ const CloseButton = forwardRef(function CloseButton({ onClick }, ref) {
         borderRadius: 12,
         cursor: 'pointer',
         display: 'grid', placeItems: 'center',
-        background: glassSupported ? 'transparent' : 'rgba(232,84,72,0.16)',
-        border: glassSupported ? 'none' : '1px solid rgba(255,148,140,0.55)',
+        background: glassSupported ? 'transparent' : 'rgba(226,40,32,0.2)',
+        border: glassSupported ? 'none' : '1px solid rgba(255,120,110,0.65)',
         boxShadow: shadow(false),
-        color: 'rgba(120,26,20,0.9)',
+        color: 'rgba(150,14,8,0.95)',
         transition: 'box-shadow 0.16s',
+        willChange: 'transform',
       }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = shadow(true) }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = shadow(false) }}
     >
       {glassSupported && <LiquidGlassPanel params={CLOSE_GLASS} opacity={CLOSE_OPACITY} />}
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"

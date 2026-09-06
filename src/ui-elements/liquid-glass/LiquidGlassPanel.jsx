@@ -46,10 +46,14 @@ export default function LiquidGlassPanel({ params, fill = true, backdropScale = 
    */
   const resolveParams = (p, el) => {
     if (!fillRef.current || !el) return p
+    // Layout size for the same reason sync uses it: the lens is the element's
+    // resting shape, which a transform then deforms along with the canvas.
     const rect = el.getBoundingClientRect()
-    if (!rect.width || !rect.height) return p
+    const w = el.offsetWidth || rect.width
+    const h = el.offsetHeight || rect.height
+    if (!w || !h) return p
 
-    const aspect = rect.width / rect.height
+    const aspect = w / h
     const radiusPx = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
 
     const halfW = Math.max(0.01, 0.5 * aspect - p.end)
@@ -62,7 +66,7 @@ export default function LiquidGlassPanel({ params, fill = true, backdropScale = 
       rectW: halfW,
       rectH: halfH,
       // Also in canvas heights, and never larger than the box it rounds
-      radius: Math.max(0, Math.min(radiusPx / rect.height, halfW, halfH)),
+      radius: Math.max(0, Math.min(radiusPx / h, halfW, halfH)),
     }
   }
 
@@ -98,11 +102,23 @@ export default function LiquidGlassPanel({ params, fill = true, backdropScale = 
         const sync = scene => {
           const rect = host.getBoundingClientRect()
           if (!rect.width || !rect.height) return
-          const dpr = Math.min(window.devicePixelRatio || 1, 2)
-          canvas.width = Math.max(2, Math.round(rect.width * dpr))
-          canvas.height = Math.max(2, Math.round(rect.height * dpr))
 
-          scene?.setShapeScale(rect.width, rect.height)
+          // Layout size, not the measured rect: a CSS transform on the host
+          // scales the rect, and the canvas is inside that transform already.
+          // Sizing from the rect would resize the backing store every frame of
+          // an animation and derive the lens shape from an aspect the transform
+          // is about to change again — the glass would squash twice. Layout
+          // size is what the element would be at rest, which is the shape the
+          // transform should then deform. Identical to the rect when nothing is
+          // transformed, so the app's panels are unaffected.
+          const w = host.offsetWidth || rect.width
+          const h = host.offsetHeight || rect.height
+
+          const dpr = Math.min(window.devicePixelRatio || 1, 2)
+          canvas.width = Math.max(2, Math.round(w * dpr))
+          canvas.height = Math.max(2, Math.round(h * dpr))
+
+          scene?.setShapeScale(w, h)
 
           const vw = window.innerWidth
           const vh = window.innerHeight
