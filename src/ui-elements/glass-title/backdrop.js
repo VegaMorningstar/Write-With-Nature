@@ -11,6 +11,12 @@
  * stay perfectly flat; a WebGPU shader cannot sample the DOM, so anything that
  * has to bend must first be redrawn into a texture.
  *
+ * Both canvases are drawn at exactly their texture's size rather than at device
+ * resolution. The masthead is around four times wider than it is tall, so a
+ * square texture fed from it would throw away nearly half the horizontal detail
+ * on upload — and no amount of sharpening downstream brings that back. A wide
+ * texture matched to the canvas keeps the imagery at full clarity.
+ *
  * Images are drawn with the same object-fit: cover crop the CSS applies, so the
  * glazed tile frames the scene identically to the plain one.
  */
@@ -19,6 +25,12 @@ import { LETTER_TEX_W, LETTER_TEX_H } from '../glass-alphabet/scene.ts'
 
 export const MASK_W = LETTER_TEX_W
 export const MASK_H = LETTER_TEX_H
+
+// Roughly the masthead's own aspect: two rows of tiles across a page-width
+// container. Wide enough that the imagery is upsampled on the way in rather
+// than crushed.
+export const PAPER_W = 2048
+export const PAPER_H = 512
 
 /** object-fit: cover — the largest centred crop of `img` that fills w x h. */
 function coverRect(img, w, h) {
@@ -38,41 +50,40 @@ export function createTitleBackdrop() {
   const paperCtx = paper.getContext('2d')
   const maskCtx = mask.getContext('2d')
 
-  // Exactly the overlay texture's size, so the upload is one-to-one rather than
+  // Exactly the textures' sizes, so both uploads are one-to-one rather than
   // stretched on the way in and squeezed back on the way out.
+  paper.width = PAPER_W
+  paper.height = PAPER_H
   mask.width = MASK_W
   mask.height = MASK_H
 
   let rect = { left: 0, top: 0, width: 0, height: 0 }
-  let dpr = 1
 
-  function resize(r, devicePixelRatio) {
+  function resize(r) {
     rect = r
-    dpr = devicePixelRatio
-    const w = Math.max(2, Math.round(r.width * dpr))
-    const h = Math.max(2, Math.round(r.height * dpr))
-    if (paper.width !== w || paper.height !== h) {
-      paper.width = w
-      paper.height = h
-    }
   }
 
   /**
-   * `tiles` are in the canvas's own CSS pixels, carrying the wobbled centre and
-   * the size each tile currently occupies, so the imagery moves with the glass
-   * rather than sliding under it.
+   * `tiles` are in the canvas's own CSS pixels, carrying the wobbled centre, the
+   * size the image occupies and the body's half-extents, so the imagery moves
+   * with the glass rather than sliding under it.
    */
   function update(tiles, style) {
-    if (!paper.width || !paper.height || !rect.width) return
+    if (!rect.width || !rect.height) return
 
     const vw = window.innerWidth
     const vh = window.innerHeight
+    const sx = PAPER_W / rect.width
+    const sy = PAPER_H / rect.height
 
     paperCtx.setTransform(1, 0, 0, 1, 0, 0)
     paperCtx.globalCompositeOperation = 'source-over'
-    paperCtx.clearRect(0, 0, paper.width, paper.height)
+    paperCtx.clearRect(0, 0, PAPER_W, PAPER_H)
     paperCtx.save()
-    paperCtx.scale(dpr, dpr)
+    // Slightly anisotropic wherever the canvas is not exactly 4:1. The shader's
+    // sampling squeezes it back by the same factor, so what lands on screen is
+    // undistorted and rasterized at the texture's resolution.
+    paperCtx.scale(sx, sy)
 
     // The page behind the masthead, at its true scale
     paperCtx.save()
@@ -90,29 +101,41 @@ export function createTitleBackdrop() {
     }
     paperCtx.restore()
 
-    // The imagery, in canvas-local CSS pixels
+    // The imagery, in canvas-local CSS pixels. It fills the body exactly — the
+    // glaze is added around it rather than carved out of it, so nothing of the
+    // photograph is spent on the edge.
     for (const t of tiles) {
       const img = t.img
       if (!img || !img.complete || !img.naturalWidth) continue
-      const x = t.cx - t.w / 2
-      const y = t.cy - t.h / 2
       try {
-        paperCtx.drawImage(img, ...coverRect(img, t.w, t.h), x, y, t.w, t.h)
+        paperCtx.drawImage(
+          img, ...coverRect(img, t.w, t.h),
+          t.cx - t.w / 2, t.cy - t.h / 2, t.w, t.h,
+        )
       } catch (_) { /* not decodable yet; the paper shows through */ }
     }
     paperCtx.restore()
 
-    // Corner glyphs, as a coverage mask the shader mixes its own colour through
+    // Corner glyphs, as a coverage mask the shader mixes its own colour through.
+    // Positioned against the body's corner, not the visible tile's — the glaze
+    // extends past the image, and a glyph placed against its outer edge would
+    // float off the picture into the bevel.
     maskCtx.setTransform(1, 0, 0, 1, 0, 0)
-    maskCtx.clearRect(0, 0, mask.width, mask.height)
+    maskCtx.clearRect(0, 0, MASK_W, MASK_H)
     maskCtx.save()
-    maskCtx.scale(mask.width / rect.width, mask.height / rect.height)
+    maskCtx.scale(MASK_W / rect.width, MASK_H / rect.height)
     maskCtx.font = `${style.weight} ${style.size}px 'Playfair Display', Georgia, serif`
-    maskCtx.textAlign = 'right'
-    maskCtx.textBaseline = 'alphabetic'
+    maskCtx.textAlign = style.align
+    maskCtx.textBaseline = style.baseline
     maskCtx.fillStyle = `rgba(255,255,255,${style.opacity.toFixed(3)})`
     for (const t of tiles) {
-      maskCtx.fillText(t.ch, t.cx + t.w / 2 - 5, t.cy + t.h / 2 - 4)
+      const left = style.align === 'left'
+      const top = style.baseline === 'top'
+      maskCtx.fillText(
+        t.ch,
+        t.cx + (left ? -t.w / 2 + style.insetX : t.w / 2 - style.insetX),
+        t.cy + (top ? -t.h / 2 + style.insetY : t.h / 2 - style.insetY),
+      )
     }
     maskCtx.restore()
   }

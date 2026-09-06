@@ -8,63 +8,72 @@ import type { SpringProperties } from '../glass-alphabet/spring.ts';
  * refracts the satellite imagery itself, drawn into the backdrop from the very
  * <img> elements the masthead already loads.
  *
- * That makes the lens numbers different in kind rather than degree. A 46px
- * alphabet tile sits over a smooth gradient and has to overdrive its refraction
- * before anything is legible; a 70px tile of coastline is dense with detail, so
- * the same settings would smear it into noise. Refraction and aberration are
- * both well below the alphabet's here, and the edge carries the effect.
+ * That also changes what the glaze can afford to do. The alphabet's box is inset
+ * by its edge, which is fine when the thing behind it is a gradient — there is
+ * nothing to lose. Here the box is the image and the glaze is added around it,
+ * because spending the photograph's outer band on a bevel is a real loss.
+ * The blur follows from the same thing: it is a mip level rather than a bias, so
+ * zero genuinely means the sharpest one.
  */
 export const MATERIAL_DEFAULTS = {
   // ── Shape ─────────────────────────────────────────────────────────────────
-  // The masthead sizes its own tiles to the container; this is the ceiling, and
-  // the row gap and letter gap match index.css so the glazed version lines up
-  // with the CSS one it replaces.
-  maxSize: 84,
-  minSize: 36,
+  // The masthead sizes its own tiles to the container; these are the bounds it
+  // works between. `size` here means the image — a tile occupies size + 2*edge,
+  // and `gap` is the space between visible tiles.
+  maxSize: 140,
+  minSize: 28,
   gap: 4,
-  rowGap: 5,
-  spaceRatio: 0.5,   // a space is half a tile wide
-  radius: 8,         // px, corner radius of the visible tile
+  rowGap: 7,
+  spaceRatio: 0.3,   // the break between WRITE and WITH, as a fraction of a tile
+  radius: 8,         // px, the image's own corner rounding
 
   // ── Lens ──────────────────────────────────────────────────────────────────
-  // Narrower than the alphabet's relative to the tile: the glaze is meant to sit
-  // on the image, not swallow it.
-  edge: 7,
-  ringStart: 1.5,
+  // The glaze is added around the image rather than carved out of it: the SDF
+  // box is the picture, and the shader inflates it by `edge` to make the visible
+  // tile. Insetting the box instead — the obvious reading — spends the
+  // photograph's outer band on the bevel.
+  edge: 4.5,
+  ringStart: 0,
 
-  // Well under the alphabet's 0.4. There is real detail behind these tiles, so a
-  // displacement that reads as a lens over a gradient reads as damage over a
-  // photograph.
-  refractionStrength: 0.05,
-  chromaticStrength: 0.012,
-  chromaticFalloff: 1.6,
-  // Dispersion through the body, on the imagery rather than a glyph. Kept small
-  // for the same reason.
-  bodyChromatic: 0.004,
+  // Negative values are allowed and are worth trying. Positive pushes the
+  // sample outward, so the rim shows what lies beyond the tile; negative pulls
+  // the image out into the rim instead, which reads as glass thicker than the
+  // picture magnifying its own edge.
+  refractionStrength: 0.248,
+  chromaticStrength: 0.08,
+  chromaticFalloff: 5.7,
+  // Dispersion through the body, on photographic detail rather than a glyph.
+  bodyChromatic: 0,
 
-  // The image should stay legible through the glaze, so the body is barely
-  // blurred and the rim is sharper still.
-  blur: 0.35,
-  edgeBlurMultiplier: 0.35,
-  edgeFeather: 2,
+  // Zero is a mip level, not a bias — the body reads the sharpest mip, which is
+  // what keeps the image at full clarity through the glass.
+  blur: 0,
+  edgeBlurMultiplier: 2,
+  edgeFeather: 3.8,
 
-  // Barely there. The tiles carry their own colour and a tint fights it.
-  tintStrength: 0.03,
+  // Off. The tiles carry their own colour and a tint fights it.
+  tintStrength: 0,
   tintR: 0.62, tintG: 0.72, tintB: 0.96,
 
   // ── Corner glyph ──────────────────────────────────────────────────────────
   // The letter in the tile's corner, in the overlay texture so the glaze
-  // refracts it with the image underneath.
-  letterSize: 11,
-  letterWeight: 700,
+  // refracts it with the image underneath. Positioned against the body's corner
+  // rather than the visible tile's: the glaze extends past the picture, and a
+  // glyph set against its outer edge would float off into the bevel.
+  letterSize: 16,
+  letterWeight: 900,
   letterBlur: 0,
+  letterAlign: 'right',      // which corner, horizontally
+  letterBaseline: 'bottom',  // and vertically
+  letterInsetX: 5,           // px in from the body's edge
+  letterInsetY: 4,
   letterR: 240, letterG: 234, letterB: 216,
   letterOpacity: 0.85,
 
   // ── Glow ──────────────────────────────────────────────────────────────────
-  glowStrength: 0.55,
+  glowStrength: 0.6,
   glowHalo: 8,
-  glowR: 214, glowG: 178, glowB: 92,
+  glowR: 255, glowG: 178, glowB: 92,
 };
 
 export const POINTER_DEFAULTS = {

@@ -7,7 +7,7 @@
  * Landsat imagery, which is already dense, so the same settings would read as
  * damage rather than as glass.
  */
-import { Slider, GroupLabel, Note } from './primitives.jsx'
+import { Slider, Chips, GroupLabel, Note } from './primitives.jsx'
 
 export function GlassTitleControls({ material, setMat, pointer, setPtr }) {
   return (
@@ -35,21 +35,23 @@ export function GlassTitleControls({ material, setMat, pointer, setPtr }) {
 
       <GroupLabel>GLAZE — the ring that refracts</GroupLabel>
       <Note>
-        The visible tile is an SDF box inflated by Edge Width, and the ring
-        between Ring Start and that edge displaces what is behind it. Here that
-        is the satellite image itself, redrawn into a texture — a DOM image
+        The SDF box is the image, and the shader inflates it by Edge Width to
+        make the visible tile — so the glaze is added around the picture rather
+        than carved out of it, and none of the photograph is spent on the bevel.
+        What it refracts is the image itself, redrawn into a texture: a DOM image
         under a hole in the canvas would stay perfectly flat, since the shader
         cannot sample the page.
       </Note>
 
-      <Slider label="Edge Width (px)" value={material.edge} min={1} max={30} step={0.5}
+      <Slider label="Edge Width (px)" value={material.edge} min={0} max={30} step={0.5}
         onChange={v => setMat('edge', v)}
-        description="The glaze's thickness. Wide enough to read as a bevel, narrow enough to leave the photograph its middle." />
+        description="The glaze's thickness, growing outward. The layout reserves it, so raising this spreads the tiles rather than shrinking their images." />
       <Slider label="Ring Start (px)" value={material.ringStart} min={0} max={20} step={0.5}
-        onChange={v => setMat('ringStart', v)} />
-      <Slider label="Refraction" value={material.refractionStrength} min={0} max={0.4} step={0.002}
+        onChange={v => setMat('ringStart', v)}
+        description="A flat band before the rim begins. Above zero it sits outside the image, so it reads as clear glass overhanging the picture." />
+      <Slider label="Refraction" value={material.refractionStrength} min={-0.6} max={0.6} step={0.002}
         fmt={v => v.toFixed(3)} onChange={v => setMat('refractionStrength', v)}
-        description="Well below the alphabet's, deliberately. There is real detail behind these tiles, and a displacement that reads as a lens over a gradient reads as damage over a photograph." />
+        description="Negative is worth trying. Positive pushes the sample outward, so the rim shows what lies beyond the tile; negative pulls the image out into the rim instead, which reads as glass thicker than the picture magnifying its own edge." />
       <Slider label="Rim Aberration" value={material.chromaticStrength} min={0} max={0.08} step={0.0005}
         fmt={v => v.toFixed(4)} onChange={v => setMat('chromaticStrength', v)}
         description="Red bends least, blue most — the colour fringe along the glaze's edge." />
@@ -63,7 +65,7 @@ export function GlassTitleControls({ material, setMat, pointer, setPtr }) {
 
       <Slider label="Blur" value={material.blur} min={0} max={4} step={0.05}
         onChange={v => setMat('blur', v)}
-        description="Mip bias through the middle. Near zero keeps the scene readable; the glaze is supposed to sit on the image, not hide it." />
+        description="A mip level through the middle, not a bias — so zero really is the sharpest one. As a bias it was added to a level the hardware derived from the uv derivatives, and no setting could reach mip 0." />
       <Slider label="Edge Blur ×" value={material.edgeBlurMultiplier} min={0} max={2} step={0.05}
         onChange={v => setMat('edgeBlurMultiplier', v)}
         description="Below 1 the rim is sharper than the body, which is what makes the edge read as a bevel rather than a smear." />
@@ -85,10 +87,26 @@ export function GlassTitleControls({ material, setMat, pointer, setPtr }) {
       <GroupLabel>CORNER GLYPH</GroupLabel>
       <Note>
         The letter in each tile&apos;s corner, in the overlay texture so the
-        glaze refracts it along with the image beneath.
+        glaze refracts it along with the image beneath. Placed against the
+        body&apos;s corner, not the visible tile&apos;s — the glaze extends past
+        the picture, and a glyph set against its outer edge floats off into the
+        bevel.
       </Note>
 
-      <Slider label="Size (px)" value={material.letterSize} min={5} max={30} step={0.5}
+      <Chips label="Corner — horizontal" value={material.letterAlign}
+        options={['left', 'center', 'right']}
+        onChange={v => setMat('letterAlign', v)} />
+      <Chips label="Corner — vertical" value={material.letterBaseline}
+        options={['top', 'middle', 'bottom']}
+        onChange={v => setMat('letterBaseline', v)} />
+      <Slider label="Inset X (px)" value={material.letterInsetX} min={-20} max={60} step={0.5}
+        onChange={v => setMat('letterInsetX', v)}
+        description="In from the image's own left or right edge. Ignored on centre." />
+      <Slider label="Inset Y (px)" value={material.letterInsetY} min={-20} max={60} step={0.5}
+        onChange={v => setMat('letterInsetY', v)}
+        description="In from the image's own top or bottom edge. Ignored on middle." />
+
+      <Slider label="Size (px)" value={material.letterSize} min={5} max={40} step={0.5}
         onChange={v => setMat('letterSize', v)} />
       <Slider label="Weight" value={material.letterWeight} min={300} max={900} step={100}
         fmt={v => v.toFixed(0)} onChange={v => setMat('letterWeight', v)} />

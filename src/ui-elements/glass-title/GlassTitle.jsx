@@ -67,7 +67,7 @@ export default function GlassTitle({
   const measure = useCallback(() => {
     const host = hostRef.current
     if (!host) return
-    const avail = host.clientWidth - 2 * (Math.ceil(m.edge) + 6)
+    const avail = host.clientWidth - 12
     if (avail <= 0) return
     let fit = m.maxSize
     lines.forEach(line => {
@@ -75,7 +75,10 @@ export default function GlassTitle({
       const spaces = [...line].filter(c => c === ' ').length
       const n = letters + spaces
       if (n < 1) return
-      const each = (avail - (n - 1) * m.gap) / (letters + spaces * m.spaceRatio)
+      // Each tile costs its image plus the glaze on both sides, so the edge has
+      // to come out of the budget before the images are sized.
+      const each = (avail - (n - 1) * m.gap - letters * m.edge * 2) /
+        (letters + spaces * m.spaceRatio)
       if (each > 0) fit = Math.min(fit, each)
     })
     setSize(Math.max(m.minSize, Math.min(m.maxSize, Math.floor(fit))))
@@ -89,26 +92,34 @@ export default function GlassTitle({
   }, [measure])
 
   // ── Layout, in the canvas's own CSS pixels ─────────────────────────────────
-  const pad = Math.ceil(m.edge) + 6
+  //
+  // `size` is the image, and the glaze is added around it: a tile occupies
+  // size + 2 * edge, and `gap` is the space between visible tiles. Insetting the
+  // box by the edge instead — the obvious reading, and what this did first —
+  // spends the photograph's outer band on the bevel, which is exactly the image
+  // loss we do not want.
+  const outer = size + m.edge * 2
+  const pad = 6
   const rowWidth = line => {
     const items = [...line].filter(c => c === ' ' || LETTERS[c])
-    const w = items.reduce((a, c) => a + (c === ' ' ? size * m.spaceRatio : size), 0)
+    const w = items.reduce((a, c) => a + (c === ' ' ? size * m.spaceRatio : outer), 0)
     return w + Math.max(items.length - 1, 0) * m.gap
   }
   const widest = Math.max(...lines.map(rowWidth), 1)
   const width = widest + pad * 2
-  const height = lines.length * size + (lines.length - 1) * m.rowGap + pad * 2
+  const height = lines.length * outer + (lines.length - 1) * m.rowGap + pad * 2
 
-  // Rows are centred, as .title-row is
+  // Rows are centred, as .title-row is. x/y are the visible tile's top-left, so
+  // the image sits `edge` inside it.
   const cellFor = slot => {
     const line = lines[slot.row]
     let x = pad + (widest - rowWidth(line)) / 2
     for (let i = 0; i < slot.col; i++) {
       const c = line[i]
       if (c !== ' ' && !LETTERS[c]) continue
-      x += (c === ' ' ? size * m.spaceRatio : size) + m.gap
+      x += (c === ' ' ? size * m.spaceRatio : outer) + m.gap
     }
-    return { x, y: pad + slot.row * (size + m.rowGap) }
+    return { x, y: pad + slot.row * (outer + m.rowGap) }
   }
   const cells = slots.map(cellFor)
 
@@ -208,7 +219,7 @@ export default function GlassTitle({
       try {
         const { tgpu } = await import('typegpu')
         const { setupTileGlass } = await import('../glass-alphabet/scene.ts')
-        const { createTitleBackdrop, MASK_W, MASK_H } = await import('./backdrop.js')
+        const { createTitleBackdrop, MASK_W, MASK_H, PAPER_W, PAPER_H } = await import('./backdrop.js')
         if (cancelled) return
 
         const backdrop = createTitleBackdrop()
@@ -218,6 +229,10 @@ export default function GlassTitle({
           tileCount: count,
           maskW: MASK_W,
           maskH: MASK_H,
+          // Wide, matching the masthead. A square backdrop would drop nearly
+          // half the imagery's horizontal detail before the shader read it.
+          paperW: PAPER_W,
+          paperH: PAPER_H,
         })
         if (cancelled) { scene.onCleanup(); root.destroy(); return }
 
@@ -236,22 +251,26 @@ export default function GlassTitle({
             canvas.height = ch
           }
           scene.setShapeScale(rect.width, rect.height)
-          backdrop.resize(rect, dpr)
+          backdrop.resize(rect)
 
           const H = rect.height
-          const halfBox = Math.max(L.size / 2 - mm.edge, 0.5)
+          const halfBox = L.size / 2
           const tiles = []
           const drawList = []
 
           for (let i = 0; i < L.cells.length; i++) {
             const sq = springs ? springs.squash[i].value : 0
             const ly = springs ? springs.lift[i].value : 0
-            const cx = L.cells[i].x + L.size / 2
-            const cy = L.cells[i].y + L.size / 2 - ly * 40
+            // The cell is the visible tile's corner, so the image's centre is
+            // one edge width in from it on both axes.
+            const cx = L.cells[i].x + mm.edge + L.size / 2
+            const cy = L.cells[i].y + mm.edge + L.size / 2 - ly * 40
 
-            const halfPx = L.size / 2
-            const hx = halfPx * (1 + sq) - mm.edge
-            const hy = halfPx * (1 - sq * 0.7) - mm.edge
+            // The box IS the image. The shader inflates it by `end` to make the
+            // visible shape, so the glaze grows outward into the space the
+            // layout already reserved rather than eating into the photograph.
+            const hx = halfBox * (1 + sq)
+            const hy = halfBox * (1 - sq * 0.7)
 
             const glow = springs
               ? Math.min(
@@ -263,22 +282,22 @@ export default function GlassTitle({
 
             tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H, glow })
 
-            // The imagery is drawn at the tile's full visible size — the box is
-            // inset by `edge` because the shader inflates it back, but the
-            // picture has to fill what you actually see.
             drawList.push({
               img: imgRefs.current[i],
               ch: L.slots[i].ch,
               cx,
               cy,
-              w: L.size * (1 + sq),
-              h: L.size * (1 - sq * 0.7),
+              w: hx * 2,
+              h: hy * 2,
             })
           }
 
           scene.setTiles(tiles)
           scene.setParams({
-            radius: Math.min(Math.max(0, mm.radius - mm.edge) / H, halfBox / H),
+            // Measured on the box, which is now the image, so it is the image's
+            // own corner rounding. The shader adds `end` to it for the visible
+            // corner, which is why the glaze follows the picture's shape.
+            radius: Math.min(mm.radius, halfBox) / H,
             start: mm.ringStart / H,
             end: Math.max(mm.edge / H, 0.0005),
             chromaticStrength: mm.chromaticStrength,
@@ -302,6 +321,10 @@ export default function GlassTitle({
             size: mm.letterSize,
             weight: mm.letterWeight,
             opacity: mm.letterOpacity,
+            align: mm.letterAlign,
+            baseline: mm.letterBaseline,
+            insetX: mm.letterInsetX,
+            insetY: mm.letterInsetY,
           })
         }
 
@@ -384,9 +407,12 @@ export default function GlassTitle({
               position: 'absolute',
               left: cell.x,
               top: cell.y,
-              width: size,
-              height: size,
-              borderRadius: m.radius,
+              // The visible tile, glaze included, so the hit target matches what
+              // is drawn. The image sits `edge` inside it.
+              width: outer,
+              height: outer,
+              padding: m.edge,
+              borderRadius: m.radius + m.edge,
               overflow: 'hidden',
               cursor: 'pointer',
               willChange: 'transform',
@@ -401,6 +427,7 @@ export default function GlassTitle({
               alt={`${slot.ch} — ${label}`}
               style={{
                 width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                borderRadius: m.radius,
                 opacity: gpuSupported ? 0 : 1,
               }}
             />

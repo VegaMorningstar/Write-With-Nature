@@ -15,7 +15,7 @@
  *      union the fragment must use the values belonging to whichever tile
  *      actually won.
  *   2. The letters live in their own texture rather than in the backdrop. Two
- *      reasons: the backdrop is sampled at a mip bias to blur the glass body,
+ *      reasons: the backdrop is sampled at a mip level to blur the glass body,
  *      which turns a 15px letter to mush, and a separate texture can be given
  *      its own dispersion so the letter fringes like the word under the jelly.
  *      It carries a mask in its alpha and takes its colour from a uniform, so
@@ -45,6 +45,16 @@ export const TILE_COUNT = 26;
 export const LETTER_TEX_W = 1024;
 export const LETTER_TEX_H = 512;
 
+/**
+ * Default backdrop size. Textures here are a fixed size for the life of the
+ * pipeline: the shader captures its view when it is built, so recreating one on
+ * resize would leave the compiled pipeline holding a view of a destroyed
+ * texture. Sampling is in uv space, so a stretch on upload undoes itself
+ * geometrically — but not in detail, which is why callers should pass a size
+ * matching their canvas rather than take this square one.
+ */
+const TEX_SIZE = 1024;
+
 export type TileGlassOptions = {
   /** How many boxes the union covers. Baked into the uniform array and the
    *  shader's loop, so it is fixed for the life of the pipeline. */
@@ -54,6 +64,11 @@ export type TileGlassOptions = {
    *  stretches and the shader squeezes it back, losing detail on the way. */
   maskW?: number;
   maskH?: number;
+  /** Size of the backdrop texture. Match it to the canvas's aspect: this is
+   *  where the refracted content lives, and a square texture fed from a wide
+   *  canvas throws away horizontal detail before the shader ever reads it. */
+  paperW?: number;
+  paperH?: number;
 };
 
 const Params = d.struct({
@@ -129,33 +144,26 @@ export async function setupTileGlass(
   const COUNT = options.tileCount ?? TILE_COUNT;
   const maskW = options.maskW ?? LETTER_TEX_W;
   const maskH = options.maskH ?? LETTER_TEX_H;
+  const paperW = options.paperW ?? TEX_SIZE;
+  const paperH = options.paperH ?? TEX_SIZE;
 
   /** xy = centre in box space, zw = half-extents in box space. */
   const Tiles = d.arrayOf(d.vec4f, COUNT);
   /** x = glow, from residual wobble energy. The rest is padding. */
   const Glows = d.arrayOf(d.vec4f, COUNT);
 
-  // Fixed size, written with fit: 'stretch'. Recreating it on resize would leave
-  // the compiled pipeline holding a view of a destroyed texture — the shader
-  // captures the view when it is built, not on every frame. Sampling is in uv
-  // space, so the stretch undoes itself.
-  //
-  // Both backdrops cover only the grid's own rectangle rather than the whole
-  // viewport, so 1024 across a few hundred CSS pixels is oversampled — which is
-  // the point for the letters, which are read through a lens at mip 0.
-  const TEX_SIZE = 1024;
-
   const makeTexture = (w: number, h: number) =>
     root
       .createTexture({
         size: [w, h, 1],
-        // 6 levels, because textureSampleBias needs a mip chain for the blur
+        // 6 levels: the blur reads an explicit mip level, so the chain has to
+        // exist for anything above zero to have somewhere to come from
         format: 'rgba8unorm',
         mipLevelCount: 6,
       })
       .$usage('sampled', 'render');
 
-  const paperTexture = makeTexture(TEX_SIZE, TEX_SIZE);
+  const paperTexture = makeTexture(paperW, paperH);
   // OURS: the letters get a 2:1 texture, and their canvas is drawn at exactly
   // that size. Both matter for sharpness. A square texture fed from a grid twice
   // as wide as it is tall stretches the glyphs 2x vertically on upload and the
@@ -225,13 +233,19 @@ export async function setupTileGlass(
     uv: d.v2f,
     offset: number,
     dir: d.v2f,
-    blur: number,
+    level: number,
   ) => {
     'use gpu';
     const samples = d.arrayOf(d.vec3f, 3)();
     for (const i of tgpu.unroll(std.range(3))) {
       const channelOffset = dir * (d.f32(i) - 1) * offset;
-      samples[i] = std.textureSampleBias(tex, samp, uv - channelOffset, blur).rgb;
+      // OURS: textureSampleLevel, where theirs is textureSampleBias. A bias is
+      // added to a level the hardware derives from the uv derivatives, and this
+      // texture is nearly always read across fewer pixels than it has texels —
+      // so a blur of zero was still coming back from a mip a full step down, and
+      // no setting could ask for the sharpest one. An explicit level says what
+      // is meant, and the slider drives it directly.
+      samples[i] = std.textureSampleLevel(tex, samp, uv - channelOffset, level).rgb;
     }
     return d.vec3f(samples[0].x, samples[1].y, samples[2].z);
   };
