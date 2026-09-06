@@ -52,6 +52,9 @@ export function GlassTitleControls({ material, setMat, pointer, setPtr }) {
       <Slider label="Refraction" value={material.refractionStrength} min={-0.6} max={0.6} step={0.002}
         fmt={v => v.toFixed(3)} onChange={v => setMat('refractionStrength', v)}
         description="Negative is worth trying. Positive pushes the sample outward, so the rim shows what lies beyond the tile; negative pulls the image out into the rim instead, which reads as glass thicker than the picture magnifying its own edge." />
+      <Slider label="Edge Curve" value={material.edgeCurve} min={0.2} max={8} step={0.05}
+        onChange={v => setMat('edgeCurve', v)}
+        description="The edge's profile rather than its strength — how much of the image blends into it, and where. 1 is a flat chamfer, tilting at a constant rate from the image to the rim. Above 1 the bend holds off near the image and sweeps fast at the outer edge, so the picture compresses into a thin lip and reads as curved. Below 1 front-loads it into a dome." />
       <Slider label="Rim Aberration" value={material.chromaticStrength} min={0} max={0.08} step={0.0005}
         fmt={v => v.toFixed(4)} onChange={v => setMat('chromaticStrength', v)}
         description="Red bends least, blue most — the colour fringe along the glaze's edge." />

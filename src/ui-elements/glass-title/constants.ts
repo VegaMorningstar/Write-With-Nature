@@ -48,6 +48,14 @@ export const MATERIAL_DEFAULTS = {
   refractionStrength: 0.192,
   chromaticStrength: 0.08,
   chromaticFalloff: 5.7,
+
+  // Exponent on the ring's displacement ramp — the edge's profile rather than
+  // its strength. Linear is a flat chamfer: the surface tilts at a constant
+  // rate from the image to the rim. A rounded lip barely turns near the image
+  // and then sweeps fast at the outer edge, which is what above 1 gives, and
+  // it is what makes the picture appear to wrap around the glass rather than
+  // slide under a slope.
+  edgeCurve: 2.4,
   // Dispersion through the body, on photographic detail rather than a glyph.
   bodyChromatic: 0.0008,
 
@@ -84,7 +92,7 @@ export const MATERIAL_DEFAULTS = {
 
 export const POINTER_DEFAULTS = {
   // Falls off over this many tiles
-  radius: 8,
+  radius: 2.2,
   strength: 1,
   sensitivity: 40,
   gain: 0.35,

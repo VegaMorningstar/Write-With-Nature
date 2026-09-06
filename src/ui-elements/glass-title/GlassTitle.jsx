@@ -308,6 +308,7 @@ export default function GlassTitle({
             tintStrength: mm.tintStrength,
             tintR: mm.tintR, tintG: mm.tintG, tintB: mm.tintB,
             chromaticFalloff: mm.chromaticFalloff,
+            edgeCurve: mm.edgeCurve,
             bodyChromatic: mm.bodyChromatic,
             bodyDepth: halfBox / H,
             letterBlur: mm.letterBlur,

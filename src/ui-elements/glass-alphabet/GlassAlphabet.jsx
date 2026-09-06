@@ -244,6 +244,7 @@ export default function GlassAlphabet({
             tintStrength: mm.tintStrength,
             tintR: mm.tintR, tintG: mm.tintG, tintB: mm.tintB,
             chromaticFalloff: mm.chromaticFalloff,
+            edgeCurve: mm.edgeCurve,
             bodyChromatic: mm.bodyChromatic,
             // The body's dispersion ramps over the box's own half-width, so it
             // scales with the tile instead of needing a second slider.

@@ -83,6 +83,7 @@ const Params = d.struct({
   tintStrength: d.f32,
   tintColor: d.vec3f,
   chromaticFalloff: d.f32,
+  edgeCurve: d.f32,
   // OURS
   bodyChromatic: d.f32,
   bodyDepth: d.f32,
@@ -107,6 +108,7 @@ export type SceneParams = {
   tintG: number;
   tintB: number;
   chromaticFalloff: number;
+  edgeCurve: number;
   bodyChromatic: number;
   bodyDepth: number;
   letterBlur: number;
@@ -204,6 +206,7 @@ export async function setupTileGlass(
     tintStrength: 0.05,
     tintColor: d.vec3f(0.58, 0.44, 0.96),
     chromaticFalloff: 1,
+    edgeCurve: 1,
     bodyChromatic: 0.01,
     bodyDepth: 0.05,
     letterBlur: 0,
@@ -320,12 +323,25 @@ export async function setupTileGlass(
     const featherUV = paramsUniform.$.edgeFeather / std.max(texDim.x, texDim.y);
     const weights = calculateWeights(sdfDist, paramsUniform.$.start, paramsUniform.$.end, featherUV);
 
+    // OURS: an exponent on the ring's displacement ramp. Theirs is linear across
+    // the band, which is a flat chamfer — the surface tilts at a constant rate
+    // from the body to the rim. A rounded lip does not: its normal barely turns
+    // near the body and then sweeps fast at the outer edge, so the view through
+    // it stays still and then compresses hard. Above 1 gives that fillet; below
+    // 1 front-loads the bend into a dome. 1 is theirs exactly.
+    //
+    // Saturated before the power for the same reason the fringe ramp is:
+    // normalizedDist runs negative inside the ring, and a fractional exponent on
+    // a negative base is not a number. The weights discard that region, but a
+    // NaN survives multiplication by zero and would punch a hole through it.
+    const edgeRamp = std.saturate(normalizedDist) ** paramsUniform.$.edgeCurve;
+
     // OURS: dir is a unit vector in box space, and uv is not — on a canvas wider
     // than it is tall, adding one to the other displaces further horizontally
     // than vertically. Dividing by the shape scale converts back, so the
     // strength is a distance in canvas heights like every other param here.
     const ringUv = uv.add(
-      dir.mul(paramsUniform.$.refractionStrength * normalizedDist).div(shapeScaleUniform.$),
+      dir.mul(paramsUniform.$.refractionStrength * edgeRamp).div(shapeScaleUniform.$),
     );
 
     // Their ramp: no fringing at the inner edge of the ring, most at the outer.
@@ -451,6 +467,7 @@ export async function setupTileGlass(
         tintStrength: p.tintStrength,
         tintColor: d.vec3f(p.tintR, p.tintG, p.tintB),
         chromaticFalloff: Math.max(p.chromaticFalloff ?? 1, 0.05),
+        edgeCurve: Math.max(p.edgeCurve ?? 1, 0.05),
         bodyChromatic: p.bodyChromatic,
         bodyDepth: Math.max(p.bodyDepth, 1e-4),
         letterBlur: p.letterBlur,

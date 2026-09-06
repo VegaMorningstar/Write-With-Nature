@@ -47,6 +47,11 @@ export const MATERIAL_DEFAULTS = {
   // higher pushes the colour into the outer rim.
   chromaticFalloff: 1.85,
 
+  // Exponent on the ring's displacement ramp. 1 is TypeGPU's linear chamfer;
+  // above it the bend concentrates at the outer rim and the edge reads as a
+  // rounded lip rather than a bevel.
+  edgeCurve: 1,
+
   // Dispersion through the body rather than the rim — the jelly's `dispersion`,
   // which is what fringes the word seen through it. Strongest against the
   // tile's own edge and fading to nothing at its centre, since a slab splits

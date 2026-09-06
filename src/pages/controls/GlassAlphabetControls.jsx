@@ -44,6 +44,9 @@ export function GlassAlphabetControls({ material, setMat, pointer, setPtr, fluid
       <Slider label="Fringe Falloff" value={material.chromaticFalloff} min={0.2} max={6} step={0.05}
         onChange={v => setMat('chromaticFalloff', v)}
         description="Exponent on the fringe's ramp across the ring. 1 is TypeGPU's linear version; higher pushes the colour into the outer rim." />
+      <Slider label="Edge Curve" value={material.edgeCurve} min={0.2} max={8} step={0.05}
+        onChange={v => setMat('edgeCurve', v)}
+        description="The same exponent, on the displacement itself. 1 is TypeGPU's linear ramp — a flat chamfer. Above it the bend holds off near the body and sweeps fast at the rim, which reads as a rounded lip rather than a slope." />
       <Slider label="Body Dispersion" value={material.bodyChromatic} min={0} max={0.06} step={0.0005}
         fmt={v => v.toFixed(4)} onChange={v => setMat('bodyChromatic', v)}
         description="The jelly's dispersion rather than the rim's: splits what you see through the middle of the tile, letter included. Strongest against the tile's own edge and fading to nothing at its centre, since a slab splits light where you look through it at an angle and not head on." />
