@@ -92,6 +92,13 @@ const Params = d.struct({
   glowStrength: d.f32,
   glowHalo: d.f32,
   glowColor: d.vec3f,
+  // Unit vector toward the light, in screen space with y downward like uv.
+  // Built on the CPU from an azimuth and an elevation, which are what a person
+  // can actually reason about.
+  lightDir: d.vec3f,
+  specularStrength: d.f32,
+  specularPower: d.f32,
+  specularColor: d.vec3f,
 });
 
 export type SceneParams = {
@@ -120,6 +127,13 @@ export type SceneParams = {
   glowR: number;
   glowG: number;
   glowB: number;
+  lightAzimuth: number;
+  lightElevation: number;
+  specularStrength: number;
+  specularPower: number;
+  specR: number;
+  specG: number;
+  specB: number;
 };
 
 const Weights = d.struct({
@@ -214,6 +228,10 @@ export async function setupTileGlass(
     glowStrength: 0,
     glowHalo: 0.03,
     glowColor: d.vec3f(0.68, 0.85, 0.45),
+    lightDir: d.vec3f(0, -0.57, 0.82),
+    specularStrength: 0,
+    specularPower: 40,
+    specularColor: d.vec3f(1, 1, 1),
   });
 
   // ── theirs, unchanged ───────────────────────────────────────────────────────
@@ -402,8 +420,32 @@ export async function setupTileGlass(
       std.exp(-std.max(sdfDist - paramsUniform.$.end, 0) / std.max(paramsUniform.$.glowHalo, 1e-5)) *
       glow * paramsUniform.$.glowStrength;
 
+    // OURS: a lit highlight, which the ring gives us almost for free. The bevel
+    // already has an implied surface — flat across the body, rolling over to
+    // vertical by the outer rim — so its normal is the tilt `edgeRamp` describes
+    // swung along `dir`, the same outward direction the refraction uses. That
+    // makes the highlight and the bending agree about the shape of the glass,
+    // which is what stops it reading as a decal.
+    //
+    // Blinn-Phong against an orthographic view: the body's normal points
+    // straight at the camera, so it only catches a light nearly overhead, while
+    // somewhere on the bevel the normal bisects light and view exactly and lights
+    // up. Moving the light sweeps that band around the tile.
+    const theta = edgeRamp * 1.5707964;
+    const normal = d.vec3f(
+      dir.x * std.sin(theta),
+      dir.y * std.sin(theta),
+      std.cos(theta),
+    );
+    const halfVector = std.normalize(paramsUniform.$.lightDir.add(d.vec3f(0, 0, 1)));
+    const specular =
+      std.saturate(std.dot(normal, halfVector)) ** std.max(paramsUniform.$.specularPower, 1) *
+      paramsUniform.$.specularStrength * cover;
+
     return d.vec4f(
-      glass.add(paramsUniform.$.glowColor.mul(halo)),
+      glass
+        .add(paramsUniform.$.glowColor.mul(halo))
+        .add(paramsUniform.$.specularColor.mul(specular)),
       std.saturate(cover + halo),
     );
   });
@@ -475,6 +517,20 @@ export async function setupTileGlass(
         glowStrength: p.glowStrength,
         glowHalo: Math.max(p.glowHalo, 1e-5),
         glowColor: d.vec3f(p.glowR / 255, p.glowG / 255, p.glowB / 255),
+        // Azimuth is measured on screen with 90 straight down from the top, and
+        // y grows downward in uv — so a light "from above" has a negative y.
+        lightDir: (() => {
+          const a = (p.lightAzimuth * Math.PI) / 180;
+          const e = (p.lightElevation * Math.PI) / 180;
+          return d.vec3f(
+            Math.cos(e) * Math.cos(a),
+            -Math.cos(e) * Math.sin(a),
+            Math.sin(e),
+          );
+        })(),
+        specularStrength: p.specularStrength,
+        specularPower: Math.max(p.specularPower, 1),
+        specularColor: d.vec3f(p.specR / 255, p.specG / 255, p.specB / 255),
       });
     },
     onCleanup() {

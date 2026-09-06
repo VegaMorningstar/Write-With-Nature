@@ -254,6 +254,11 @@ export default function GlassAlphabet({
             glowStrength: mm.glowStrength,
             glowHalo: mm.glowHalo / H,
             glowR: mm.glowR, glowG: mm.glowG, glowB: mm.glowB,
+            lightAzimuth: mm.lightAzimuth,
+            lightElevation: mm.lightElevation,
+            specularStrength: mm.specularStrength,
+            specularPower: mm.specularPower,
+            specR: mm.specR, specG: mm.specG, specB: mm.specB,
           })
 
           backdrop.update(glyphs, {

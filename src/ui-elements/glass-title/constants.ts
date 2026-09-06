@@ -55,7 +55,7 @@ export const MATERIAL_DEFAULTS = {
   // and then sweeps fast at the outer edge, which is what above 1 gives, and
   // it is what makes the picture appear to wrap around the glass rather than
   // slide under a slope.
-  edgeCurve: 2.4,
+  edgeCurve: 1.1,
   // Dispersion through the body, on photographic detail rather than a glyph.
   bodyChromatic: 0.0008,
 
@@ -88,6 +88,19 @@ export const MATERIAL_DEFAULTS = {
   glowStrength: 0.6,
   glowHalo: 8,
   glowR: 255, glowG: 178, glowB: 92,
+
+  // ── Light ─────────────────────────────────────────────────────────────────
+  // A highlight from a directional source, off the bevel the ring already
+  // implies. Azimuth is measured on screen with 90 straight down from the top;
+  // elevation is degrees above the surface, so 90 is directly overhead and
+  // lights the flat body rather than the edge.
+  lightAzimuth: 90,
+  lightElevation: 35,
+  specularStrength: 0.55,
+  // Tightness. High keeps the highlight to a thin bright line along the lip;
+  // low spreads it into a broad sheen across the whole bevel.
+  specularPower: 40,
+  specR: 255, specG: 252, specB: 240,
 };
 
 export const POINTER_DEFAULTS = {
