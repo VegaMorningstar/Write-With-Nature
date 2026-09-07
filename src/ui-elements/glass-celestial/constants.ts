@@ -53,21 +53,31 @@ export const MATERIAL_DEFAULTS = {
  * its shape and wants to look like cold glass.
  */
 export const SUN = {
-  tintStrength: 0.30,
+  tintStrength: 0.48,
   tintR: 1, tintG: 0.66, tintB: 0.16,
   glowR: 255, glowG: 148, glowB: 40,
 };
 
 export const MOON = {
-  tintStrength: 0.20,
+  tintStrength: 0.38,
   tintR: 0.76, tintG: 0.68, tintB: 1,
   glowR: 198, glowG: 164, glowB: 255,
 };
 
 export const POINTER_DEFAULTS = {
-  // Emission when hovered, and how much residual wobble adds on top
-  hoverGlow: 0.85,
-  glowGain: 0.9,
+  // Three levels, and the brightest reason to be lit wins. Idle is not zero:
+  // the ornament sits between two hairlines on a busy ground, and something
+  // that only exists once you find it with a cursor is not an ornament.
+  idleGlow: 0.32,
+  hoverGlow: 0.62,
+  clickGlow: 0.95,
+  // How fast the press burst falls back to whichever level is underneath. Short
+  // enough to read as a flash rather than a state.
+  clickDecay: 0.19,
+  // A shimmer on top, from residual wobble energy. Small — the levels above are
+  // the signal, this is only what keeps the glow from sitting perfectly still
+  // while the shape is still ringing.
+  glowGain: 0.16,
   glowHalo: 0.055,
 
   // Impulses. A velocity kick peaks at roughly v/omega, and omega here is 28.6,

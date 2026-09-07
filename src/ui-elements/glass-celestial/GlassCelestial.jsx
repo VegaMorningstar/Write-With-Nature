@@ -75,6 +75,7 @@ export default function GlassCelestial({
     if (s) {
       s.squash.velocity += ptrRef.current.clickImpulse
       s.wobble.velocity -= ptrRef.current.clickImpulse * 0.7
+      s.flash()
     }
   }, [isMoon, value, onChange])
 
@@ -87,9 +88,13 @@ export default function GlassCelestial({
     const squash = new Spring(squashProperties)
     const wobble = new Spring(wobbleProperties)
     const morph = new Spring(morphProperties)
+    // Not a spring: a press should flare and fall back, not ring. A spring here
+    // would dip the glow below its resting level on the overshoot, which reads
+    // as the light guttering rather than flaring.
+    let flash = 0
     morph.value = targetRef.current
     morph.target = targetRef.current
-    springs.current = { squash, wobble, morph }
+    springs.current = { squash, wobble, morph, flash: () => { flash = 1 } }
 
     let cancelled = false
     let cleanup = null
@@ -138,6 +143,7 @@ export default function GlassCelestial({
               wobble.step(dt / steps)
               morph.step(dt / steps)
             }
+            flash *= Math.exp(-dt / pp.clickDecay)
           }
 
           // The morph runs past 0 and 1 on the overshoot, which is the point —
@@ -148,8 +154,15 @@ export default function GlassCelestial({
           const energy = Math.min(
             Math.abs(squash.velocity) * 0.04 + Math.abs(squash.value) * 1.2, 1.4,
           )
-          const glow =
-            (hoverRef.current ? pp.hoverGlow : 0) + energy * pp.glowGain
+          // The brightest reason to be lit wins, rather than the three adding
+          // up: summed, a press while hovering would run to twice the level a
+          // press alone reaches, and the flash would read differently depending
+          // on whether the cursor happened to be resting on it.
+          const glow = Math.max(
+            pp.idleGlow,
+            hoverRef.current ? pp.hoverGlow : 0,
+            flash * pp.clickGlow,
+          ) + energy * pp.glowGain
 
           // Colour follows the morph, so the halo warms and cools with the shape
           // rather than switching under it.
