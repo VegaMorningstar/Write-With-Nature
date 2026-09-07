@@ -23,6 +23,11 @@ export const MATERIAL_DEFAULTS = {
   blendK: 0.055,
   moonOffset: 0.135,   // how far the bite is shifted
   moonRadius: 0.20,
+  // The crescent, scaled as a whole. At the sun's own radius it reads smaller —
+  // less area, and the sun's spokes reach well past its edge. 1.44 is
+  // rayInner / radius, which lands the moon's outer arc exactly where the sun's
+  // rays begin, so the two fill the same circle.
+  moonScale: 1.44,
 
   // ── Lens ──────────────────────────────────────────────────────────────────
   // A wide ring against a small shape, as on the alphabet: at this size the

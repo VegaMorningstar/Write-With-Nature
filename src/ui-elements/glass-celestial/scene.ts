@@ -41,6 +41,7 @@ const Params = d.struct({
   blendK: d.f32,
   moonOffset: d.f32,
   moonRadius: d.f32,
+  moonScale: d.f32,
   morph: d.f32,
   squash: d.vec2f,
 
@@ -77,6 +78,7 @@ export type CelestialParams = {
   blendK: number;
   moonOffset: number;
   moonRadius: number;
+  moonScale: number;
   morph: number;
   squashX: number;
   squashY: number;
@@ -150,6 +152,7 @@ export async function setupCelestial(
     blendK: 0.05,
     moonOffset: 0.14,
     moonRadius: 0.2,
+    moonScale: 1.44,
     morph: 0,
     squash: d.vec2f(1, 1),
     start: 0,
@@ -226,13 +229,22 @@ export async function setupCelestial(
     return dist;
   };
 
-  /** The same disk with an offset one taken out of it. */
+  /**
+   * The same disk with an offset one taken out of it, scaled up as a whole.
+   *
+   * A crescent at the sun's own radius reads smaller than the sun does: it has
+   * less area, and the sun carries eight spokes past its edge. Scaling the body,
+   * the bite and the offset by one factor grows it without reshaping it — change
+   * the body alone and the bite eats a different fraction, which turns a
+   * crescent into a gibbous.
+   */
   const sdMoon = (p: d.v2f) => {
     'use gpu';
     const P = paramsUniform.$;
-    const body = sdDisk(p, P.radius);
-    const bite = sdDisk(d.vec2f(p.x - P.moonOffset, p.y), P.moonRadius);
-    return opSmoothDifference(bite, body, P.blendK);
+    const k = P.moonScale;
+    const body = sdDisk(p, P.radius * k);
+    const bite = sdDisk(d.vec2f(p.x - P.moonOffset * k, p.y), P.moonRadius * k);
+    return opSmoothDifference(bite, body, P.blendK * k);
   };
 
   const fragmentShader = tgpu.fragmentFn({
@@ -341,6 +353,7 @@ export async function setupCelestial(
         blendK: Math.max(p.blendK, 1e-4),
         moonOffset: p.moonOffset,
         moonRadius: p.moonRadius,
+        moonScale: Math.max(p.moonScale, 0.05),
         morph: p.morph,
         squash: d.vec2f(Math.max(p.squashX, 0.05), Math.max(p.squashY, 0.05)),
         start: p.start,
