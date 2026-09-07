@@ -48,6 +48,7 @@ import LiquidGlassDemo from '../ui-elements/liquid-glass/LiquidGlassDemo'
 import { overlayDefaults } from '../ui-elements/liquid-glass/overlay.ts'
 import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
 import GlassSheet from '../ui-elements/glass-sheet/GlassSheet'
+import GlassCelestial from '../ui-elements/glass-celestial/GlassCelestial'
 import { LETTERS as SCENES } from '../data/letters'
 
 // Everything the library holds, numerals included, so the pager can reach them
@@ -165,6 +166,7 @@ export default function UiTunePage() {
   const [lastLetter, setLastLetter] = useState(null)
 
   // Glass sheet — the overlay the colophon opens when a letter is clicked
+  const [celestial, setCelestial] = useState('sun')
   const [sheetChar, setSheetChar] = useState(null)
   const sheetScenes = sheetChar ? SCENES[sheetChar] ?? [] : []
 
@@ -221,6 +223,23 @@ export default function UiTunePage() {
               then wire it in.
             </p>
           </div>
+
+          <Bench
+            name="Celestial Toggle"
+            summary="The masthead's ornament as a jelly: a sun that becomes a crescent when pressed. Both shapes are signed distance fields — the sun is a disk smooth-unioned with eight spokes, the crescent the same disk with an offset one subtracted, which is why a crescent belongs in an SDF rather than a path. A spring mixes between the two fields, so the rays retract through shapes that are still fields and the lens never stops being one; because it is a spring it overshoots, which reads as a flip rather than a fade. Hover glows orange as a sun and lavender as a moon, with the colour following the morph so the halo warms and cools with the shape."
+            wide
+            bare
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 28, padding: '14px 0' }}>
+              <GlassCelestial size={64} value={celestial} onChange={setCelestial} />
+              <GlassCelestial size={40} value={celestial} onChange={setCelestial} />
+              <GlassCelestial size={26} value={celestial} onChange={setCelestial} />
+              <div style={{ ...mono, fontSize: 9.5, color: 'rgba(0,0,0,0.45)', lineHeight: 1.7 }}>
+                state: <strong>{celestial}</strong><br />
+                three sizes, one state — the ornament runs at 40 in the masthead
+              </div>
+            </div>
+          </Bench>
 
           <Bench
             name="Glass Sheet"
