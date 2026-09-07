@@ -27,15 +27,64 @@ const FOCUS_CSS = `
 .gt-key:focus-visible { outline: 2px solid rgba(200,150,42,0.9); outline-offset: 3px; }
 `
 
-/** Every letter in the masthead that has imagery, flattened with its position. */
-function buildSlots(lines) {
+/**
+ * Every letter in the masthead that has imagery, flattened with its position.
+ *
+ * Keyed by its index in the whole title rather than by row and column, because
+ * the rows re-break with the viewport. The letters and their order do not
+ * change when that happens, so an index survives a reflow where a row/column
+ * key would not — and a key that changes resets which scene each tile is
+ * showing, mid-rotation.
+ */
+function buildSlots(rows) {
   const slots = []
-  lines.forEach((line, row) => {
+  let i = 0
+  rows.forEach((line, row) => {
     ;[...line].forEach((ch, col) => {
-      if (ch !== ' ' && LETTERS[ch]) slots.push({ ch, row, col, key: `t-${row}-${col}-${ch}` })
+      if (ch !== ' ' && LETTERS[ch]) slots.push({ ch, row, col, key: `t-${i++}-${ch}` })
     })
   })
   return slots
+}
+
+/**
+ * Ways to break the title, from the fewest rows to the most. The title is
+ * measured against each in turn and the first that reaches a legible tile size
+ * wins, so a phone gets three short rows of readable tiles rather than two long
+ * rows of stamps.
+ */
+function breakCandidates(lines) {
+  const out = [lines]
+  const words = lines.flatMap(l => l.split(' ').filter(Boolean))
+  if (words.length !== lines.length) out.push(words)
+  return out
+}
+
+/** How wide the widest of `rows` renders at a given tile size. */
+function rowsWidth(rows, size, m) {
+  const outer = size + m.edge * 2
+  return Math.max(...rows.map(line => {
+    const items = [...line].filter(c => c === ' ' || LETTERS[c])
+    const w = items.reduce((a, c) => a + (c === ' ' ? size * m.spaceRatio : outer), 0)
+    return w + Math.max(items.length - 1, 0) * m.gap
+  }), 0)
+}
+
+/** The tile size a given set of rows can afford in `avail` px. */
+function fitFor(rows, avail, m) {
+  let fit = m.maxSize
+  for (const line of rows) {
+    const letters = [...line].filter(c => c !== ' ' && LETTERS[c]).length
+    const spaces = [...line].filter(c => c === ' ').length
+    const n = letters + spaces
+    if (n < 1) continue
+    // Each tile costs its image plus the glaze on both sides, so the edge has
+    // to come out of the budget before the images are sized.
+    const each = (avail - (n - 1) * m.gap - letters * m.edge * 2) /
+      (letters + spaces * m.spaceRatio)
+    if (each > 0) fit = Math.min(fit, each)
+  }
+  return fit
 }
 
 export default function GlassTitle({
@@ -52,7 +101,13 @@ export default function GlassTitle({
   const m = { ...MATERIAL_DEFAULTS, ...material }
   const p = { ...POINTER_DEFAULTS, ...pointer }
 
-  const slots = buildSlots(lines)
+  // How the title is broken, and how big its tiles are. Both come out of the
+  // same measurement, so they cannot disagree.
+  const [layout, setLayout] = useState(() => ({ rows: lines, size: m.maxSize }))
+  const rows = layout.rows
+  const size = layout.size
+
+  const slots = buildSlots(rows)
   const count = slots.length
 
   // Which variant of each letter's imagery is showing. Clicking cycles it, the
@@ -61,28 +116,38 @@ export default function GlassTitle({
     Object.fromEntries(slots.map(s => [s.key, Math.floor(Math.random() * LETTERS[s.ch].length)])),
   )
 
-  // Tile size is derived from the host's width the same way the masthead derives
-  // it, so a glazed row breaks exactly where the CSS one does.
-  const [size, setSize] = useState(m.maxSize)
+  /**
+   * Choose the fewest rows that still leave the tiles legible.
+   *
+   * minSize is a preference, not a floor: it is the size below which adding a
+   * row beats shrinking further. Treating it as a floor is what broke this —
+   * at 390px the two-row title wants 17.7px tiles, the floor snapped that back
+   * to 52, and the row rendered 601px wide inside a 294px column. hardMin is
+   * the real floor, for the case where even the most broken-up title cannot
+   * reach the preference.
+   */
   const measure = useCallback(() => {
     const host = hostRef.current
     if (!host) return
     const avail = host.clientWidth - 12
     if (avail <= 0) return
-    let fit = m.maxSize
-    lines.forEach(line => {
-      const letters = [...line].filter(c => c !== ' ' && LETTERS[c]).length
-      const spaces = [...line].filter(c => c === ' ').length
-      const n = letters + spaces
-      if (n < 1) return
-      // Each tile costs its image plus the glaze on both sides, so the edge has
-      // to come out of the budget before the images are sized.
-      const each = (avail - (n - 1) * m.gap - letters * m.edge * 2) /
-        (letters + spaces * m.spaceRatio)
-      if (each > 0) fit = Math.min(fit, each)
-    })
-    setSize(Math.max(m.minSize, Math.min(m.maxSize, Math.floor(fit))))
-  }, [lines, m.edge, m.gap, m.maxSize, m.minSize, m.spaceRatio])
+
+    const candidates = breakCandidates(lines)
+    // The first arrangement that stays legible, else the most broken-up one.
+    const chosen = candidates.find(rows => fitFor(rows, avail, m) >= m.minSize)
+      ?? candidates[candidates.length - 1]
+
+    // fitFor is the size that exactly consumes the width, so flooring it can
+    // only help — but it is derived, and a derived width that overflows its
+    // column is the bug this is fixing. Measure the result and shrink it if it
+    // does not actually fit, whatever the preference says.
+    let size = Math.max(m.hardMin, Math.min(m.maxSize, Math.floor(fitFor(chosen, avail, m))))
+    if (rowsWidth(chosen, size, m) > avail) {
+      size = Math.max(1, Math.floor(fitFor(chosen, avail, m)))
+    }
+
+    setLayout({ rows: chosen, size })
+  }, [lines, m.edge, m.gap, m.maxSize, m.minSize, m.hardMin, m.spaceRatio])
 
   useEffect(() => {
     measure()
@@ -105,14 +170,14 @@ export default function GlassTitle({
     const w = items.reduce((a, c) => a + (c === ' ' ? size * m.spaceRatio : outer), 0)
     return w + Math.max(items.length - 1, 0) * m.gap
   }
-  const widest = Math.max(...lines.map(rowWidth), 1)
+  const widest = Math.max(...rows.map(rowWidth), 1)
   const width = widest + pad * 2
-  const height = lines.length * outer + (lines.length - 1) * m.rowGap + pad * 2
+  const height = rows.length * outer + (rows.length - 1) * m.rowGap + pad * 2
 
   // Rows are centred, as .title-row is. x/y are the visible tile's top-left, so
   // the image sits `edge` inside it.
   const cellFor = slot => {
-    const line = lines[slot.row]
+    const line = rows[slot.row]
     let x = pad + (widest - rowWidth(line)) / 2
     for (let i = 0; i < slot.col; i++) {
       const c = line[i]

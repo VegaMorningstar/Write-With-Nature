@@ -18,7 +18,7 @@
  * Without WebGPU this renders the buttons with a plain frosted CSS fallback:
  * the behaviour survives, the refraction does not.
  */
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { LETTERS, MATERIAL_DEFAULTS, POINTER_DEFAULTS, squashProperties, liftProperties } from './constants.ts'
 import { Spring } from './spring.ts'
 
@@ -40,8 +40,12 @@ export default function GlassAlphabet({
   pointer = POINTER_DEFAULTS,
   available,
   onSelect,
+  // The widest the grid would like to be. It narrows to whatever the container
+  // can actually hold, keeping the tiles their tuned size rather than shrinking
+  // them — a 30px letter that fits beats a 46px one that does not.
   columns = 8,
 }) {
+  const wrapRef = useRef(null)
   const hostRef = useRef(null)
   const canvasRef = useRef(null)
   const buttonRefs = useRef([])
@@ -58,17 +62,46 @@ export default function GlassAlphabet({
   const availRef = useRef(available)
   useEffect(() => { matRef.current = m; ptrRef.current = p; availRef.current = available })
 
-  const rows = Math.ceil(LETTERS.length / columns)
+  // Measured on the wrapper, which is full-width; the host below is sized to the
+  // grid, so asking it how much room there is would only ever return its own
+  // answer back.
+  const [cols, setCols] = useState(columns)
+  const measure = useCallback(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const avail = wrap.clientWidth
+    if (avail <= 0) return
+    const pad = Math.ceil(m.edge) + 6
+    let fit = columns
+    while (fit > 1 && pad * 2 + fit * m.size + (fit - 1) * m.gap > avail) fit--
+    setCols(fit)
+  }, [columns, m.edge, m.size, m.gap])
+
+  useEffect(() => {
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (wrapRef.current) ro.observe(wrapRef.current)
+    return () => ro.disconnect()
+  }, [measure])
+
+  // The render loop reads the column count rather than closing over it, so
+  // crossing a breakpoint reflows the grid instead of tearing down and
+  // rebuilding the WebGPU pipeline. The tile count never changes, so the
+  // pipeline has no reason to care.
+  const colsRef = useRef(cols)
+  colsRef.current = cols
+
+  const rows = Math.ceil(LETTERS.length / cols)
   // Room for the lens: the visible tile is the box inflated by `edge`, so the
   // grid needs that much clearance before the canvas would clip its own rim.
   const pad = Math.ceil(m.edge) + 6
   const stride = m.size + m.gap
-  const width = pad * 2 + columns * m.size + (columns - 1) * m.gap
+  const width = pad * 2 + cols * m.size + (cols - 1) * m.gap
   const height = pad * 2 + rows * m.size + (rows - 1) * m.gap
 
   const cellAt = i => ({
-    x: pad + (i % columns) * stride,
-    y: pad + Math.floor(i / columns) * stride,
+    x: pad + (i % cols) * stride,
+    y: pad + Math.floor(i / cols) * stride,
   })
 
   // ── Springs, and the frame loop that feeds them to the shader ──────────────
@@ -201,8 +234,8 @@ export default function GlassAlphabet({
             const sq = springs ? springs.squash[i].value : 0
             const ly = springs ? springs.lift[i].value : 0
 
-            const cx = localPad + (i % columns) * localStride + mm.size / 2
-            const cy = localPad + Math.floor(i / columns) * localStride + mm.size / 2 - ly * 40
+            const cx = localPad + (i % colsRef.current) * localStride + mm.size / 2
+            const cy = localPad + Math.floor(i / colsRef.current) * localStride + mm.size / 2 - ly * 40
 
             // Squash the box itself, so the deformation happens in the glass
             const halfPx = mm.size / 2
@@ -281,7 +314,7 @@ export default function GlassAlphabet({
       cleanup?.()
       sceneRef.current = null
     }
-  }, [columns])
+  }, [])
 
   // ── Impulses ───────────────────────────────────────────────────────────────
   const kick = (index, squashAmount, liftAmount, reach) => {
@@ -330,6 +363,7 @@ export default function GlassAlphabet({
   })
 
   return (
+    <div ref={wrapRef} style={{ width: '100%' }}>
     <div
       ref={hostRef}
       style={{
@@ -388,6 +422,7 @@ export default function GlassAlphabet({
           </button>
         )
       })}
+    </div>
     </div>
   )
 }

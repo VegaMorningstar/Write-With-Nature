@@ -587,6 +587,16 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ── Reduced motion: plain blur for small glass elements ── */
+/* ── Narrow screens ──────────────────────────────────────────────────────────
+   The only breakpoint in the file. At 2rem of page padding plus 1rem of
+   masthead padding, a 390px phone spends a quarter of its width on margins
+   before the title gets any — which is half of why the masthead had no room to
+   lay itself out. */
+@media (max-width: 640px) {
+  .page { padding: 0 1rem 4rem; }
+  .masthead { padding: 2.25rem 0.5rem 1.5rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   textarea, .icon-btn, .save-btn, .install-btn, .render-btn, .alpha-cell {
     backdrop-filter: blur(20px);

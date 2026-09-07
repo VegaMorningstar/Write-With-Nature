@@ -27,7 +27,15 @@ export const MATERIAL_DEFAULTS = {
   // narrower than the app — a 288px control panel — so tiles there are smaller
   // than this whatever the ceiling; the app page is where the size is judged.
   maxSize: 84,
+  // A preference, not a floor: the size below which adding a row beats
+  // shrinking further, so a phone gets WRITE / WITH / NATURE at a readable size
+  // rather than WRITE WITH on one line at 18px. Treating this as a floor is
+  // what made the title overflow its column on a phone — the fit said 17.7 and
+  // the floor snapped it back to 52, rendering 601px inside 294.
   minSize: 52,
+  // The real floor, for when even the most broken-up title cannot reach the
+  // preference. Below this the tiles stop being legible as letters at all.
+  hardMin: 24,
   gap: 4,
   rowGap: 7,
   spaceRatio: 0.3,   // the break between WRITE and WITH, as a fraction of a tile
