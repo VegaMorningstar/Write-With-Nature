@@ -10,7 +10,7 @@
  * gradients are repainted from the theme's own tokens and the fluid canvas is
  * composited in at whatever blend the page is using.
  */
-import { paintPaper, paintSky, fluidBlendMode } from '../liquid-glass/backdrop.js'
+import { paintPaper } from '../liquid-glass/backdrop.js'
 
 /** Comfortably above the ornament's own size at any sane device ratio. */
 export const TEX_SIZE = 256
@@ -44,13 +44,14 @@ export function createCelestialBackdrop() {
     ctx.translate(-rect.left, -rect.top)
 
     paintPaper(ctx, vw, vh)
-    paintSky(ctx, vw, vh)
 
     const fluid = document.getElementById('fluid-cursor-canvas') ||
       document.getElementById('tune-fluid-canvas')
     if (fluid && fluid.width > 0 && fluid.height > 0) {
       try {
-        ctx.globalCompositeOperation = fluidBlendMode()
+        // The blend the real canvas uses, so the glass refracts what is on
+        // screen rather than a brighter version of it
+        ctx.globalCompositeOperation = 'multiply'
         ctx.drawImage(fluid, 0, 0, vw, vh)
       } catch (_) { /* tainted or mid-frame; the paper still stands */ }
       ctx.globalCompositeOperation = 'source-over'
