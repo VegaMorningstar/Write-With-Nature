@@ -19,7 +19,7 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { Spring } from '../glass-alphabet/spring.ts'
 import {
   MATERIAL_DEFAULTS, POINTER_DEFAULTS, SUN, MOON,
-  squashProperties, morphProperties,
+  squashProperties, wobbleProperties, morphProperties,
 } from './constants.ts'
 
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
@@ -74,7 +74,7 @@ export default function GlassCelestial({
     const s = springs.current
     if (s) {
       s.squash.velocity += ptrRef.current.clickImpulse
-      s.wobble.velocity -= ptrRef.current.clickImpulse * 0.6
+      s.wobble.velocity -= ptrRef.current.clickImpulse * 0.7
     }
   }, [isMoon, value, onChange])
 
@@ -85,7 +85,7 @@ export default function GlassCelestial({
     if (!canvas || !host) return
 
     const squash = new Spring(squashProperties)
-    const wobble = new Spring(squashProperties)
+    const wobble = new Spring(wobbleProperties)
     const morph = new Spring(morphProperties)
     morph.value = targetRef.current
     morph.target = targetRef.current
@@ -158,8 +158,11 @@ export default function GlassCelestial({
           scene.setParams({
             ...mm,
             morph: t,
+            // Anti-correlated, so the shape keeps roughly its area while it
+            // deforms — a jelly that grows on both axes reads as a zoom.
             squashX: 1 + squash.value * pp.squashGain,
-            squashY: 1 - squash.value * pp.squashGain * 0.7 + wobble.value * pp.squashGain * 0.3,
+            squashY: 1 - squash.value * pp.squashGain * 0.75 + wobble.value * pp.wobbleGain,
+            rayLength: mm.rayLength * (1 + squash.value * pp.rayStretch),
             tintStrength,
             tintR: mix(SUN.tintR, MOON.tintR, t),
             tintG: mix(SUN.tintG, MOON.tintG, t),
@@ -190,6 +193,7 @@ export default function GlassCelestial({
     hoverRef.current = on
     if (on && springs.current) {
       springs.current.squash.velocity += ptrRef.current.hoverImpulse
+      springs.current.wobble.velocity += ptrRef.current.hoverImpulse * 0.5
     }
   }
 

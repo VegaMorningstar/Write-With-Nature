@@ -69,11 +69,22 @@ export const POINTER_DEFAULTS = {
   hoverGlow: 0.85,
   glowGain: 0.9,
   glowHalo: 0.055,
-  // Impulses
-  hoverImpulse: 2.4,
-  clickImpulse: 5.5,
+
+  // Impulses. A velocity kick peaks at roughly v/omega, and omega here is 28.6,
+  // so these land at about 10% deformation on hover and 28% on a press —
+  // matched to the alphabet's 7% and 25%, which is the feel this should share.
+  // The first pass at 2.4 and 5.5 gave 2% and 5%: the springs were running, and
+  // nothing moved enough to see.
+  hoverImpulse: 6,
+  clickImpulse: 16,
   // How far the squash spring deforms the shape, as a fraction
-  squashGain: 0.28,
+  squashGain: 0.5,
+  // The secondary ring, on the vertical only — a jelly does not squash
+  // symmetrically, and a single axis reads as a pulse rather than a wobble.
+  wobbleGain: 0.34,
+  // Rays lengthen on the bounce. A sun whose body squashes while its spokes
+  // stay rigid reads as a decal on a jelly rather than one object.
+  rayStretch: 0.4,
 };
 
 /**
@@ -84,6 +95,14 @@ export const squashProperties: SpringProperties = {
   mass: 1,
   stiffness: 820,
   damping: 12,
+};
+
+/** Softer and slower than the squash, so the two rings beat against each other
+ *  instead of moving as one. */
+export const wobbleProperties: SpringProperties = {
+  mass: 1,
+  stiffness: 430,
+  damping: 9,
 };
 
 export const morphProperties: SpringProperties = {

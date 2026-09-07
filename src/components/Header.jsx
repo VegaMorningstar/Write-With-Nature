@@ -11,6 +11,7 @@
  * masthead still reads as it always did.
  */
 import GlassTitle from '../ui-elements/glass-title/GlassTitle'
+import GlassCelestial from '../ui-elements/glass-celestial/GlassCelestial'
 
 export default function Header() {
   return (
@@ -23,17 +24,9 @@ export default function Header() {
 
       <div className="ornament">
         <div className="ornament-rule" />
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="5.5" fill="currentColor" opacity="0.65"/>
-          <line x1="12" y1="1"    x2="12" y2="4.5"  stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-          <line x1="12" y1="19.5" x2="12" y2="23"   stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-          <line x1="1"  y1="12"   x2="4.5"  y2="12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-          <line x1="19.5" y1="12" x2="23" y2="12"   stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-          <line x1="3.5" y1="3.5" x2="6"    y2="6"    stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-          <line x1="18"  y1="18"  x2="20.5" y2="20.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-          <line x1="20.5" y1="3.5" x2="18" y2="6"    stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-          <line x1="6"   y1="18"  x2="3.5"  y2="20.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-        </svg>
+        {/* The ornament, as a jelly of liquid glass. It toggles its own shape
+            and nothing else — the page theme is not wired to it. */}
+        <GlassCelestial size={40} defaultValue="sun" />
         <div className="ornament-rule" />
       </div>
     </header>
