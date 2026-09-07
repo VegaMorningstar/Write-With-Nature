@@ -28,6 +28,8 @@ export const MATERIAL_DEFAULTS = {
   // rayInner / radius, which lands the moon's outer arc exactly where the sun's
   // rays begin, so the two fill the same circle.
   moonScale: 1.44,
+  // Nudged left. Negative moves the crescent toward the left of its box.
+  moonShiftX: -0.05,
 
   // ── Lens ──────────────────────────────────────────────────────────────────
   // A wide ring against a small shape, as on the alphabet: at this size the

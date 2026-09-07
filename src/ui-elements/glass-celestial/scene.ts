@@ -42,6 +42,7 @@ const Params = d.struct({
   moonOffset: d.f32,
   moonRadius: d.f32,
   moonScale: d.f32,
+  moonShiftX: d.f32,
   morph: d.f32,
   squash: d.vec2f,
 
@@ -79,6 +80,7 @@ export type CelestialParams = {
   moonOffset: number;
   moonRadius: number;
   moonScale: number;
+  moonShiftX: number;
   morph: number;
   squashX: number;
   squashY: number;
@@ -153,6 +155,7 @@ export async function setupCelestial(
     moonOffset: 0.14,
     moonRadius: 0.2,
     moonScale: 1.44,
+    moonShiftX: 0,
     morph: 0,
     squash: d.vec2f(1, 1),
     start: 0,
@@ -242,8 +245,13 @@ export async function setupCelestial(
     'use gpu';
     const P = paramsUniform.$;
     const k = P.moonScale;
-    const body = sdDisk(p, P.radius * k);
-    const bite = sdDisk(d.vec2f(p.x - P.moonOffset * k, p.y), P.moonRadius * k);
+    // The crescent's mass sits to one side of the disk it is cut from, so its
+    // visual centre is not the disk's centre. This nudges the whole thing back,
+    // rather than the caller compensating with layout the sun would then have
+    // to undo.
+    const q = d.vec2f(p.x - P.moonShiftX, p.y);
+    const body = sdDisk(q, P.radius * k);
+    const bite = sdDisk(d.vec2f(q.x - P.moonOffset * k, q.y), P.moonRadius * k);
     return opSmoothDifference(bite, body, P.blendK * k);
   };
 
@@ -354,6 +362,7 @@ export async function setupCelestial(
         moonOffset: p.moonOffset,
         moonRadius: p.moonRadius,
         moonScale: Math.max(p.moonScale, 0.05),
+        moonShiftX: p.moonShiftX,
         morph: p.morph,
         squash: d.vec2f(Math.max(p.squashX, 0.05), Math.max(p.squashY, 0.05)),
         start: p.start,

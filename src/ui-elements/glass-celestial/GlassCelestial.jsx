@@ -213,7 +213,16 @@ export default function GlassCelestial({
   const label = isMoon ? 'Moon — switch to sun' : 'Sun — switch to moon'
 
   return (
-    <div ref={hostRef} style={{ position: 'relative', width: size, height: size, isolation: 'isolate' }}>
+    <div
+      ref={hostRef}
+      style={{
+        position: 'relative', width: size, height: size, isolation: 'isolate',
+        // The ornament sits in a flex row between two rules that both grow. A
+        // flex item shrinks by default, and a squeezed box would compress what
+        // the canvas draws into it rather than the layout around it.
+        flexShrink: 0,
+      }}
+    >
       <style>{FOCUS_CSS}</style>
       <canvas
         ref={canvasRef}
