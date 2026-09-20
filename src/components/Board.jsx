@@ -4,7 +4,7 @@ import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
 import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 import GlassButtons from '../ui-elements/glass-buttons/GlassButtons'
-import { WIDE_WIDTH } from '../ui-elements/glass-buttons/constants.ts'
+import { WIDE_WIDTH, SAVE_TINT } from '../ui-elements/glass-buttons/constants.ts'
 
 const Board = forwardRef(function Board(
   { renderedLines, tileW, vs, onShuffle, onResize, onClear, onCycleVariant, onSave, onInstall, installVisible },
@@ -24,7 +24,7 @@ const Board = forwardRef(function Board(
     { key: 'smaller', label: '−', title: 'Smaller tiles', onClick: () => onResize(-16), fallbackClass: 'icon-btn' },
     { key: 'larger', label: '+', title: 'Larger tiles', onClick: () => onResize(16), fallbackClass: 'icon-btn' },
     { key: 'clear', label: '✕', title: 'Clear', onClick: onClear, fallbackClass: 'icon-btn' },
-    { key: 'save', label: 'Save', title: 'Save as PNG', onClick: onSave, width: WIDE_WIDTH, fallbackClass: 'save-btn' },
+    { key: 'save', label: 'Save', title: 'Save as PNG', onClick: onSave, width: WIDE_WIDTH, tint: SAVE_TINT, fallbackClass: 'save-btn' },
   ], [onShuffle, onResize, onClear, onSave])
 
   return (

@@ -169,7 +169,7 @@ export default function GlassButtons({
               )
               : 0
 
-            tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H, glow })
+            tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H, glow, tint: list[i].tint })
             glyphs.push({ letter: list[i].label, x: cx, y: cy, alpha: 1 })
           }
           scene.setTiles(tiles)

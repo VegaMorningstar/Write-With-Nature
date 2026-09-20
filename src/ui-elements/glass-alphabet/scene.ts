@@ -167,6 +167,13 @@ export async function setupTileGlass(
   const Tiles = d.arrayOf(d.vec4f, COUNT);
   /** x = glow, from residual wobble energy. The rest is padding. */
   const Glows = d.arrayOf(d.vec4f, COUNT);
+  /**
+   * xyz = this tile's own tint, w = its strength. A negative strength means
+   * the tile has no opinion and takes the scene's tint, which is what every
+   * tile in a grid of identical glass does — the override exists for a row
+   * where one button is not the same colour as the others.
+   */
+  const Tints = d.arrayOf(d.vec4f, COUNT);
 
   const makeTexture = (w: number, h: number) =>
     root
@@ -206,6 +213,10 @@ export async function setupTileGlass(
   const glowsUniform = root.createUniform(
     Glows,
     Array.from({ length: COUNT }, () => d.vec4f(0, 0, 0, 0)),
+  );
+  const tintsUniform = root.createUniform(
+    Tints,
+    Array.from({ length: COUNT }, () => d.vec4f(0, 0, 0, -1)),
   );
 
   const paramsUniform = root.createUniform(Params, {
@@ -315,6 +326,7 @@ export async function setupTileGlass(
     let sdfDist = d.f32(1e6);
     let dir = d.vec2f(0, 1);
     let glow = d.f32(0);
+    let ownTint = d.vec4f(0, 0, 0, -1);
 
     for (const i of std.range(COUNT)) {
       const tile = tilesUniform.$[i];
@@ -332,6 +344,7 @@ export async function setupTileGlass(
       sdfDist = std.select(sdfDist, dist, closer);
       dir = std.select(dir, dirI, closer);
       glow = std.select(glow, glowsUniform.$[i].x, closer);
+      ownTint = std.select(ownTint, tintsUniform.$[i], closer);
     }
 
     const normalizedDist =
@@ -398,9 +411,15 @@ export async function setupTileGlass(
     const bodyColor = std.mix(paperBody, paramsUniform.$.letterColor, maskBody);
     const ringColor = std.mix(paperRing, paramsUniform.$.letterColor, maskRing);
 
+    // The winning tile's own tint if it has one, the scene's if it does not.
+    const tintIsOwn = ownTint.w >= 0;
     const tint = TintParams({
-      color: paramsUniform.$.tintColor,
-      strength: paramsUniform.$.tintStrength,
+      color: std.select(
+        paramsUniform.$.tintColor,
+        d.vec3f(ownTint.x, ownTint.y, ownTint.z),
+        tintIsOwn,
+      ),
+      strength: std.select(paramsUniform.$.tintStrength, ownTint.w, tintIsOwn),
     });
 
     const tintedBlur = applyTint(bodyColor, tint);
@@ -490,11 +509,28 @@ export async function setupTileGlass(
      * and calling it on a uniform throws from inside the render loop where the
      * only sign of it is a silent black canvas.
      */
-    setTiles(tiles: { cx: number; cy: number; hx: number; hy: number; glow: number }[]) {
+    setTiles(
+      tiles: {
+        cx: number;
+        cy: number;
+        hx: number;
+        hy: number;
+        glow: number;
+        /** This tile's own tint. Omit it to take the scene's. */
+        tint?: { r: number; g: number; b: number; strength: number };
+      }[],
+    ) {
       tilesUniform.write(
         tiles.map(t => d.vec4f(t.cx, t.cy, Math.max(t.hx, 0.0005), Math.max(t.hy, 0.0005))),
       );
       glowsUniform.write(tiles.map(t => d.vec4f(t.glow, 0, 0, 0)));
+      tintsUniform.write(
+        tiles.map(t =>
+          t.tint
+            ? d.vec4f(t.tint.r, t.tint.g, t.tint.b, t.tint.strength)
+            : d.vec4f(0, 0, 0, -1),
+        ),
+      );
     },
     setParams(p: SceneParams) {
       paramsUniform.write({
