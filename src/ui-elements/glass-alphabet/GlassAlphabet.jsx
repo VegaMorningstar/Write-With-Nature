@@ -55,6 +55,10 @@ export default function GlassAlphabet({
   const m = { ...MATERIAL_DEFAULTS, ...material }
   const p = { ...POINTER_DEFAULTS, ...pointer }
 
+  // False until the shader is genuinely running, which is not the same as the
+  // browser advertising WebGPU. The frosted fallback stays up until it is.
+  const [glassReady, setGlassReady] = useState(false)
+
   // The render loop reads these rather than closing over them, so tuning a
   // slider does not tear down and rebuild the WebGPU pipeline.
   const matRef = useRef(m)
@@ -311,9 +315,14 @@ export default function GlassAlphabet({
         }
 
         sceneRef.current = scene
+        if (!cancelled) setGlassReady(true)
         cleanup = () => { scene.onCleanup(); root.destroy() }
       } catch (e) {
-        console.warn('[GlassAlphabet] init failed:', e)
+        // The frosted buttons stay up. A browser that advertises WebGPU and
+        // then cannot give us an adapter would otherwise leave transparent
+        // buttons over a canvas that never drew — an alphabet that is not
+        // there at all.
+        console.warn('[GlassAlphabet] init failed, keeping the plain keys:', e)
       }
     }
 
@@ -360,7 +369,7 @@ export default function GlassAlphabet({
 
   // Only when there is no WebGPU. With the shader running, the buttons are
   // invisible hit targets and every pixel comes from the canvas.
-  const fallbackStyle = has => (gpuSupported ? null : {
+  const fallbackStyle = has => (glassReady ? null : {
     background: 'rgba(255,255,255,0.14)',
     backdropFilter: 'blur(8px) saturate(150%)',
     WebkitBackdropFilter: 'blur(8px) saturate(150%)',
@@ -427,7 +436,7 @@ export default function GlassAlphabet({
               ...fallbackStyle(has),
             }}
           >
-            {gpuSupported ? '' : letter}
+            {glassReady ? '' : letter}
           </button>
         )
       })}

@@ -52,6 +52,10 @@ export default function GlassCelestial({
 
   // Read by the frame loop rather than closed over, so changing state or tuning
   // a slider does not tear down the pipeline.
+  // False until the shader is genuinely running, which is not the same as the
+  // browser advertising WebGPU. The plain SVG stays up until it is.
+  const [glassReady, setGlassReady] = useState(false)
+
   const matRef = useRef(m)
   const ptrRef = useRef(p)
   const targetRef = useRef(isMoon ? 1 : 0)
@@ -188,9 +192,11 @@ export default function GlassCelestial({
           })
         }
 
+        if (!cancelled) setGlassReady(true)
         cleanup = () => { scene.onCleanup(); root.destroy() }
       } catch (e) {
-        console.warn('[GlassCelestial] init failed:', e)
+        // The plain sun or moon stays up rather than an empty canvas.
+        console.warn('[GlassCelestial] init failed, keeping the plain mark:', e)
       }
     }
 
@@ -250,7 +256,7 @@ export default function GlassCelestial({
         }}
       >
         {/* Only when there is no shader to draw it */}
-        {!gpuSupported && (
+        {!glassReady && (
           <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" aria-hidden="true">
             {isMoon ? (
               <path d="M15.5 3.2a9 9 0 1 0 5.3 11.4A7.2 7.2 0 0 1 15.5 3.2Z"

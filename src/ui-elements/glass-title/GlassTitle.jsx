@@ -20,6 +20,11 @@ import { LETTERS, TITLE_LINES } from '../../data/letters'
 import { Spring } from '../glass-alphabet/spring.ts'
 import { MATERIAL_DEFAULTS, POINTER_DEFAULTS, squashProperties, liftProperties } from './constants.ts'
 
+/**
+ * Whether the browser advertises WebGPU — worth asking before going to the
+ * trouble of an init, but not the same question as whether the glass ended up
+ * drawing. What the tiles show is gated on that second question instead.
+ */
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
 const FOCUS_CSS = `
@@ -100,6 +105,10 @@ export default function GlassTitle({
 
   const m = { ...MATERIAL_DEFAULTS, ...material }
   const p = { ...POINTER_DEFAULTS, ...pointer }
+
+  // False until the shader is genuinely running. The images underneath stay
+  // visible for exactly as long as it is not.
+  const [glassReady, setGlassReady] = useState(false)
 
   // How the title is broken, and how big its tiles are. Both come out of the
   // same measurement, so they cannot disagree.
@@ -399,9 +408,14 @@ export default function GlassTitle({
           })
         }
 
+        if (!cancelled) setGlassReady(true)
         cleanup = () => { scene.onCleanup(); root.destroy() }
       } catch (e) {
-        console.warn('[GlassTitle] init failed:', e)
+        // The images stay visible. A browser that advertises WebGPU and then
+        // cannot give us an adapter is not rare — blocklisted drivers, some
+        // Linux stacks, VMs, a crashed GPU process — and the masthead going
+        // missing is not an acceptable answer to any of them.
+        console.warn('[GlassTitle] init failed, keeping the plain tiles:', e)
       }
     }
 
@@ -499,7 +513,7 @@ export default function GlassTitle({
               style={{
                 width: '100%', height: '100%', objectFit: 'cover', display: 'block',
                 borderRadius: m.radius,
-                opacity: gpuSupported ? 0 : 1,
+                opacity: glassReady ? 0 : 1,
               }}
             />
           </button>
