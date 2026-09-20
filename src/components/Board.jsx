@@ -1,8 +1,10 @@
-import { forwardRef } from 'react'
+import { forwardRef, useMemo } from 'react'
 import Tile from './Tile'
 import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
 import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
+import GlassButtons from '../ui-elements/glass-buttons/GlassButtons'
+import { WIDE_WIDTH } from '../ui-elements/glass-buttons/constants.ts'
 
 const Board = forwardRef(function Board(
   { renderedLines, tileW, vs, onShuffle, onResize, onClear, onCycleVariant, onSave, onInstall, installVisible },
@@ -15,6 +17,16 @@ const Board = forwardRef(function Board(
   const letterCount = renderedLines.flatMap(l => l.type === 'row' ? l.chars.filter(c => c.type === 'letter') : []).length
   const lineCount   = renderedLines.filter(l => l.type === 'row').length
 
+  // One lens each, in one canvas. `fallbackClass` is what they wear if the
+  // glass never starts — the buttons these were before it existed.
+  const toolbar = useMemo(() => [
+    { key: 'shuffle', label: '⇌', title: 'Shuffle all tiles', onClick: onShuffle, fallbackClass: 'icon-btn' },
+    { key: 'smaller', label: '−', title: 'Smaller tiles', onClick: () => onResize(-16), fallbackClass: 'icon-btn' },
+    { key: 'larger', label: '+', title: 'Larger tiles', onClick: () => onResize(16), fallbackClass: 'icon-btn' },
+    { key: 'clear', label: '✕', title: 'Clear', onClick: onClear, fallbackClass: 'icon-btn' },
+    { key: 'save', label: 'Save', title: 'Save as PNG', onClick: onSave, width: WIDE_WIDTH, fallbackClass: 'save-btn' },
+  ], [onShuffle, onResize, onClear, onSave])
+
   return (
     <section className="section" style={{ marginTop: '2rem' }}>
       <div className="collage-bar">
@@ -24,18 +36,7 @@ const Board = forwardRef(function Board(
             : 'Collage'}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div className="icon-cluster">
-            <button className="icon-btn" title="Shuffle all tiles"  onClick={onShuffle}>⇌</button>
-            <button className="icon-btn" title="Smaller tiles"      onClick={() => onResize(-16)}>−</button>
-            <button className="icon-btn" title="Larger tiles"       onClick={() => onResize(16)}>+</button>
-            <button className="icon-btn" title="Clear"              onClick={onClear}>✕</button>
-          </div>
-          <button className="save-btn" onClick={onSave}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M6.5 1v7M4 6l2.5 2.5L9 6M1.5 10.5h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Save as PNG
-          </button>
+          <GlassButtons items={toolbar} />
           {installVisible && (
             <button className="install-btn visible" onClick={onInstall}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none">

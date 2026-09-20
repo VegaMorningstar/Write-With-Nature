@@ -320,8 +320,9 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
   flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.85rem;
 }
 
-.icon-cluster { display: flex; gap: 6px; align-items: center; }
-
+/* .icon-btn and .save-btn are what the toolbar wears when the glass fails to
+   start; GlassButtons lays them out itself, so the flex cluster they used to
+   sit in is gone. */
 .icon-btn {
   width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
