@@ -18,19 +18,26 @@ export const BUTTON_MATERIAL = {
   edge: 8,         // px of rim, in proportion to the smaller tile
   ringStart: 2.6,
 
-  letterSize: 15,
-  letterWeight: 500,
+  // 700 because that is the only upright weight of Playfair the page loads —
+  // 500 asked for one that does not exist and got whatever was nearest. And
+  // the symbols these carry are not in Playfair's glyph set at all, so they
+  // fall through to the system serif, where thin strokes all but vanish once
+  // the lens has displaced and blurred them. Bigger and heavier is what makes
+  // them legible through glass.
+  letterSize: 18,
+  letterWeight: 700,
 };
 
 /** Width in px of a button carrying a word rather than a single glyph. */
 export const WIDE_WIDTH = 92;
 
 /**
- * #7EE022, and a strength a little above the row's own so it reads as green
- * rather than as a suggestion — but still well under a filter. Tint is what
- * marks Save out now that every label shares one colour and one font.
+ * #7EE022, at a strength well above the row's own 0.04 — enough that the tile
+ * reads as a green thing made of glass rather than as clear glass with a
+ * green note in it. Tint is what marks Save out now that every label in the
+ * row shares one colour and one font.
  */
-export const SAVE_TINT = { r: 0x7e / 255, g: 0xe0 / 255, b: 0x22 / 255, strength: 0.1 };
+export const SAVE_TINT = { r: 0x7e / 255, g: 0xe0 / 255, b: 0x22 / 255, strength: 0.2 };
 
 /**
  * The compose button: the page's one action, so a bigger lens than the
@@ -60,7 +67,11 @@ export const RENDER_MATERIAL = {
   ringStart: 3.5,
 
   letterSize: 23,
-  letterWeight: 600,
+  // 700 for the same reason as the toolbar's: it is the only upright weight
+  // of Playfair the page loads, and RENDER is a word Playfair does have, so
+  // this is the one label in the app that gets the real face at the real
+  // weight rather than a fallback.
+  letterWeight: 700,
 
   bodyChromatic: 0.009,
 };
