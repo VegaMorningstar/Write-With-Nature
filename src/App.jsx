@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { LETTERS } from './data/letters'
 import Header from './components/Header'
 import Board from './components/Board'
@@ -8,7 +8,8 @@ import usePanelGlass, { glassSupported } from './hooks/usePanelGlass'
 import LiquidGlassPanel from './ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from './ui-elements/liquid-glass/panelPreset'
 import FluidCursor from './components/FluidCursor'
-import JellyWireframeButton from './ui-elements/jelly-wireframe-button/JellyWireframeButton'
+import GlassButtons from './ui-elements/glass-buttons/GlassButtons'
+import { RENDER_MATERIAL, RENDER_WIDTH } from './ui-elements/glass-buttons/constants.ts'
 import { ButterflyLoader } from './butterflies/react'
 import { CursorButterflies } from './cursor-butterflies/react'
 
@@ -117,6 +118,10 @@ export default function App() {
       return { ...prev, [key]: newIdx }
     })
   }, [showToast])
+
+  const renderButton = useMemo(() => [
+    { key: 'render', label: 'RENDER', title: 'Render the collage', onClick: handleRender, width: RENDER_WIDTH, fallbackClass: 'render-btn' },
+  ], [handleRender])
 
   const handleResizeTiles = useCallback(delta => {
     setTileW(prev => Math.max(32, Math.min(200, prev + delta)))
@@ -241,10 +246,15 @@ export default function App() {
               style={{ width: '100%' }}
             />
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-              {/* Falls back to a plain .render-btn where WebGPU is absent.
-                  Every parameter has a default, so the tuned look ships without
-                  props; ?tune drives the same widget through sliders. */}
-              <JellyWireframeButton onClick={handleRender} />
+              {/* The same lens the alphabet is made of, one tile of it, with
+                  the body's dispersion turned up so RENDER splits into colour
+                  where it is read through the edges. Falls back to a plain
+                  .render-btn where the glass cannot start.
+
+                  The WebGPU jelly this replaced is still here, in
+                  ui-elements/jelly-wireframe-button, and still driven by ?ui,
+                  ?tune and ?preview — it is off the live page, not gone. */}
+              <GlassButtons items={renderButton} material={RENDER_MATERIAL} />
             </div>
             <p className="compose-note">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
