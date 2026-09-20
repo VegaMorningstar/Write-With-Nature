@@ -35,8 +35,10 @@
     <meta name="description" content="Compose text as NASA Landsat satellite imagery: rivers, glaciers and coastlines shaped into letters from orbit." />
     <meta property="og:title" content="Write with Nature" />
     <meta property="og:description" content="Compose words in NASA Landsat satellite imagery." />
-    <!-- Absolute: link previews are fetched by scrapers with no page context -->
-    <meta property="og:image" content="https://vegamorningstar.github.io/Write-With-Nature/icon-512.png" />
+    <!-- Absolute: link previews are fetched by scrapers with no page context,
+         so this is the one URL here that cannot be relative. SITE_URL is
+         substituted at build time; see vite.config.js. -->
+    <meta property="og:image" content="%SITE_URL%/icon-512.png" />
 
     <!-- Fonts (Phase 3 will replace with self-hosted) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
