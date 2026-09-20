@@ -58,9 +58,18 @@ const TUNING = {
    */
   FLAP_AMP: 0.62,
 
-  /** The kick away from a press, and how long the spring stays loosened. */
-  SCATTER_SPEED: 560,
+  /**
+   * The kick away from a press, how long the spring stays loosened, and how
+   * far the spot each one is heading for swings out while that lasts.
+   *
+   * Two things set how far they actually get, and they are the same order of
+   * magnitude: the kick itself, which peaks around SCATTER_SPEED / DAMP, and
+   * the widened reach holding them out there before the pull wins. Moving one
+   * without the other only changes half the distance.
+   */
+  SCATTER_SPEED: 280,
   SCATTER_HOLD: 0.75,
+  SCATTER_REACH: 0.8,
 
   /** Device pixel ratio ceiling. Five sprites, so this can be generous. */
   DPR_CAP: 2,
@@ -245,7 +254,7 @@ export function mountCursorButterflies(
       // at the cursor itself — five things converging on one point would pile
       // up into a single blur.
       const ease = b.scatter > 0 ? 1 - b.scatter / TUNING.SCATTER_HOLD : 1;
-      const reach = b.orbitR * (1 + (1 - ease) * 1.6);
+      const reach = b.orbitR * (1 + (1 - ease) * TUNING.SCATTER_REACH);
       const tx = cursor.x + Math.cos(b.orbit) * reach;
       const ty = cursor.y + Math.sin(b.orbit) * reach;
 
