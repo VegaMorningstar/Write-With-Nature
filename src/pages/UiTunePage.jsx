@@ -56,6 +56,7 @@ const SHEET_SEQUENCE = Object.keys(SCENES)
 import {
   MATERIAL_DEFAULTS as ALPHA_MATERIAL,
   POINTER_DEFAULTS as ALPHA_POINTER,
+  characterLabel,
 } from '../ui-elements/glass-alphabet/constants.ts'
 import GlassTitle from '../ui-elements/glass-title/GlassTitle'
 import {
@@ -346,7 +347,7 @@ export default function UiTunePage() {
 
       <GlassSheet
         open={sheetChar !== null}
-        title={sheetChar ? `The letter ${sheetChar}` : ''}
+        title={sheetChar ? characterLabel(sheetChar) : ''}
         subtitle={`${sheetScenes.length} Landsat ${sheetScenes.length === 1 ? 'scene' : 'scenes'}`}
         items={sheetScenes}
         onClose={() => setSheetChar(null)}

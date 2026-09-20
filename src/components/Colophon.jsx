@@ -5,7 +5,7 @@ import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 import GlassAlphabet from '../ui-elements/glass-alphabet/GlassAlphabet'
 import GlassSheet from '../ui-elements/glass-sheet/GlassSheet'
-import { LETTERS as ALPHABET } from '../ui-elements/glass-alphabet/constants.ts'
+import { LETTERS as ALPHABET, characterLabel } from '../ui-elements/glass-alphabet/constants.ts'
 
 export default function Colophon() {
   const colophonRef = useRef(null)
@@ -38,13 +38,13 @@ export default function Colophon() {
           to find all available filenames and add more variants.
         </p>
       </div>
-      {/* Twenty-six lenses of liquid glass, each a real button. Clicking one
-          opens every Landsat scene mapped to that character. */}
+      {/* A lens of liquid glass per character, each a real button. Clicking one
+          opens every Landsat scene mapped to it. */}
       <GlassAlphabet available={available} onSelect={setOpenChar} />
 
       <GlassSheet
         open={openChar !== null}
-        title={openChar ? `The letter ${openChar}` : ''}
+        title={openChar ? characterLabel(openChar) : ''}
         subtitle={`${scenes.length} Landsat ${scenes.length === 1 ? 'scene' : 'scenes'}`}
         items={scenes}
         onClose={() => setOpenChar(null)}

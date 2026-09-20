@@ -1,6 +1,16 @@
 import type { SpringProperties } from './spring.ts';
 
-export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+/**
+ * The characters the grid offers, in the order it lays them out. Digits are
+ * here because the Landsat gallery has scenes behind them too — a year or a
+ * house number composes as readily as a word.
+ */
+export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+
+/** "The letter A", but "The number 7" — a digit is not a letter. */
+export function characterLabel(ch: string) {
+  return /[0-9]/.test(ch) ? `The number ${ch}` : `The letter ${ch}`;
+}
 
 /**
  * TypeGPU's liquid glass, one lens per letter.

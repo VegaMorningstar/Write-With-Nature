@@ -25,6 +25,7 @@ import {
   MATERIAL_DEFAULTS as ALPHA_MATERIAL,
   POINTER_DEFAULTS as ALPHA_POINTER,
   LETTERS as ALPHA_MATERIAL_LETTERS,
+  characterLabel,
 } from '../ui-elements/glass-alphabet/constants.ts'
 import GlassTitle from '../ui-elements/glass-title/GlassTitle'
 import {
@@ -519,7 +520,7 @@ export default function TunePage() {
 
       <GlassSheet
         open={openChar !== null}
-        title={openChar ? `The letter ${openChar}` : ''}
+        title={openChar ? characterLabel(openChar) : ''}
         subtitle={`${openScenes.length} Landsat ${openScenes.length === 1 ? 'scene' : 'scenes'}`}
         items={openScenes}
         onClose={() => setOpenChar(null)}

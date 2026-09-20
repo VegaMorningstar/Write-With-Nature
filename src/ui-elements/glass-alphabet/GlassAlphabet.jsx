@@ -1,9 +1,9 @@
 /**
- * The alphabet as twenty-six lenses of liquid glass.
+ * The alphabet and the digits, each a lens of liquid glass.
  *
- * One canvas runs TypeGPU's liquid-glass shader over a union of 26 rounded
- * boxes (scene.ts), and twenty-six transparent <button> elements sit on top of
- * it carrying the behaviour — click handlers, keyboard focus, disabled state,
+ * One canvas runs TypeGPU's liquid-glass shader over a union of rounded boxes,
+ * one per character (scene.ts), and a transparent <button> sits on top of each
+ * carrying the behaviour — click handlers, keyboard focus, disabled state,
  * aria labels. The glass is drawn, the buttons are real; neither has to
  * compromise for the other.
  *
@@ -203,7 +203,12 @@ export default function GlassAlphabet({
         const backdrop = createTileBackdrop()
         const root = await tgpu.init()
         const context = root.configureContext({ canvas, alphaMode: 'premultiplied' })
-        const scene = await setupTileGlass(root, context, backdrop.paper, backdrop.letters)
+        // The uniform array's length and the shader's loop bound are both
+        // compile-time, so the count has to be handed over rather than left to
+        // the default — the grid grew past the alphabet when digits joined it.
+        const scene = await setupTileGlass(root, context, backdrop.paper, backdrop.letters, {
+          tileCount: LETTERS.length,
+        })
         if (cancelled) { scene.onCleanup(); root.destroy(); return }
 
         scene.beforeFrame = () => {
