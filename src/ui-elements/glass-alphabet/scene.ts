@@ -89,6 +89,14 @@ const Params = d.struct({
   bodyDepth: d.f32,
   letterBlur: d.f32,
   letterColor: d.vec3f,
+  // OURS: the ink used where the backdrop is bright, and the luminance band
+  // the glyph crosses over from one to the other in. The fluid cursor is
+  // multiplied into the paper, so a dark trail passing under the grid can take
+  // the page out from under a 20px letter of near-black ink entirely.
+  letterColorLight: d.vec3f,
+  inkLumLo: d.f32,
+  inkLumHi: d.f32,
+  inkSampleLevel: d.f32,
   glowStrength: d.f32,
   glowHalo: d.f32,
   glowColor: d.vec3f,
@@ -122,6 +130,12 @@ export type SceneParams = {
   letterR: number;
   letterG: number;
   letterB: number;
+  letterLightR: number;
+  letterLightG: number;
+  letterLightB: number;
+  inkLumLo: number;
+  inkLumHi: number;
+  inkSampleLevel: number;
   glowStrength: number;
   glowHalo: number;
   glowR: number;
@@ -236,6 +250,10 @@ export async function setupTileGlass(
     bodyDepth: 0.05,
     letterBlur: 0,
     letterColor: d.vec3f(0.11, 0.1, 0.06),
+    letterColorLight: d.vec3f(0.96, 0.94, 0.88),
+    inkLumLo: 0.3,
+    inkLumHi: 0.55,
+    inkSampleLevel: 4,
     glowStrength: 0,
     glowHalo: 0.03,
     glowColor: d.vec3f(0.68, 0.85, 0.45),
@@ -408,8 +426,29 @@ export async function setupTileGlass(
       letterView.$, sampler.$, ringUv, ringOffset, dir, paramsUniform.$.letterBlur,
     );
 
-    const bodyColor = std.mix(paperBody, paramsUniform.$.letterColor, maskBody);
-    const ringColor = std.mix(paperRing, paramsUniform.$.letterColor, maskRing);
+    // OURS: which ink the glyph is written in, decided by what is behind it.
+    //
+    // Read from a coarse mip rather than at this pixel. Per-pixel would be
+    // exact and free — paperBody is already the backdrop right here — but a
+    // letter straddling the edge of a dark fluid trail would then be written
+    // in two inks at once, which on a 20px glyph reads as a fault rather than
+    // an effect. A level partway up the chain is a local average instead, near
+    // enough one answer per tile, and it damps the flicker that a moving trail
+    // would otherwise drive through the threshold.
+    const behind = std.textureSampleLevel(
+      paperView.$, sampler.$, uv, paramsUniform.$.inkSampleLevel,
+    ).rgb;
+    const behindLum = std.dot(behind, d.vec3f(0.2126, 0.7152, 0.0722));
+    // Smoothstepped across a band, not switched at a threshold: a step would
+    // snap the whole grid over as a trail drifted past.
+    const ink = std.mix(
+      paramsUniform.$.letterColorLight,
+      paramsUniform.$.letterColor,
+      std.smoothstep(paramsUniform.$.inkLumLo, paramsUniform.$.inkLumHi, behindLum),
+    );
+
+    const bodyColor = std.mix(paperBody, ink, maskBody);
+    const ringColor = std.mix(paperRing, ink, maskRing);
 
     // The winning tile's own tint if it has one, the scene's if it does not.
     const tintIsOwn = ownTint.w >= 0;
@@ -550,6 +589,10 @@ export async function setupTileGlass(
         bodyDepth: Math.max(p.bodyDepth, 1e-4),
         letterBlur: p.letterBlur,
         letterColor: d.vec3f(p.letterR / 255, p.letterG / 255, p.letterB / 255),
+        letterColorLight: d.vec3f(p.letterLightR / 255, p.letterLightG / 255, p.letterLightB / 255),
+        inkLumLo: p.inkLumLo,
+        inkLumHi: p.inkLumHi,
+        inkSampleLevel: p.inkSampleLevel,
         glowStrength: p.glowStrength,
         glowHalo: Math.max(p.glowHalo, 1e-5),
         glowColor: d.vec3f(p.glowR / 255, p.glowG / 255, p.glowB / 255),

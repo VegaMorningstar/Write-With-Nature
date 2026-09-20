@@ -90,6 +90,22 @@ export const MATERIAL_DEFAULTS = {
   letterR: 28, letterG: 26, letterB: 16,
   letterOpacity: 1,
 
+  // The ink to use where what is behind the glyph has gone dark, and the
+  // luminance band it crosses over in. The fluid cursor is multiplied into the
+  // paper this lens refracts, so a dark trail drifting under the grid can take
+  // the page out from under near-black type entirely — worst on the small
+  // letters, which have the least stroke to be seen by.
+  //
+  // Warm parchment rather than white: a black-to-white flip reads as a toggle,
+  // and this type belongs to a palette. The band is wide on purpose, so the
+  // change is something you notice having happened rather than watch happen.
+  letterLightR: 246, letterLightG: 241, letterLightB: 226,
+  inkLumLo: 0.30,
+  inkLumHi: 0.55,
+  // Which mip of the backdrop the brightness is read from: high enough to be a
+  // local average rather than this pixel, low enough to still be local.
+  inkSampleLevel: 4,
+
   // ── Glow ──────────────────────────────────────────────────────────────────
   // Emission from residual wobble energy, as on the jelly. This is what marks a
   // press now that the focus ring is keyboard-only.
