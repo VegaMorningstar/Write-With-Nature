@@ -9,6 +9,7 @@ import LiquidGlassPanel from './ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from './ui-elements/liquid-glass/panelPreset'
 import FluidCursor from './components/FluidCursor'
 import JellyWireframeButton from './ui-elements/jelly-wireframe-button/JellyWireframeButton'
+import { ButterflyLoader } from './butterflies/react'
 
 function parseLines(rawText) {
   return rawText.split('\n').map((line, lineIdx) => {
@@ -52,6 +53,17 @@ export default function App() {
   const [toastVisible,  setToastVisible]  = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installVisible,setInstallVisible]= useState(false)
+
+  // Butterfly loading screen. What covers the page is the cluster itself —
+  // the butterflies and the shadows they cast — so the page is revealed as
+  // they scatter and those shadows lift, rather than by a curtain coming up.
+  // Once the field hands over, whatever is left of it fades out.
+  const [loadPhase, setLoadPhase] = useState('load') // 'load' | 'fade' | 'done'
+
+  useEffect(() => {
+    document.body.style.overflow = loadPhase === 'load' ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [loadPhase])
 
   const boardRef      = useRef(null)
   const composeRef    = useRef(null)
@@ -263,6 +275,31 @@ export default function App() {
       </div>
 
       <div className={`toast${toastVisible ? ' show' : ''}`}>{toastMsg}</div>
+
+      {loadPhase !== 'done' && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            // No background on purpose. The cluster is what hides the page,
+            // so a solid colour here would sit behind every gap the
+            // butterflies leave and there would be nothing to reveal. This
+            // div is only a positioning box for the loader.
+            opacity: loadPhase === 'fade' ? 0 : 1,
+            transition: 'opacity 0.6s ease',
+            pointerEvents: loadPhase === 'fade' ? 'none' : 'auto',
+          }}
+        >
+          <ButterflyLoader
+            invite="Tap or click anywhere to release"
+            onReveal={() => {
+              setLoadPhase('fade')
+              window.setTimeout(() => setLoadPhase('done'), 940)
+            }}
+          />
+        </div>
+      )}
     </>
   )
 }
