@@ -481,7 +481,11 @@ export function mountButterflies(
           py = b.y - T.FLY_UP * b.rise * ease - 46 * t;
           px = b.x + b.spread * T.FLY_OUT * ease + Math.sin(now * 2.4 + b.sway) * 16 * t;
           rot = b.tilt + b.spread * 0.42 * ease + Math.sin(now * 2.4 + b.sway) * 0.06;
-          alpha = 1 - Math.max(0, (t - 0.3) / 0.7) ** 1.4;
+          // Solid the whole way out. They leave by leaving — the rise is
+          // 2200px at its shortest, several times any viewport, so every one
+          // of them is off the top long before its flight is up and none
+          // needs to be dissolved to get it off the screen.
+          alpha = 1;
           b.ph += dt * T.FAST_SPEED * 1.15;
           amp = T.MAX_AMP;
         }
