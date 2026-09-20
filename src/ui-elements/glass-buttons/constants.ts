@@ -43,6 +43,13 @@ export const SAVE_TINT = { r: 0x7e / 255, g: 0xe0 / 255, b: 0x22 / 255, strength
  * the way a slab splits light you look through at an angle and not head on.
  * The alphabet keeps it at zero: thirty-six of them fringing at once is noise.
  * One of them, carrying a word, is the whole effect.
+ *
+ * It is a UV offset, not a pixel one: red is pulled one of these toward the
+ * tile's centre and blue one away, across a texture that spans the canvas. So
+ * the separation it buys is roughly `bodyChromatic × canvas width` at the rim,
+ * ramping to nothing at the middle — about 2px here, where the canvas is some
+ * 230px across. Past a hundredth or so it stops being a fringe on the word and
+ * starts being three copies of it.
  */
 export const RENDER_MATERIAL = {
   ...BUTTON_MATERIAL,
@@ -55,7 +62,7 @@ export const RENDER_MATERIAL = {
   letterSize: 23,
   letterWeight: 600,
 
-  bodyChromatic: 0.09,
+  bodyChromatic: 0.009,
 };
 
 /** Width in px of the compose button. */
