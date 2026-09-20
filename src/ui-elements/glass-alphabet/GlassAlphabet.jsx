@@ -51,7 +51,12 @@ export default function GlassAlphabet({
   // The widest the grid would like to be. It narrows to whatever the container
   // can actually hold, keeping the tiles their tuned size rather than shrinking
   // them — a 30px letter that fits beats a 46px one that does not.
-  columns = 8,
+  //
+  // Nine because the set is 36 characters and nine divides it into four full
+  // rows. Eight left a fifth row holding four tiles and a gap where the other
+  // five would have been, which reads as the grid having run out rather than
+  // as a shape.
+  columns = 9,
 }) {
   const wrapRef = useRef(null)
   const hostRef = useRef(null)
