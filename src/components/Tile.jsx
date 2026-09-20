@@ -38,7 +38,7 @@ export default function Tile({ ch, tileKey, variantIdx, tileW, onCycle }) {
       ) : (
         <img
           src={url}
-          alt={`Letter ${ch} — ${label}`}
+          alt={`Letter ${ch}: ${label}`}
           className={imgLoaded ? '' : 'loading'}
           loading="lazy"
           onLoad={() => setImgLoaded(true)}

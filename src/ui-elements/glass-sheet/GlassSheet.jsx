@@ -238,8 +238,8 @@ export default function GlassSheet({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             {canPage && (
               <>
-                <NavButton dir={-1} label={`Previous — ${sequence[(idx - 1 + sequence.length) % sequence.length]}`} onClick={() => step(-1)} />
-                <NavButton dir={1} label={`Next — ${sequence[(idx + 1) % sequence.length]}`} onClick={() => step(1)} />
+                <NavButton dir={-1} label={`Previous: ${sequence[(idx - 1 + sequence.length) % sequence.length]}`} onClick={() => step(-1)} />
+                <NavButton dir={1} label={`Next: ${sequence[(idx + 1) % sequence.length]}`} onClick={() => step(1)} />
               </>
             )}
             <CloseButton ref={closeRef} onClick={close} />

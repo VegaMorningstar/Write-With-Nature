@@ -20,7 +20,7 @@ export default function Header() {
 
       <GlassTitle />
 
-      <p className="sub">Rivers, glaciers &amp; coastlines — shaped into letters from orbit</p>
+      <p className="sub">Rivers, glaciers &amp; coastlines, shaped into letters from orbit</p>
 
       <div className="ornament">
         <div className="ornament-rule" />

@@ -1,7 +1,7 @@
 {
   "name": "Write with Nature",
   "short_name": "Write w/ Nature",
-  "description": "Compose text as NASA Landsat satellite imagery — rivers, glaciers and coastlines shaped into letters from orbit.",
+  "description": "Compose text as NASA Landsat satellite imagery: rivers, glaciers and coastlines shaped into letters from orbit.",
   "start_url": "/Write-With-Nature/",
   "scope": "/Write-With-Nature/",
   "display": "standalone",

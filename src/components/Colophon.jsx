@@ -30,7 +30,7 @@ export default function Colophon() {
           <a href="https://science.nasa.gov/mission/landsat/outreach/your-name-in-landsat/" target="_blank" rel="noreferrer">
             Your Name in Landsat
           </a>{' '}
-          project — real Landsat 8 &amp; 9 satellite scenes where Earth's surface naturally
+          project. These are real Landsat 8 &amp; 9 satellite scenes where Earth's surface naturally
           resembles alphabet letters. Visit the{' '}
           <a href="https://science.nasa.gov/gallery/your-name-in-landsat-gallery/" target="_blank" rel="noreferrer">
             image gallery

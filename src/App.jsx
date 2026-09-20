@@ -162,7 +162,7 @@ export default function App() {
     const onPrompt = e => { e.preventDefault(); setInstallPrompt(e); setInstallVisible(true) }
     const onInstalled = () => {
       setInstallPrompt(null); setInstallVisible(false)
-      showToast('App installed — find it on your home screen')
+      showToast('App installed. Find it on your home screen')
     }
     window.addEventListener('beforeinstallprompt', onPrompt)
     window.addEventListener('appinstalled', onInstalled)
@@ -261,7 +261,7 @@ export default function App() {
                 <circle cx="7" cy="7" r="6" stroke="rgba(28,26,16,0.25)" strokeWidth="1"/>
                 <path d="M7 6v4M7 4.5v.5" stroke="rgba(28,26,16,0.25)" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Punctuation and numbers are stripped automatically — only letters and spaces pass through.
+              Punctuation and numbers are stripped automatically. Only letters and spaces pass through.
               Each line becomes a row; blank lines add a stanza break. Click any tile to cycle its satellite scene.
             </p>
           </div>
