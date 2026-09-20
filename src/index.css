@@ -14,6 +14,20 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Hold the scrollbar's width whether or not there is a scrollbar.
+ *
+ * The loading screen locks the page with overflow:hidden so it cannot be
+ * scrolled behind, which takes the scrollbar away and hands its 15px back to
+ * the content. Releasing it takes them away again, and since the layout is
+ * centred everything jumped half that — a visible sideways lurch at the exact
+ * moment the butterflies cleared. Reserving the gutter permanently means the
+ * width never changes and nothing moves. Anything else that hides overflow, or
+ * any page that shrinks below one viewport, gets the same for free.
+ *
+ * Where scrollbars are overlaid rather than laid out, as on macOS by default,
+ * they take no width to begin with and this has nothing to reserve. */
+html { scrollbar-gutter: stable; }
+
 body {
   background:
     radial-gradient(ellipse 75% 60% at 12% 18%, rgba(42,107,94,0.38) 0%, transparent 65%),
