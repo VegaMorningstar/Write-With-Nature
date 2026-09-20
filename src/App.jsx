@@ -10,6 +10,7 @@ import { PANEL_GLASS } from './ui-elements/liquid-glass/panelPreset'
 import FluidCursor from './components/FluidCursor'
 import JellyWireframeButton from './ui-elements/jelly-wireframe-button/JellyWireframeButton'
 import { ButterflyLoader } from './butterflies/react'
+import { CursorButterflies } from './cursor-butterflies/react'
 
 function parseLines(rawText) {
   return rawText.split('\n').map((line, lineIdx) => {
@@ -181,6 +182,9 @@ export default function App() {
   return (
     <>
       <FluidCursor />
+      {/* Only once the field has handed over — they belong to the page, not
+          to the loading screen sitting on top of it. */}
+      {loadPhase === 'done' && <CursorButterflies />}
 <canvas ref={exportCanvasRef} id="c" style={{ display: 'none' }} />
 
       {/* SVG glass filter for small elements (buttons, inputs, alpha-cells) */}
