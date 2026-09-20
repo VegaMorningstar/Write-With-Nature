@@ -22,6 +22,14 @@ import {
   squashProperties, wobbleProperties, morphProperties,
 } from './constants.ts'
 
+/**
+ * Whether the browser advertises WebGPU. Worth asking before going to the
+ * trouble of an init — but NOT the question to hide a fallback on. A browser
+ * can advertise it and still fail to hand over an adapter, and gating the
+ * plain sun and moon on this once left an empty canvas where the ornament
+ * should be. Use `glassReady`, set after the scene resolves. See GlassTitle
+ * for the longer version.
+ */
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
 const FOCUS_CSS = `

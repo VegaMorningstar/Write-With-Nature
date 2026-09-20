@@ -10,12 +10,17 @@
  * under the glass and are displaced and split by it, rather than being laid
  * over a picture of glass.
  *
- * Unlike the alphabet, this falls back to real CSS buttons whenever the glass
- * is not actually running — not merely when WebGPU is missing, but whenever
- * init fails for any reason. An alphabet that fails to draw is a browsing aid
- * gone missing; a toolbar that fails to draw is Save and Clear gone missing,
- * so the buttons stay visible and keep working and the refraction is the only
- * thing lost.
+ * Falls back to real CSS buttons whenever the glass is not actually running —
+ * not merely when WebGPU is missing, but whenever init fails for any reason.
+ * A toolbar that fails to draw is Save and Clear gone missing, so the buttons
+ * stay visible and keep working and the refraction is the only thing lost.
+ *
+ * This was the only component that got that right to begin with, which is why
+ * the toolbar survived failures that took the masthead, the alphabet and the
+ * ornament out entirely. Those three now do the same. Do not reduce any of
+ * them back to checking navigator.gpu: that asks whether the browser claims
+ * WebGPU, not whether the glass drew, and the two part company more often
+ * than you would think.
  */
 import { useRef, useEffect, useState } from 'react'
 import { BUTTON_MATERIAL } from './constants.ts'

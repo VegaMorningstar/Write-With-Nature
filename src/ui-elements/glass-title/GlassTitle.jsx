@@ -21,9 +21,19 @@ import { Spring } from '../glass-alphabet/spring.ts'
 import { MATERIAL_DEFAULTS, POINTER_DEFAULTS, squashProperties, liftProperties } from './constants.ts'
 
 /**
- * Whether the browser advertises WebGPU — worth asking before going to the
- * trouble of an init, but not the same question as whether the glass ended up
- * drawing. What the tiles show is gated on that second question instead.
+ * Whether the browser advertises WebGPU. Worth asking before going to the
+ * trouble of an init — but NOT the question to hide a fallback on.
+ *
+ * A browser can advertise WebGPU and still fail to hand over an adapter:
+ * blocklisted or ageing drivers, some Linux stacks, VMs and remote desktops,
+ * a GPU process that falls over mid-session. Headless Chrome does exactly
+ * this, which is also why no screenshot taken in CI can tell you whether any
+ * of the glass works.
+ *
+ * Gating a fallback on this is how the masthead, the alphabet and the ornament
+ * all went invisible at once: images pinned at zero opacity over a canvas that
+ * never drew, with only a console warning to say so. Use `glassReady`, which
+ * is set once the scene has actually resolved.
  */
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 

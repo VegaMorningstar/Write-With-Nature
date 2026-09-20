@@ -22,6 +22,14 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { LETTERS, MATERIAL_DEFAULTS, POINTER_DEFAULTS, squashProperties, liftProperties } from './constants.ts'
 import { Spring } from './spring.ts'
 
+/**
+ * Whether the browser advertises WebGPU. Worth asking before going to the
+ * trouble of an init — but NOT the question to hide a fallback on. A browser
+ * can advertise it and still fail to hand over an adapter, and gating the
+ * frosted keys on this once left transparent buttons over a canvas that never
+ * drew. Use `glassReady`, set after the scene resolves. See GlassTitle for the
+ * longer version.
+ */
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
 /**

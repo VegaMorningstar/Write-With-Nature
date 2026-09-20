@@ -29,8 +29,33 @@
  *      inside the tile and decaying outside it, so a pressed tile both brightens
  *      and throws light into the gaps around it.
  *
- * Shared: the glass alphabet and the masthead both run this. They differ only
- * in what they paint into the two backdrops and how many boxes they ask for.
+ * ── Shared, and easy to break from a distance ─────────────────────────────
+ *
+ * Three components run this shader: GlassAlphabet, GlassTitle (the masthead)
+ * and GlassButtons (the toolbar and the compose button). They differ only in
+ * what they paint into the two backdrops and how many boxes they ask for.
+ *
+ * So a change here is a change to all three, and the compiler will not tell
+ * you. setParams takes a plain object: a field a caller does not pass is
+ * undefined, `undefined / 255` is NaN, and a NaN written into a uniform does
+ * not dim a colour or tint it oddly — it takes the entire fragment out. The
+ * component renders nothing at all.
+ *
+ * That has already happened once. The adaptive ink added fields here and
+ * updated two of the three callers; the masthead wrote NaN and vanished from
+ * production, and it was invisible in review because the fallback images were
+ * hidden behind it and no automated check can run this shader at all.
+ *
+ * So, when adding a parameter:
+ *   - give it a default in setParams, the way the ink fields have one, so a
+ *     caller that knows nothing about it keeps working;
+ *   - or update all three callers in the same change and say so in the
+ *     message.
+ *
+ * And note what cannot catch this for you: `npm run build` passes, tsc passes,
+ * and headless Chrome advertises WebGPU and then fails to hand over an adapter,
+ * so every screenshot of this shader is blank whether or not it works. The only
+ * verification is a human looking at a real GPU. Ask for one.
  *
  * Everything reaching setTiles and setParams is in box space: canvas heights,
  * with x scaled by the aspect so corners come out circular. GlassAlphabet.jsx
@@ -578,6 +603,14 @@ export async function setupTileGlass(
         ),
       );
     },
+    /**
+     * WARNING: three components call this, and a field one of them does not
+     * pass arrives as undefined. `undefined / 255` is NaN, and a NaN in a
+     * uniform blanks the whole fragment rather than shifting a colour — the
+     * component draws nothing and nothing in the build or the types complains.
+     * Any field added here wants a default, as the ink ones below have.
+     * See the header for the time this took the masthead off production.
+     */
     setParams(p: SceneParams) {
       paramsUniform.write({
         radius: p.radius,
