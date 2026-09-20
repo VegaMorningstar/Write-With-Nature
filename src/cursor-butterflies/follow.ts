@@ -11,7 +11,14 @@
  * pointer events; it only watches them.
  */
 
-import { makeBody, makeWing, SS, type Sprite } from '../butterflies/butterfly';
+import {
+  makeBody,
+  makeShadow,
+  makeSilhouette,
+  makeWing,
+  SS,
+  type Sprite,
+} from '../butterflies/butterfly';
 
 export interface CursorButterflies {
   /** Remove the canvas and every listener. */
@@ -71,6 +78,26 @@ const TUNING = {
   SCATTER_HOLD: 0.75,
   SCATTER_REACH: 0.8,
 
+  /**
+   * The shadow one throws on another it happens to be over. Offsets are per
+   * unit of size, not pixels, so the shadow sits the same distance off its
+   * butterfly at any scale — the same ratio the loading field uses.
+   */
+  SHADOW_ALPHA: 0.42,
+  SHADOW_BLUR: 9,
+  SHADOW_DX: 28,
+  SHADOW_DY: 38,
+
+  /**
+   * With no cursor to chase they pick somewhere on screen and drift to it,
+   * more slowly than they chase, then pick somewhere else.
+   */
+  ROAM_STIFF: 0.3,
+  ROAM_ARRIVED: 70,
+  ROAM_FOR_MIN: 1.8,
+  ROAM_FOR_MAX: 4.5,
+  ROAM_MARGIN: 90,
+
   /** Device pixel ratio ceiling. Five sprites, so this can be generous. */
   DPR_CAP: 2,
   SIZE_VARY: 0.22,
@@ -93,6 +120,10 @@ interface Bf {
   orbitSpeed: number;
   /** Seconds left of the loosened spring after a press. */
   scatter: number;
+  /** Somewhere to be while there is no cursor to follow, and how long for. */
+  wx: number;
+  wy: number;
+  wanderFor: number;
 }
 
 function prefersReducedMotion() {
@@ -157,6 +188,7 @@ export function mountCursorButterflies(
   const wingCfg = { gs: 0, sz: 1, dark: 0, light: 0.14, shadow: 0 };
   const wing = recolour(makeWing(wingCfg), WING_BLUE);
   const body = recolour(makeBody(wingCfg), BODY_BLUE);
+  const shadow = makeShadow(makeSilhouette(), TUNING.SHADOW_BLUR);
 
   let W = 0;
   let H = 0;
@@ -171,9 +203,18 @@ export function mountCursorButterflies(
   };
   resize();
 
-  // Until the pointer has been somewhere, they make for the middle — so they
-  // still fly in on load rather than waiting on a cursor that may never move.
-  const cursor = { x: W / 2, y: H / 2, seen: false };
+  // `present` is false until the pointer has actually been somewhere, and
+  // again once it leaves the window. Without it they would converge on a
+  // guessed point and sit there, which is worse than having them roam.
+  const cursor = { x: W / 2, y: H / 2, present: false };
+
+  const pickWander = (b: Bf) => {
+    const m = TUNING.ROAM_MARGIN;
+    b.wx = m + Math.random() * Math.max(1, W - m * 2);
+    b.wy = m + Math.random() * Math.max(1, H - m * 2);
+    b.wanderFor =
+      TUNING.ROAM_FOR_MIN + Math.random() * (TUNING.ROAM_FOR_MAX - TUNING.ROAM_FOR_MIN);
+  };
 
   const bfs: Bf[] = Array.from({ length: count }, () => {
     const at = spawnAtEdge(W, H);
@@ -192,20 +233,34 @@ export function mountCursorButterflies(
           Math.random() * (TUNING.ORBIT_SPEED_MAX - TUNING.ORBIT_SPEED_MIN)) *
         (Math.random() < 0.5 ? -1 : 1),
       scatter: 0,
+      wx: 0,
+      wy: 0,
+      wanderFor: 0,
     };
   });
+  for (const b of bfs) pickWander(b);
 
   const onMove = (e: MouseEvent) => {
     cursor.x = e.clientX;
     cursor.y = e.clientY;
-    cursor.seen = true;
+    cursor.present = true;
   };
   const onTouch = (e: TouchEvent) => {
     const t = e.touches[0];
     if (!t) return;
     cursor.x = t.clientX;
     cursor.y = t.clientY;
-    cursor.seen = true;
+    cursor.present = true;
+  };
+
+  // Cursor gone: off the window entirely, or the tab lost focus with it
+  // sitting somewhere we can no longer hear about. Either way, stop chasing a
+  // position that is no longer being updated, and give each one somewhere of
+  // its own to be until it comes back.
+  const onLeave = () => {
+    if (!cursor.present) return;
+    cursor.present = false;
+    for (const b of bfs) pickWander(b);
   };
 
   // A press shoves them off the cursor. The spring is loosened for a moment
@@ -213,7 +268,7 @@ export function mountCursorButterflies(
   const onPress = (e: MouseEvent) => {
     cursor.x = e.clientX;
     cursor.y = e.clientY;
-    cursor.seen = true;
+    cursor.present = true;
     for (const b of bfs) {
       const dx = b.x - cursor.x;
       const dy = b.y - cursor.y;
@@ -232,6 +287,10 @@ export function mountCursorButterflies(
   window.addEventListener('touchmove', onTouch, { passive: true });
   window.addEventListener('mousedown', onPress, { passive: true });
   window.addEventListener('resize', resize);
+  // On documentElement, not window: this is the one that fires when the
+  // pointer actually crosses out of the page rather than between elements.
+  document.documentElement.addEventListener('mouseleave', onLeave);
+  window.addEventListener('blur', onLeave);
 
   let raf = 0;
   let last = performance.now() / 1000;
@@ -250,16 +309,35 @@ export function mountCursorButterflies(
       b.orbit += b.orbitSpeed * dt;
       if (b.scatter > 0) b.scatter = Math.max(0, b.scatter - dt);
 
-      // Each one aims at its own slowly circling spot beside the cursor, not
-      // at the cursor itself — five things converging on one point would pile
-      // up into a single blur.
       const ease = b.scatter > 0 ? 1 - b.scatter / TUNING.SCATTER_HOLD : 1;
-      const reach = b.orbitR * (1 + (1 - ease) * TUNING.SCATTER_REACH);
-      const tx = cursor.x + Math.cos(b.orbit) * reach;
-      const ty = cursor.y + Math.sin(b.orbit) * reach;
 
-      const ax = (tx - b.x) * b.stiff * ease - b.vx * TUNING.DAMP;
-      const ay = (ty - b.y) * b.stiff * ease - b.vy * TUNING.DAMP;
+      let tx: number;
+      let ty: number;
+      let stiff: number;
+
+      if (cursor.present) {
+        // Each one aims at its own slowly circling spot beside the cursor,
+        // not at the cursor itself — five things converging on one point
+        // would pile up into a single blur.
+        const reach = b.orbitR * (1 + (1 - ease) * TUNING.SCATTER_REACH);
+        tx = cursor.x + Math.cos(b.orbit) * reach;
+        ty = cursor.y + Math.sin(b.orbit) * reach;
+        stiff = b.stiff;
+      } else {
+        // No cursor: make for somewhere of its own, and pick somewhere else
+        // on arriving or on losing interest. A much softer pull, so this
+        // reads as drifting about rather than commuting between points.
+        b.wanderFor -= dt;
+        if (b.wanderFor <= 0 || Math.hypot(b.wx - b.x, b.wy - b.y) < TUNING.ROAM_ARRIVED) {
+          pickWander(b);
+        }
+        tx = b.wx;
+        ty = b.wy;
+        stiff = b.stiff * TUNING.ROAM_STIFF;
+      }
+
+      const ax = (tx - b.x) * stiff * ease - b.vx * TUNING.DAMP;
+      const ay = (ty - b.y) * stiff * ease - b.vy * TUNING.DAMP;
       b.vx += ax * dt;
       b.vy += ay * dt;
 
@@ -286,6 +364,21 @@ export function mountCursorButterflies(
       const lx = -si * lift;
       const ly = co * lift;
 
+      // Its shadow, on whichever of the others it happens to be over.
+      // source-atop paints only where the canvas already has something, so
+      // this lands on butterflies drawn before it and nowhere else — never on
+      // the page, which is not this canvas's to darken. Drawn before its own
+      // wing, so it never shades the butterfly casting it.
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = TUNING.SHADOW_ALPHA;
+      ctx.setTransform(
+        co * sx * d, si * sx * d, -si * sy * d, co * sy * d,
+        (b.x + lx + TUNING.SHADOW_DX * b.sz) * d,
+        (b.y + ly + TUNING.SHADOW_DY * b.sz) * d,
+      );
+      ctx.drawImage(shadow.c, shadow.ox, shadow.oy);
+      ctx.globalCompositeOperation = 'source-over';
+
       ctx.globalAlpha = 1 - fold * 0.16;
       ctx.setTransform(co * sx * d, si * sx * d, -si * sy * d, co * sy * d, (b.x + lx) * d, (b.y + ly) * d);
       ctx.drawImage(wing.c, wing.ox, wing.oy);
@@ -304,6 +397,8 @@ export function mountCursorButterflies(
       window.removeEventListener('touchmove', onTouch);
       window.removeEventListener('mousedown', onPress);
       window.removeEventListener('resize', resize);
+      document.documentElement.removeEventListener('mouseleave', onLeave);
+      window.removeEventListener('blur', onLeave);
       canvas.remove();
     },
   };
