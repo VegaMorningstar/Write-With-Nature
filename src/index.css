@@ -58,17 +58,28 @@ body::after {
   pointer-events: none; z-index: 0; mix-blend-mode: multiply;
 }
 
+/* The page runs edge to edge under the status bar and the home indicator, so
+ * the background is unbroken there — and every inset is given back as padding,
+ * so the content itself never sits under either. On anything without notches
+ * or rounded corners these resolve to zero and this is the padding it always
+ * had. */
 .page {
   position: relative; z-index: 20;
   max-width: 980px;
   margin: 0 auto;
-  padding: 0 2rem 6rem;
+  padding:
+    0
+    calc(2rem + env(safe-area-inset-right))
+    calc(6rem + env(safe-area-inset-bottom))
+    calc(2rem + env(safe-area-inset-left));
 }
 
 /* ── Masthead ── */
+/* The top inset lands here rather than on .page, because this is the first
+ * thing down the page and the only one at risk of the clock. */
 .masthead {
   text-align: center;
-  padding: 3.5rem 1rem 2rem;
+  padding: calc(3.5rem + env(safe-area-inset-top)) 1rem 2rem;
 }
 
 .over {

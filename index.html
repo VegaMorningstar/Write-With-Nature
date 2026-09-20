@@ -2,7 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover is what makes apple-mobile-web-app-status-bar-style
+      below mean anything. Without it the content is inset to the safe area and
+      iOS fills the strip behind the clock itself — with the body's solid
+      background-color, ignoring the gradients layered over it, which is why
+      that strip read as a flat cream band that matched nothing.
+
+      With it, the page runs under the status bar and the clock and battery sit
+      on the gradient. The layout pays that back through env(safe-area-inset-*),
+      so nothing important ends up underneath them.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Write with Nature</title>
 
     <!-- PWA -->
