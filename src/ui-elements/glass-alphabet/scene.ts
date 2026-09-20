@@ -130,12 +130,19 @@ export type SceneParams = {
   letterR: number;
   letterG: number;
   letterB: number;
-  letterLightR: number;
-  letterLightG: number;
-  letterLightB: number;
-  inkLumLo: number;
-  inkLumHi: number;
-  inkSampleLevel: number;
+  /**
+   * The ink for a dark backdrop, and the band it is crossed over in. Optional
+   * — leave them out and the light ink is the dark one, which is to say the
+   * glyph is written in one colour whatever is behind it, as it was before
+   * any of this existed. The masthead does exactly that: its "letters" are
+   * photographs, not type, and it has no contrast problem to solve.
+   */
+  letterLightR?: number;
+  letterLightG?: number;
+  letterLightB?: number;
+  inkLumLo?: number;
+  inkLumHi?: number;
+  inkSampleLevel?: number;
   glowStrength: number;
   glowHalo: number;
   glowR: number;
@@ -589,10 +596,18 @@ export async function setupTileGlass(
         bodyDepth: Math.max(p.bodyDepth, 1e-4),
         letterBlur: p.letterBlur,
         letterColor: d.vec3f(p.letterR / 255, p.letterG / 255, p.letterB / 255),
-        letterColorLight: d.vec3f(p.letterLightR / 255, p.letterLightG / 255, p.letterLightB / 255),
-        inkLumLo: p.inkLumLo,
-        inkLumHi: p.inkLumHi,
-        inkSampleLevel: p.inkSampleLevel,
+        // Falling back to the dark ink rather than to nothing. A caller that
+        // does not know about these would otherwise write undefined/255 —
+        // NaN — into the uniform, and a NaN here does not degrade the colour,
+        // it takes the whole fragment out. That is what blanked the masthead.
+        letterColorLight: d.vec3f(
+          (p.letterLightR ?? p.letterR) / 255,
+          (p.letterLightG ?? p.letterG) / 255,
+          (p.letterLightB ?? p.letterB) / 255,
+        ),
+        inkLumLo: p.inkLumLo ?? 0.3,
+        inkLumHi: p.inkLumHi ?? 0.55,
+        inkSampleLevel: p.inkSampleLevel ?? 4,
         glowStrength: p.glowStrength,
         glowHalo: Math.max(p.glowHalo, 1e-5),
         glowColor: d.vec3f(p.glowR / 255, p.glowG / 255, p.glowB / 255),
