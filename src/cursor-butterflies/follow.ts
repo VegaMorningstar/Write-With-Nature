@@ -175,10 +175,14 @@ export function mountCursorButterflies(
     'inset:0',
     'width:100%',
     'height:100%',
-    // Never take a click. Everything under this canvas stays reachable.
+    // Never take a click. Everything under this canvas stays reachable, which
+    // is what lets it sit over all of it without being in the way.
     'pointer-events:none',
-    // Over the page and its glass panels (z 20), under the loading field (100).
-    'z-index:40',
+    // Above everything: the page and its glass panels (20), the toast (100),
+    // and the scene sheet (10000), which is the highest thing the app puts up.
+    // They are never drawn over the loading field, because they are not
+    // mounted until it has handed over.
+    'z-index:100000',
   ].join(';');
   document.body.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
@@ -364,12 +368,10 @@ export function mountCursorButterflies(
       const lx = -si * lift;
       const ly = co * lift;
 
-      // Its shadow, on whichever of the others it happens to be over.
-      // source-atop paints only where the canvas already has something, so
-      // this lands on butterflies drawn before it and nowhere else — never on
-      // the page, which is not this canvas's to darken. Drawn before its own
-      // wing, so it never shades the butterfly casting it.
-      ctx.globalCompositeOperation = 'source-atop';
+      // Its shadow — on the page as much as on the others. Plain source-over,
+      // so it lands wherever it falls: over butterflies already drawn, and
+      // over bare canvas, which is the page showing through. Drawn before its
+      // own wing, so it never shades the butterfly casting it.
       ctx.globalAlpha = TUNING.SHADOW_ALPHA;
       ctx.setTransform(
         co * sx * d, si * sx * d, -si * sy * d, co * sy * d,
@@ -377,7 +379,6 @@ export function mountCursorButterflies(
         (b.y + ly + TUNING.SHADOW_DY * b.sz) * d,
       );
       ctx.drawImage(shadow.c, shadow.ox, shadow.oy);
-      ctx.globalCompositeOperation = 'source-over';
 
       ctx.globalAlpha = 1 - fold * 0.16;
       ctx.setTransform(co * sx * d, si * sx * d, -si * sy * d, co * sy * d, (b.x + lx) * d, (b.y + ly) * d);
