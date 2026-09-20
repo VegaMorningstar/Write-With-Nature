@@ -21,8 +21,11 @@ const Board = forwardRef(function Board(
   // glass never starts — the buttons these were before it existed.
   const toolbar = useMemo(() => [
     { key: 'shuffle', label: '⇌', title: 'Shuffle all tiles', onClick: onShuffle, fallbackClass: 'icon-btn' },
-    { key: 'smaller', label: '−', title: 'Smaller tiles', onClick: () => onResize(-16), fallbackClass: 'icon-btn' },
-    { key: 'larger', label: '+', title: 'Larger tiles', onClick: () => onResize(16), fallbackClass: 'icon-btn' },
+    // Off the bar for now, pending a decision on how tile size gets changed.
+    // Everything behind them is still wired: onResize is still passed in, and
+    // App still clamps and holds tileW — these two lines are the whole of it.
+    // { key: 'smaller', label: '−', title: 'Smaller tiles', onClick: () => onResize(-16), fallbackClass: 'icon-btn' },
+    // { key: 'larger', label: '+', title: 'Larger tiles', onClick: () => onResize(16), fallbackClass: 'icon-btn' },
     { key: 'clear', label: '✕', title: 'Clear', onClick: onClear, fallbackClass: 'icon-btn' },
     { key: 'save', label: 'Save', title: 'Save as PNG', onClick: onSave, width: WIDE_WIDTH, tint: SAVE_TINT, fallbackClass: 'save-btn' },
   ], [onShuffle, onResize, onClear, onSave])
