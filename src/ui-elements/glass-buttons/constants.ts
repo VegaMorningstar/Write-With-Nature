@@ -31,6 +31,9 @@ export const BUTTON_MATERIAL = {
 /** Width in px of a button carrying a word rather than a single glyph. */
 export const WIDE_WIDTH = 92;
 
+/** Wider again, for the two words the install prompt needs. */
+export const INSTALL_WIDTH = 132;
+
 /**
  * #7EE022, at a strength well above the row's own 0.04 — enough that the tile
  * reads as a green thing made of glass rather than as clear glass with a

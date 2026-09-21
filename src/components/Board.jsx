@@ -4,7 +4,7 @@ import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
 import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 import GlassButtons from '../ui-elements/glass-buttons/GlassButtons'
-import { WIDE_WIDTH, SAVE_TINT } from '../ui-elements/glass-buttons/constants.ts'
+import { WIDE_WIDTH, INSTALL_WIDTH, SAVE_TINT } from '../ui-elements/glass-buttons/constants.ts'
 
 const Board = forwardRef(function Board(
   { renderedLines, tileW, vs, onShuffle, onResize, onClear, onCycleVariant, onSave, onInstall, installVisible },
@@ -30,6 +30,10 @@ const Board = forwardRef(function Board(
     { key: 'save', label: 'Save', title: 'Save as PNG', onClick: onSave, width: WIDE_WIDTH, tint: SAVE_TINT, fallbackClass: 'save-btn' },
   ], [onShuffle, onResize, onClear, onSave])
 
+  const installButton = useMemo(() => [
+    { key: 'install', label: 'Install App', title: 'Install this app', onClick: onInstall, width: INSTALL_WIDTH, fallbackClass: 'install-btn visible' },
+  ], [onInstall])
+
   return (
     <section className="section" style={{ marginTop: '2rem' }}>
       <div className="collage-bar">
@@ -40,15 +44,11 @@ const Board = forwardRef(function Board(
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <GlassButtons items={toolbar} />
-          {installVisible && (
-            <button className="install-btn visible" onClick={onInstall}>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <rect x="1.5" y="1.5" width="10" height="10" rx="2.5" stroke="currentColor" strokeWidth="1.4"/>
-                <path d="M6.5 4v4M4.5 6.5l2 2 2-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Install App
-            </button>
-          )}
+          {/* Its own canvas rather than a sixth item in the toolbar's: the
+              shader's tile count is fixed when the scene is built, so adding
+              one would tear the whole bar down and rebuild it at whatever
+              moment the install prompt happened to fire. */}
+          {installVisible && <GlassButtons items={installButton} />}
         </div>
       </div>
 
