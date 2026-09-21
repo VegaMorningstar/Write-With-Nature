@@ -241,7 +241,7 @@ export default function App() {
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}
-              placeholder={'Paste a poem, a sentence, a whole essay…\nPunctuation & numbers are stripped automatically.\nEach line becomes its own row of satellite tiles.'}
+              placeholder={'Paste a poem, a sentence, a whole essay…\nPunctuation & numbers are stripped automatically.\nEach line becomes its own row of Earth tiles.'}
               rows={4}
               style={{ width: '100%' }}
             />
