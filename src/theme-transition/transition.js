@@ -65,22 +65,30 @@ const DUSK = {
   // as it takes the screen rather than arriving after it has finished. A
   // separate window made them a second event that happened once the sky was
   // already dark; tied to the front they are part of the same one.
-  // Paced off the stars rather than off the clock, and matched to the dawn.
+  // Paced off the stars rather than off the clock.
   //
   // The dusk stars are complete at about 2205ms — they finish early, because
-  // they only have to catch the front and the front overshoots. The moon then
-  // used to wait until 3600 to start rising, nearly a second and a half of a
-  // finished night sky with nothing happening in it, and then hurried up in
-  // 1000ms. The dawn's sun starts 200ms after its own stars are done and takes
-  // 1400ms. These are those same offsets: +100 to the switch, +200 to the
-  // rise, +250 to the fade, and the same durations.
+  // they only have to catch the front and the front overshoots. The moon
+  // starts moving 245ms after that, which is where the dawn's sun starts
+  // relative to its own stars.
   switchAt: 2350,
-  rise: [2450, 3850],
-  fadeIn: [2500, 3450],
-  // 900ms of held night after the moon is up, as the dawn holds its risen sun
-  // before clearing.
-  clear: [4750, 5550],
-  total: 5550,
+  rise: [2450, 3550],
+  fadeIn: [2500, 3300],
+  // The tail is shorter than the dawn's on purpose, and this is the one place
+  // the two directions are deliberately not symmetrical.
+  //
+  // Going dark there is nothing left to wait for: the page underneath has been
+  // the night sky since the switch, so holding a finished sky over an identical
+  // finished page is dead time — and it was the slowest-feeling part of the
+  // whole thing, 1700ms of it after the moon was already up. The clearing now
+  // overlaps the end of the moon's rise, which it can, because the moon is
+  // drawn above the sky and the page revealed underneath already matches it.
+  //
+  // The dawn cannot do this. Its sky is still a sunrise while the sun comes up
+  // and the page underneath is paper, so those two have to be told apart in
+  // time rather than overlapped.
+  clear: [3500, 4200],
+  total: 4200,
 }
 
 const DAWN = {
