@@ -124,8 +124,24 @@ export function isTransitioning() {
   return active !== null
 }
 
+/**
+ * One listener must not be able to stop the transition.
+ *
+ * The overlay goes fully opaque in the middle of this, and the theme changes
+ * underneath it. A listener that throws before the loop reschedules leaves the
+ * page covered by a sky that will never clear, with the old theme still set —
+ * which is exactly what a missing colour in the palette table did. Failing one
+ * listener and carrying on turns that into a cosmetic glitch instead of a
+ * frozen page.
+ */
 function emit(frame) {
-  for (const fn of listeners) fn(frame)
+  for (const fn of listeners) {
+    try {
+      fn(frame)
+    } catch (e) {
+      console.warn('[transition] listener failed:', e)
+    }
+  }
 }
 
 /**

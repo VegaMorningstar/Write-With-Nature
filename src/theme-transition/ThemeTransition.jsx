@@ -61,13 +61,33 @@ const hexToRgb = h => [
   parseInt(h.slice(3, 5), 16),
   parseInt(h.slice(5, 7), 16),
 ]
-const RGB = Object.fromEntries(
-  [...SUNSET, ...NIGHT, ...DAWN, ...DAY].map(h => [h, hexToRgb(h)]),
-)
+/**
+ * Hex to components, memoised on first use.
+ *
+ * This used to be a table built eagerly from a list of the palettes, and the
+ * list was a bug waiting to happen: adding SUNRISE without adding it to that
+ * list left mix() dereferencing undefined, which threw on the first frame of
+ * every dark-to-light transition and took the animation loop with it. Going
+ * dark still worked, because that direction never touches the new palette —
+ * so the failure looked like "one direction is broken" rather than like a
+ * missing entry in a list.
+ *
+ * Filling the cache on demand means a palette cannot be forgotten: there is
+ * nothing left to register it in.
+ */
+const RGB = new Map()
+function rgbOf(hex) {
+  let v = RGB.get(hex)
+  if (!v) {
+    v = hexToRgb(hex)
+    RGB.set(hex, v)
+  }
+  return v
+}
 
 function mix(aHex, bHex, k) {
-  const a = RGB[aHex]
-  const b = RGB[bHex]
+  const a = rgbOf(aHex)
+  const b = rgbOf(bHex)
   return `rgb(${Math.round(a[0] + (b[0] - a[0]) * k)},${Math.round(a[1] + (b[1] - a[1]) * k)},${Math.round(a[2] + (b[2] - a[2]) * k)})`
 }
 
