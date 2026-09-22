@@ -9,6 +9,7 @@ import LiquidGlassPanel from './ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from './ui-elements/liquid-glass/panelPreset'
 import FluidCursor from './components/FluidCursor'
 import NightSky from './night-sky/NightSky'
+import ThemeTransition from './theme-transition/ThemeTransition'
 import GlassButtons from './ui-elements/glass-buttons/GlassButtons'
 import { RENDER_MATERIAL, RENDER_WIDTH } from './ui-elements/glass-buttons/constants.ts'
 import { ButterflyLoader } from './butterflies/react'
@@ -240,6 +241,11 @@ export default function App() {
       </svg>
 
       <div className="page">
+        {/* Inside .page on purpose: that element sets z-index 20, which makes
+            it a stacking context, so anything it contains is sealed under 20
+            no matter how large its own z-index is. The sinking jelly lives in
+            here, so the sky it has to rise above has to live in here too. */}
+        <ThemeTransition />
         <Header />
 
         <svg className="vine" viewBox="0 0 960 24" fill="none">
