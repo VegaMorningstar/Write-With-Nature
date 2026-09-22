@@ -16,6 +16,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Write with Nature</title>
 
+    <!--
+      The theme, set before the first paint.
+
+      This runs inline and synchronously on purpose: the CSS keys off
+      [data-theme], so setting it from React would mean painting the default
+      theme first and swapping on hydration - a flash of the wrong background
+      on every load.
+
+      The page always opens on the paper theme. Night is something a visitor
+      chooses, by pressing the sun in the masthead, and nothing remembers the
+      choice - it is not stored anywhere, so it lasts until the page is
+      reloaded and every load starts in daylight. If it should survive a
+      reload, this is where to read it back from, and setTheme in
+      src/theme.js is where to write it.
+
+      Nothing here selects dark on its own, so if this script does not run, or
+      this file is served stale, the CSS and src/theme.js fall back to light
+      together - which is also what the page was going to show anyway.
+
+      Being in index.html is also why a service worker caching the shell breaks
+      it. sw.js caches './index.html', so it is registered in production only;
+      see the note in App.jsx.
+
+      ?theme=light / ?theme=dark overrides it, for comparing the two on one
+      server while dark is being designed.
+    -->
+    <script>
+      (function () {
+        try {
+          var q = new URLSearchParams(location.search).get('theme')
+          var t = (q === 'light' || q === 'dark') ? q : 'light'
+          document.documentElement.dataset.theme = t
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light'
+        }
+      })()
+    </script>
+
     <!-- PWA -->
     <!--
       Must not be a relative href. Vite treats a relative one as a bundled asset
