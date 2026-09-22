@@ -107,6 +107,9 @@ const THEMES = {
     // null leaves the glass buttons' adaptive ink alone: dark glyphs, lightened
     // only where the backdrop behind them is bright.
     buttonGlyph: null,
+    // The sheet's pager and close buttons pick their own ink; null leaves them
+    // to it. See src/ui-elements/glass-sheet/GlassSheet.jsx.
+    sheetInk: null,
   },
   dark: {
     // Not pure black: a trace of blue is the difference between a void and a
@@ -143,6 +146,10 @@ const THEMES = {
     // one that is simply always white. Only the buttons; the masthead glyphs
     // sit over photographs, where adapting is still the right behaviour.
     buttonGlyph: { r: 255, g: 255, b: 255 },
+    // White, for the same reason the toolbar glyphs are: the sheet floats over
+    // the fluid cursor, and a deep green chevron or a deep red cross on a dark
+    // lens over moving colour is unreadable.
+    sheetInk: 'rgba(255,255,255,0.96)',
   },
 }
 

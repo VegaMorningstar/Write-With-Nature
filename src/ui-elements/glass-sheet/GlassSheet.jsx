@@ -17,13 +17,26 @@
  * scrim carries its own blur: without it the sheet reads as inline rather than
  * on top, since the shader has no way to see the content it covers.
  */
-import { useEffect, useRef, useCallback, forwardRef } from 'react'
+import { useEffect, useRef, useCallback, useState, forwardRef } from 'react'
 import { createPortal } from 'react-dom'
 import LiquidGlassPanel from '../liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../liquid-glass/panelPreset'
 import { glassSupported } from '../../hooks/usePanelGlass'
 import { Spring } from '../glass-alphabet/spring.ts'
 import { squashProperties, liftProperties } from '../glass-alphabet/constants.ts'
+import { tokens, onThemeChange } from '../../theme.js'
+
+/**
+ * Re-renders the caller when the theme changes.
+ *
+ * These buttons pick their ink at render rather than per frame, so unlike the
+ * backdrops they have to be told. Without this the sheet would keep whatever
+ * ink it was opened with if the theme changed underneath it.
+ */
+function useThemeTick() {
+  const [, set] = useState(0)
+  useEffect(() => onThemeChange(() => set(n => n + 1)), [])
+}
 
 /**
  * How much of the glass layer is composited. The shader is opaque inside its
@@ -298,6 +311,7 @@ export default function GlassSheet({
  * handling and the chrome rules in one place rather than three.
  */
 function CloseButtonImpl({ onClick }, ref) {
+  useThemeTick()
   return (
     <SheetButton
       ref={ref}
@@ -309,7 +323,10 @@ function CloseButtonImpl({ onClick }, ref) {
       glowHover="0 0 30px rgba(232,32,26,0.85), 0 0 10px rgba(255,90,80,0.6)"
       fallbackBg="rgba(226,40,32,0.2)"
       fallbackBorder="rgba(255,120,110,0.65)"
-      ink="rgba(150,14,8,0.95)"
+      // The glass around it stays red — that is what says "close" at a glance
+      // — but the cross itself goes white at night, where a deep red on a red
+      // lens is two dark things on top of each other.
+      ink={tokens().sheetInk ?? 'rgba(150,14,8,0.95)'}
     >
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
         <path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor"
@@ -321,6 +338,7 @@ function CloseButtonImpl({ onClick }, ref) {
 const CloseButton = forwardRef(CloseButtonImpl)
 
 function NavButton({ dir, label, onClick }) {
+  useThemeTick()
   return (
     <SheetButton
       label={label}
@@ -331,7 +349,10 @@ function NavButton({ dir, label, onClick }) {
       glowHover="0 0 22px rgba(74,124,63,0.52)"
       fallbackBg="rgba(255,255,255,0.16)"
       fallbackBorder="rgba(255,255,255,0.42)"
-      ink="rgba(28,46,10,0.82)"
+      // The chevron is an SVG stroked with currentColor, so this is what
+      // colours it. Deep green is right on paper and unreadable on a night
+      // sky, where the sheet floats over the fluid cursor.
+      ink={tokens().sheetInk ?? 'rgba(28,46,10,0.82)'}
     >
       <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true"
         style={{ transform: dir < 0 ? 'none' : 'scaleX(-1)' }}>
