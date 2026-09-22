@@ -1,20 +1,35 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { tokens, onThemeChange } from '../theme.js'
+import { withFluidHue, installLoopGuard, capture } from './fluidHue.js'
 
 let _booted = false
 
 /**
- * `blend` decides whether CSS glass on the page can see the fluid.
+ * The blend decides whether CSS glass on the page can see the fluid.
  *
  * An element with mix-blend-mode forms its own backdrop root, and Chrome will
- * not let a backdrop-filter sample blended content — so under 'multiply' the
- * fluid stains the paper and is invisible to every CSS-frosted surface, which
+ * not let a backdrop-filter sample blended content — so under any blend the
+ * fluid stains the page and is invisible to every CSS-frosted surface, which
  * is left refracting a smooth gradient and reads as flat white.
  *
  * The WebGPU glass is not affected either way: it cannot sample the DOM at all,
- * so it rebuilds the page into a texture and reads this canvas directly. Hence
- * 'multiply' as the default — the app's look, with nothing given up for it.
+ * so it rebuilds the page into a texture and reads this canvas directly.
+ *
+ * Which blend comes from the theme, because it cannot be the same in both:
+ * multiply is backdrop x source, so on beige paper the fluid reads as pigment
+ * soaking in, while on black it is multiplication by zero and the colour is
+ * annihilated rather than dimmed. Screen is its dual and reduces to the source
+ * on black. See src/theme.js; the two backdrop painters read the same token so
+ * the glass refracts the fluid that is actually on screen.
+ *
+ * Passing `blend` explicitly overrides the theme, which the tune page uses.
  */
-export default function FluidCursor({ blend = 'multiply' }) {
+export default function FluidCursor({ blend }) {
+  // Unlike the backdrops, this one is not repainted every frame, so it has to
+  // be told when the theme changes rather than noticing on its own.
+  const [themeBlend, setThemeBlend] = useState(() => tokens().fluidBlend)
+  useEffect(() => onThemeChange(() => setThemeBlend(tokens().fluidBlend)), [])
+  const activeBlend = blend ?? themeBlend
   useEffect(() => {
     if (_booted) return
     _booted = true
@@ -42,8 +57,23 @@ export default function FluidCursor({ blend = 'multiply' }) {
             ? { ...options, passive: true }
             : { passive: true }
         }
-        return originalAdd.call(this, type, listener, options)
+        // Every listener registered inside initFluid is the library's, and the
+        // press handlers pick a fresh colour — so they need the hue guard just
+        // as much as the animation loop does. Wrapping here rather than
+        // globally is what keeps the patch off everyone else's Math.random.
+        //
+        // Note this registers a wrapper, not the library's own function, so a
+        // removeEventListener with the original reference would not match and
+        // the listener would stay attached. Harmless as things stand: the
+        // _booted guard means this runs once and never tears down. It would
+        // stop being harmless the day this component needs to unmount.
+        const guarded = typeof listener === 'function'
+          ? function (ev) { return withFluidHue(() => listener.call(this, ev)) }
+          : listener
+        return originalAdd.call(this, type, guarded, options)
       }
+
+      installLoopGuard()
 
       // Do NOT force preserveDrawingBuffer here. It looks like the obvious way
       // to make this canvas readable by the collage export and by the liquid
@@ -56,7 +86,9 @@ export default function FluidCursor({ blend = 'multiply' }) {
       // To read this canvas, draw from it inside a rAF registered after the
       // library's own, while the buffer is still valid for the current frame.
       try {
-        initFluid({
+        // capture() marks the window in which the library's animation loop can
+        // be recognised: it registers that loop synchronously inside initFluid.
+        capture(() => initFluid({
           transparent: true,
           // Slower dissipation → trails linger on the background like paint drying
           densityDissipation: 1.2,
@@ -67,7 +99,7 @@ export default function FluidCursor({ blend = 'multiply' }) {
           shading: true,
           colorUpdateSpeed: 6,
           id: 'fluid-cursor-canvas',
-        })
+        }))
       } finally {
         window.addEventListener = originalAdd
       }
@@ -83,7 +115,7 @@ export default function FluidCursor({ blend = 'multiply' }) {
         pointerEvents: 'none',
         // z-index 5: same layer as the old watercolor canvas — behind glass panels (z:20)
         zIndex: 5,
-        mixBlendMode: blend,
+        mixBlendMode: activeBlend,
       }}
     />
   )
