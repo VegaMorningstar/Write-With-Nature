@@ -24,6 +24,7 @@
  */
 import { useRef, useEffect, useState } from 'react'
 import { BUTTON_MATERIAL } from './constants.ts'
+import { tokens } from '../../theme.js'
 import { POINTER_DEFAULTS } from '../glass-alphabet/constants.ts'
 import { Spring } from '../glass-alphabet/spring.ts'
 import { squashProperties, liftProperties } from '../glass-alphabet/constants.ts'
@@ -126,6 +127,8 @@ export default function GlassButtons({
 
         scene.beforeFrame = () => {
           const mm = matRef.current
+          // Read per frame, so a theme switch lands on the next one.
+          const glyph = tokens().buttonGlyph
           const springs = springsRef.current
           const rect = host.getBoundingClientRect()
           if (!rect.width || !rect.height) return
@@ -197,8 +200,15 @@ export default function GlassButtons({
             bodyChromatic: mm.bodyChromatic,
             bodyDepth: halfBox / H,
             letterBlur: mm.letterBlur,
-            letterR: mm.letterR, letterG: mm.letterG, letterB: mm.letterB,
-            letterLightR: mm.letterLightR, letterLightG: mm.letterLightG, letterLightB: mm.letterLightB,
+            // Both ends of the adaptive ramp get the same colour when the theme
+            // pins one, which switches adaptation off without a second code
+            // path in the shader: the mix has nothing left to mix between.
+            letterR: glyph?.r ?? mm.letterR,
+            letterG: glyph?.g ?? mm.letterG,
+            letterB: glyph?.b ?? mm.letterB,
+            letterLightR: glyph?.r ?? mm.letterLightR,
+            letterLightG: glyph?.g ?? mm.letterLightG,
+            letterLightB: glyph?.b ?? mm.letterLightB,
             inkLumLo: mm.inkLumLo,
             inkLumHi: mm.inkLumHi,
             inkSampleLevel: mm.inkSampleLevel,
