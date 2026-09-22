@@ -62,8 +62,13 @@ const DUSK = {
   /** The fire blooms, then is squeezed out by the front. */
   warmIn: [150, 1250],
   warmOut: [1350, 2900],
-  /** Filling in behind the front, so they appear against sky that is already dark. */
-  stars: [1500, 3350],
+  /**
+   * Filling in behind the front, and deliberately trailing it: the front is
+   * still descending at 1800, so by the time a star's part of the sky gets one
+   * it has already gone deep blue. Starting them with the front put them over
+   * a sky that was still lit, where they simply did not read.
+   */
+  stars: [1800, 3400],
   switchAt: 3450,
   rise: [3600, 4600],
   fadeIn: [3650, 4350],

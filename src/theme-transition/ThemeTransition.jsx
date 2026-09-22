@@ -77,6 +77,15 @@ export default function ThemeTransition() {
     // already in the positions they will still be in when the overlay clears.
     drawStars(ctx, w, h)
 
+    // And again, added on top of itself. These stars are tuned to be read
+    // against the night theme's near-black; during the transition they have to
+    // come up over a blue that is still lit, where a single pass is invisible.
+    // Drawing twice additively roughly doubles each star's contribution
+    // without touching the field the night theme uses.
+    ctx.globalCompositeOperation = 'lighter'
+    drawStars(ctx, w, h)
+    ctx.globalCompositeOperation = 'source-over'
+
     // Then cut them back to the part of the sky they belong in. destination-in
     // keeps what the gradient covers and discards the rest, which turns a
     // vertical alpha ramp into a front sweeping across the field — stars

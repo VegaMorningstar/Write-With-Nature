@@ -17,26 +17,42 @@
  * no edge anywhere, so nothing reads as moving.
  */
 
-// ── Dusk ────────────────────────────────────────────────────────────────────
-/** Late afternoon, the blue the front starts as before it deepens. */
-const DUSK_BLUE = '#3d7ab8'
 /** The theme's own background, which is where the whole sky ends up. */
 const NIGHT = '#050814'
-/** The fire, top of the band to the horizon. */
-const DUSK_RED = '#b9432f'
-const DUSK_ORANGE = '#ee8038'
+
+// ── Dusk, top of the sky to the horizon ─────────────────────────────────────
+//
+// Eight stops rather than five, and the extra three are all in the blue.
+// A single blue stop makes the whole upper sky one flat colour, which is the
+// thing that read as a coloured panel rather than as depth — real sky gets
+// lighter toward the horizon the entire way down, long before any sunset
+// colour starts.
+const DUSK_TOP = '#12365f'     // overhead, the darkest blue
+const DUSK_BLUE = '#2f6ba8'    // midway down
+const DUSK_INDIGO = '#465a96'  // just above the front, where blue turns
+//
+// And the fire is a ramp, not a colour. Blue straight into red is a
+// straight line between two hues that are nearly opposite, so it passes
+// through the desaturated middle and arrives as brown — which is why the
+// in-between colours were not showing. Violet and magenta are the path
+// around the outside of that, and they are what a sunset actually does.
+const DUSK_VIOLET = '#7d4a8e'
+const DUSK_MAGENTA = '#b8455f'
+const DUSK_RED = '#d2553c'
+const DUSK_ORANGE = '#f0863c'
 const DUSK_YELLOW = '#ffd27f'
 
 // ── Dawn ────────────────────────────────────────────────────────────────────
-/** First light, climbing from the horizon. */
-const DAWN_BLUE = '#7fb0e4'
+const DAWN_DEEP = '#1d3a66'    // the night thinning overhead
+const DAWN_INDIGO = '#4e6ea8'  // the band under it
+const DAWN_BLUE = '#8fbce8'    // first light
 /** The sun's own colours, which arrive with it rather than before it. */
+const DAWN_VIOLET = '#a4629a'
 const DAWN_RED = '#d9603f'
 const DAWN_ORANGE = '#ff9a4e'
 const DAWN_YELLOW = '#ffe6b0'
 /** Near the paper background, so the overlay's last frame is almost the page. */
-const DAY_TOP = '#c9cdc0'
-const DAY_BOTTOM = '#e2d6b6'
+const DAY_MID = '#d8d0b8'
 
 const cache = new Map()
 function rgbOf(hex) {
@@ -95,26 +111,37 @@ export function skyGradient(toDark, f) {
 }
 
 function duskGradient(f) {
-  const front = f.front * 118
+  const front = f.front * 125
 
-  // The blue grows down and darkens as it goes, so the top of the screen is
-  // already night by the time the front reaches the bottom.
-  const blue = mix(DUSK_BLUE, NIGHT, Math.min(1, f.front * 1.25))
+  // The blue darkens as it grows, so the top of the screen is already night by
+  // the time the front reaches the bottom. Each band darkens a little less
+  // than the one above it, which keeps the blue a gradient the whole way down
+  // instead of collapsing to one flat tone as it deepens.
+  const dk = Math.min(1, f.front * 1.15)
+  const top = mix(DUSK_TOP, NIGHT, dk)
+  const upper = mix(DUSK_BLUE, NIGHT, dk * 0.95)
+  const indigo = mix(DUSK_INDIGO, NIGHT, dk * 0.85)
 
   // The fire fades toward night rather than toward transparent: it has to be
   // able to disappear while still being the thing under the front.
+  const violet = mix(NIGHT, DUSK_VIOLET, f.warm)
+  const magenta = mix(NIGHT, DUSK_MAGENTA, f.warm)
   const red = mix(NIGHT, DUSK_RED, f.warm)
   const orange = mix(NIGHT, DUSK_ORANGE, f.warm)
   const yellow = mix(NIGHT, DUSK_YELLOW, f.warm)
 
-  // The blend across the front is wide on purpose. Narrower than about a fifth
-  // of the screen and the boundary stops being a sky and becomes a line with
-  // two colours either side of it.
+  // The blue stops are spread across everything above the front rather than
+  // pinned near it, so the upper sky is a ramp at every moment of the descent.
+  // The warm stops trail the front at fixed distances, so the whole sunset
+  // moves down as one thing.
   return `linear-gradient(to bottom, ${orderStops([
-    [0, blue],
-    [front - 12, blue],
-    [front + 7, red],
-    [Math.max(front + 18, 76), orange],
+    [0, top],
+    [front * 0.38, upper],
+    [front - 16, indigo],
+    [front - 1, violet],
+    [front + 14, magenta],
+    [front + 28, red],
+    [Math.max(front + 42, 82), orange],
     [100, yellow],
   ]).join(', ')})`
 }
@@ -122,27 +149,34 @@ function duskGradient(f) {
 function dawnGradient(f) {
   // Travels the other way: the leading edge starts at the bottom of the screen
   // and climbs.
-  const front = 100 - f.front * 118
+  const front = 100 - f.front * 125
 
-  const night = mix(NIGHT, DAWN_BLUE, f.front * 0.35)
+  // The night thins from the top as the light comes up under it, so the dark
+  // part is a gradient too rather than a flat cap.
+  const night = mix(NIGHT, DAWN_DEEP, f.front * 0.5)
+  const indigo = mix(NIGHT, DAWN_INDIGO, Math.min(1, f.front * 1.1))
   const blue = DAWN_BLUE
 
   // The warm band only exists once the sun is on its way up, and it sits below
-  // the blue rather than replacing it.
+  // the blue rather than replacing it — through violet again, for the same
+  // reason as dusk.
+  const violet = mix(blue, DAWN_VIOLET, f.warm)
   const red = mix(blue, DAWN_RED, f.warm)
   const orange = mix(blue, DAWN_ORANGE, f.warm)
   const yellow = mix(blue, DAWN_YELLOW, f.warm)
 
   // Everything then opens out into daylight. Applied last and to every stop,
   // so the sky arrives at the page's own colour rather than clearing off it.
-  const day = c => mix(c, mix(DAY_TOP, DAY_BOTTOM, 0.5), f.day)
+  const day = c => mix(c, DAY_MID, f.day)
 
   return `linear-gradient(to bottom, ${orderStops([
     [0, day(night)],
-    [front - 6, day(night)],
-    [front + 4, day(blue)],
-    [Math.max(front + 14, 70), day(red)],
-    [88, day(orange)],
+    [Math.min(front - 30, 34), day(night)],
+    [front - 12, day(indigo)],
+    [front + 6, day(blue)],
+    [Math.max(front + 24, 62), day(violet)],
+    [Math.max(front + 38, 78), day(red)],
+    [91, day(orange)],
     [100, day(yellow)],
   ]).join(', ')})`
 }
