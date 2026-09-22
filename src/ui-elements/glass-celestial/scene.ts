@@ -314,8 +314,26 @@ export async function setupCelestial(
       P.specularStrength * cover;
 
     // Hover and wobble energy, spilling past the shape as a halo
-    const halo =
+    const rawHalo =
       std.exp(-std.max(sdfDist - P.end, 0) / std.max(P.glowHalo, 1e-5)) * P.glowStrength;
+
+    // A backstop, and only that. The glow is meant to have died on its own long
+    // before here: the canvas is drawn with margin around the shape (see SPREAD in
+    // GlassCelestial), which puts the border far enough out in SDF units that
+    // the exponential is worth millionths there.
+    //
+    // It is worth keeping because the failure it prevents is ugly and silent —
+    // raise glowHalo or the shape's radius and the glow reaches the border,
+    // where the canvas cuts it dead straight.
+    //
+    // But it must never be the thing actually shaping the glow. This is a
+    // Chebyshev window, so its contours are squares; when the margin was too
+    // small it was doing the work across about three pixels, and a square fade
+    // looks exactly like the square clip it replaced. Squeezing a live glow
+    // into a vignette does not remove the edge, it just softens which shape the
+    // edge is. Give it margin instead.
+    const fromCentre = std.max(std.abs(uv.x - 0.5), std.abs(uv.y - 0.5));
+    const halo = rawHalo * (1 - std.smoothstep(0.46, 0.5, fromCentre));
 
     return d.vec4f(
       glass.add(P.specularColor.mul(specular)).add(P.glowColor.mul(halo)),
@@ -348,8 +366,15 @@ export async function setupCelestial(
     set beforeFrame(fn: (() => void) | null) {
       onFrame = fn;
     },
-    setShapeScale(w: number, h: number) {
-      shapeScaleUniform.write(d.vec2f(h > 0 ? w / h : 1, 1));
+    /**
+     * `zoom` shrinks the shape within its canvas: the shape's constants are in
+     * units of half the canvas height, so a zoom of 2 makes one unit half of
+     * what it was and the shape draws at half the size. Paired with a canvas
+     * twice as large, that keeps the ornament the same size on screen while
+     * putting empty margin around it — which is where the glow goes.
+     */
+    setShapeScale(w: number, h: number, zoom = 1) {
+      shapeScaleUniform.write(d.vec2f((h > 0 ? w / h : 1) * zoom, zoom));
     },
     setParams(p: CelestialParams) {
       paramsUniform.write({

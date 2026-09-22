@@ -32,6 +32,14 @@ import {
  */
 const gpuSupported = typeof navigator !== 'undefined' && !!navigator.gpu
 
+/**
+ * How much bigger the canvas is than the ornament, so the hover glow has room
+ * to fade out inside it instead of being clipped by its edge. The shape is
+ * scaled down by the same factor, so the ornament's size on screen does not
+ * change — only the transparent margin around it.
+ */
+const SPREAD = 2
+
 const FOCUS_CSS = `
 .gc-btn { outline: none; -webkit-tap-highlight-color: transparent; background: none; border: none; padding: 0; }
 .gc-btn:focus-visible { outline: 2px solid rgba(200,150,42,0.85); outline-offset: 4px; }
@@ -131,15 +139,47 @@ export default function GlassCelestial({
           const rect = host.getBoundingClientRect()
           if (!rect.width || !rect.height) return
 
-          const dpr = Math.min(window.devicePixelRatio || 1, 2)
-          const cw = Math.max(2, Math.round(rect.width * dpr))
-          const ch = Math.max(2, Math.round(rect.height * dpr))
+          // Capped at 3 rather than the 2 used everywhere else, because this
+          // is the smallest lens on the page and the only one asked to hold a
+          // crescent. At 40px and a cap of 2 the whole ornament was 80x80
+          // physical pixels, and the terminator — a curve subtracted from a
+          // curve — was landing on a handful of them, which is what made it
+          // read as stepped rather than as a moon. The backdrop texture is 256
+          // square, so there is detail available to resolve; this is the thing
+          // that was throwing it away.
+          const dpr = Math.min(window.devicePixelRatio || 1, 3)
+
+          // The canvas is drawn larger than the ornament, and the shape is
+          // scaled down by the same factor, so what lands on screen is exactly
+          // the size it was — with empty margin around it.
+          //
+          // That margin is the whole point. The hover glow is an exponential
+          // falling off from the shape's edge, and the moon's outer arc sits
+          // 0.245 from centre (0.17 x 1.44) shifted 0.05 left, leaving only
+          // about 0.2 to the border — where the glow still had six per cent of
+          // its strength, and the canvas cut it off square. With this margin
+          // the border is more than three times further out in SDF units and
+          // the glow is worth millionths by the time it gets there, so it ends
+          // because it has faded rather than because it ran out of canvas.
+          const padW = rect.width * SPREAD
+          const padH = rect.height * SPREAD
+          const cw = Math.max(2, Math.round(padW * dpr))
+          const ch = Math.max(2, Math.round(padH * dpr))
           if (canvas.width !== cw || canvas.height !== ch) {
             canvas.width = cw
             canvas.height = ch
           }
-          scene.setShapeScale(rect.width, rect.height)
-          backdrop.resize(rect)
+          scene.setShapeScale(padW, padH, SPREAD)
+
+          // The backdrop has to cover what the canvas covers, not what the
+          // button covers, or the refraction samples the wrong slice of page.
+          const grow = (SPREAD - 1) / 2
+          backdrop.resize({
+            left: rect.left - rect.width * grow,
+            top: rect.top - rect.height * grow,
+            width: padW,
+            height: padH,
+          })
           backdrop.update()
 
           const now = performance.now()
@@ -241,7 +281,18 @@ export default function GlassCelestial({
       <canvas
         ref={canvasRef}
         aria-hidden="true"
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        // Overhangs the host by (SPREAD-1)/2 on every side, centred on it. The
+        // overhang is transparent and takes no pointer events, so it changes
+        // nothing about the layout or the hit target — the button below is
+        // still exactly the ornament's own box.
+        style={{
+          position: 'absolute',
+          top: `${-(SPREAD - 1) * 50}%`,
+          left: `${-(SPREAD - 1) * 50}%`,
+          width: `${SPREAD * 100}%`,
+          height: `${SPREAD * 100}%`,
+          pointerEvents: 'none',
+        }}
       />
       <button
         ref={btnRef}
