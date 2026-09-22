@@ -62,13 +62,11 @@ const DUSK = {
   /** The fire blooms, then is squeezed out by the front. */
   warmIn: [150, 1250],
   warmOut: [1350, 2900],
-  /**
-   * Filling in behind the front, and deliberately trailing it: the front is
-   * still descending at 1800, so by the time a star's part of the sky gets one
-   * it has already gone deep blue. Starting them with the front put them over
-   * a sky that was still lit, where they simply did not read.
-   */
-  stars: [1800, 3400],
+  // No window for the stars going this way. They are driven off the front's
+  // own position instead — see STAR_LAG — so that they fill in behind the blue
+  // as it takes the screen rather than arriving after it has finished. A
+  // separate window made them a second event that happened once the sky was
+  // already dark; tied to the front they are part of the same one.
   switchAt: 3450,
   rise: [3600, 4600],
   fadeIn: [3650, 4350],
@@ -184,6 +182,24 @@ function emit(frame) {
  */
 const win = (t, w, ease = easeInOut) => (w ? ease(span(t, w[0], w[1])) : 0)
 
+/**
+ * How far the stars trail the dusk front, as a fraction of the SCREEN.
+ *
+ * Measured in screen height rather than in the front's progress, because the
+ * front overshoots — it runs to 125% so the last of the fire is pushed off the
+ * bottom — while the star line only ever spans the screen itself. Trailing by
+ * a fraction of progress therefore drifted: the gap between the blue edge and
+ * the topmost star grew from about 11% of the screen early to over 40% late.
+ * In screen terms it now stays at this, the whole way down.
+ *
+ * Non-zero on purpose. The two move together — a strip of sky goes blue and
+ * gets its stars at much the same moment, the way dusk actually works — but
+ * not simultaneously, or stars appear inside the lit edge of the front itself.
+ */
+const STAR_LAG = 0.16
+/** The front's overshoot, which the lag has to be measured against. */
+const FRONT_SPAN = 1.25
+
 function frameAt(t, from, to, distance) {
   const toDark = to === 'dark'
   const T = toDark ? DUSK : DAWN
@@ -206,16 +222,26 @@ function frameAt(t, from, to, distance) {
   // brings it with the sun and then washes it into daylight.
   const warm = clamp01(win(t, T.warmIn) - win(t, T.warmOut))
 
+  const front = win(t, T.front)
+
+  // Going dark, the stars are the front: the same boundary, a little behind.
+  // Going light they keep their own window, because there the light comes up
+  // from the bottom while the stars go out ahead of it, and the two want
+  // different speeds.
+  const stars = toDark
+    ? clamp01(front * FRONT_SPAN - STAR_LAG)
+    : win(t, T.stars)
+
   return {
     from,
     to,
     toDark,
     t,
     sky: clamp01(win(t, T.sky) - win(t, T.clear)),
-    front: win(t, T.front),
+    front,
     warm,
     day: win(t, T.day),
-    stars: win(t, T.stars),
+    stars,
     drop,
     bodyAlpha: clamp01(bodyAlpha),
   }
