@@ -177,6 +177,30 @@
   color: #fff;
 }
 
+/* The compose box, which was picking up the fluid cursor as colour.
+   Two things were doing it. The frost is a 22% white wash, so most of what you
+   see through it is whatever is behind — and behind it is the card's glass
+   refracting the fluid. Then saturate(170%) took that and amplified it, which
+   is right over paper, where it lifts a muted background into something worth
+   looking through, and wrong here, where it turns a moving cursor into pink
+   and green blooms across the panel.
+   So: no saturation boost at all, and a fill dark enough to be the thing you
+   are looking at rather than a window onto the thing behind it. The blur and
+   both displacement filters stay, because the frosted surface is the point;
+   it is only the colour coming through it that is not. */
+:root[data-theme="dark"] textarea {
+  background-color: rgba(18, 23, 40, 0.72);
+  backdrop-filter: url(#glass-element) blur(26px) saturate(35%) brightness(0.7) url(#frost-scatter);
+  -webkit-backdrop-filter: url(#glass-element) blur(26px) saturate(35%) brightness(0.7) url(#frost-scatter);
+  border-color: rgba(255, 255, 255, 0.20);
+  /* The lit outer edges belong to a pale panel on paper; on the night sky they
+     draw a bright outline around a dark box. */
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.38),
+    inset 1px 1px 3px rgba(255, 255, 255, 0.10),
+    inset -1px -1px 3px rgba(0, 0, 0, 0.22);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Hold the scrollbar's width whether or not there is a scrollbar.
