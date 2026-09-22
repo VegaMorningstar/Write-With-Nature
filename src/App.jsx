@@ -8,6 +8,7 @@ import usePanelGlass, { glassSupported } from './hooks/usePanelGlass'
 import LiquidGlassPanel from './ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from './ui-elements/liquid-glass/panelPreset'
 import FluidCursor from './components/FluidCursor'
+import NightSky from './night-sky/NightSky'
 import GlassButtons from './ui-elements/glass-buttons/GlassButtons'
 import { RENDER_MATERIAL, RENDER_WIDTH } from './ui-elements/glass-buttons/constants.ts'
 import { ButterflyLoader } from './butterflies/react'
@@ -175,17 +176,39 @@ export default function App() {
   }, [showToast])
 
   // Service worker
+  //
+  // Production only. sw.js caches './' and './index.html' in its shell, so in
+  // dev it serves yesterday's HTML over today's — which silently undoes any
+  // edit to index.html and leaves the dev server looking broken while what it
+  // actually sends is correct. That cost a real debugging session: the theme
+  // attribute is set by an inline script in index.html, so a stale shell meant
+  // no attribute, and the page fell back to light no matter what was changed.
+  //
+  // Dev also tears down anything a previous build registered, because a worker
+  // already installed keeps serving that shell long after this guard is added
+  // and there is nothing in the app to undo it otherwise.
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () =>
-        navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
-          .catch(e => console.warn('[WWN] SW failed:', e))
-      )
+    if (!('serviceWorker' in navigator)) return
+
+    if (import.meta.env.DEV) {
+      navigator.serviceWorker.getRegistrations()
+        .then(rs => rs.forEach(r => r.unregister()))
+        .catch(() => {})
+      globalThis.caches?.keys()
+        .then(keys => keys.filter(k => k.startsWith('wwn-')).forEach(k => caches.delete(k)))
+        .catch(() => {})
+      return
     }
+
+    window.addEventListener('load', () =>
+      navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
+        .catch(e => console.warn('[WWN] SW failed:', e))
+    )
   }, [])
 
   return (
     <>
+      <NightSky />
       <FluidCursor />
       {/* Only once the field has handed over — they belong to the page, not
           to the loading screen sitting on top of it. */}
