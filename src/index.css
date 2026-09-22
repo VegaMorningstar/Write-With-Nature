@@ -38,6 +38,19 @@
      does not follow the foliage palette: on paper it is the deep moss it has
      always been, on the night sky it is violet. */
   --heading: var(--moss);
+
+  /* Secondary text inside the glass sheet. These exist as variables rather
+     than as literals in GlassSheet.jsx because that component styles inline,
+     and an inline style cannot carry a per-theme value — the alpha that reads
+     as quiet grey on cream is a whisper against a night sky, so the two
+     themes need different numbers rather than the same number in a different
+     colour. */
+  --sheet-sub: rgba(var(--ink-rgb), 0.5);
+  --sheet-caption: rgba(var(--ink-rgb), 0.62);
+
+  /* The two hairlines flanking the masthead ornament. On paper this is exactly
+     the gold it always was. */
+  --rule: var(--gold);
 }
 
 /* ── Dark ──────────────────────────────────────────────────────────────────
@@ -83,6 +96,18 @@
      merely a different hue — a heading on a night sky wants to lead. Sits
      with the fluid cursor's purples instead of against the foliage greens. */
   --heading: #c79bff;
+
+  /* Lifted, for the reason given where these are declared: the same alpha has
+     far less to work with lifting off a dark ground than sitting on cream. */
+  --sheet-sub: rgba(var(--ink-rgb), 0.72);
+  --sheet-caption: rgba(var(--ink-rgb), 0.82);
+
+  /* A pale warm gold rather than #c8962a. At one pixel there is no area for a
+     dark saturated colour to register, so against the sky the gold rule read
+     as a dark orange smear instead of a line of light. Lighter and less
+     saturated is what makes a hairline look like it is glowing rather than
+     stained. Only the rules change; gold text and the sun keep their colour. */
+  --rule: #f0dcaa;
 
   /* --blend-overlay is deliberately NOT overridden here. Its only readers are
      the two grain layers, and this theme turns those off outright (below), so
@@ -252,7 +277,10 @@ body::after {
 }
 .ornament-rule {
   flex: 1; max-width: 140px; height: 1px;
-  background: linear-gradient(to right, transparent, var(--gold), transparent);
+  /* Its own token rather than --gold directly: a hairline is the one place a
+     colour has no area to establish itself, so it needs to be lighter than the
+     gold used for text and icons to read as the same brightness. */
+  background: linear-gradient(to right, transparent, var(--rule), transparent);
 }
 
 /* ── Title collage ── */

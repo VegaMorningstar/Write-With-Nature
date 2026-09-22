@@ -234,7 +234,11 @@ export default function GlassSheet({
             <h3 id={labelledBy} style={{
               fontFamily: "'Playfair Display', Georgia, serif",
               fontStyle: 'italic', fontWeight: 400, fontSize: '1.35rem',
-              color: 'var(--moss)', margin: 0,
+              // --heading, not --moss: this is a section heading, and that
+              // token exists precisely to be deep moss on paper and violet on
+              // the night sky. --moss stays green in both, for the pale chips
+              // it is ink on elsewhere.
+              color: 'var(--heading)', margin: 0,
             }}>
               {title}
             </h3>
@@ -242,7 +246,7 @@ export default function GlassSheet({
               <p style={{
                 fontFamily: "'DM Mono', monospace", fontSize: '0.62rem',
                 letterSpacing: '0.08em', textTransform: 'uppercase',
-                color: 'rgba(28,26,16,0.5)', margin: '0.35rem 0 0',
+                color: 'var(--sheet-sub)', margin: '0.35rem 0 0',
               }}>
                 {subtitle}
               </p>
@@ -283,7 +287,7 @@ export default function GlassSheet({
               />
               <figcaption style={{
                 fontFamily: "'DM Mono', monospace", fontSize: '0.58rem',
-                lineHeight: 1.5, color: 'rgba(28,26,16,0.62)',
+                lineHeight: 1.5, color: 'var(--sheet-caption)',
                 marginTop: '0.45rem',
               }}>
                 {item.label}
@@ -293,7 +297,7 @@ export default function GlassSheet({
           {items.length === 0 && (
             <p style={{
               fontFamily: "'DM Mono', monospace", fontSize: '0.66rem',
-              color: 'rgba(28,26,16,0.5)', gridColumn: '1 / -1', margin: 0,
+              color: 'var(--sheet-sub)', gridColumn: '1 / -1', margin: 0,
             }}>
               No scenes mapped to this character yet.
             </p>
