@@ -65,11 +65,22 @@ const DUSK = {
   // as it takes the screen rather than arriving after it has finished. A
   // separate window made them a second event that happened once the sky was
   // already dark; tied to the front they are part of the same one.
-  switchAt: 3450,
-  rise: [3600, 4600],
-  fadeIn: [3650, 4350],
-  clear: [4450, 5400],
-  total: 5400,
+  // Paced off the stars rather than off the clock, and matched to the dawn.
+  //
+  // The dusk stars are complete at about 2205ms — they finish early, because
+  // they only have to catch the front and the front overshoots. The moon then
+  // used to wait until 3600 to start rising, nearly a second and a half of a
+  // finished night sky with nothing happening in it, and then hurried up in
+  // 1000ms. The dawn's sun starts 200ms after its own stars are done and takes
+  // 1400ms. These are those same offsets: +100 to the switch, +200 to the
+  // rise, +250 to the fade, and the same durations.
+  switchAt: 2350,
+  rise: [2450, 3850],
+  fadeIn: [2500, 3450],
+  // 900ms of held night after the moon is up, as the dawn holds its risen sun
+  // before clearing.
+  clear: [4750, 5550],
+  total: 5550,
 }
 
 const DAWN = {
