@@ -1,5 +1,12 @@
 :root {
   --ink:    #1c1a10;
+  /* The same ink as components, for the many places that want it at partial
+     opacity. `rgba(var(--ink-rgb), 0.4)` is the only way to vary alpha on a
+     themed colour without writing out a second variable per opacity.
+     Deliberately not used for shadows: a shadow is dark in both themes, and
+     the text-shadows behind the letters on the tile photos in particular must
+     stay dark or the labels stop being readable against the imagery. */
+  --ink-rgb: 28,26,16;
   --paper:  #d9cdb4;
   --paper2: #cfc3a8;
   --paper3: #bfb292;
@@ -10,6 +17,139 @@
   --amber:  #e8b84b;
   --rust:   #b8542a;
   --teal:   #2a6b5e;
+
+  /* How the paper grain combines with what is behind it. A blend mode rather
+     than a colour, but it belongs with the palette because it has to change
+     with it: multiply can only darken, so on a dark ground it is multiplication
+     by zero.
+     The fluid cursor needs the same decision and does NOT read this — it is a
+     canvas, and canvas code cannot read a custom property. Its copy lives in
+     src/theme.js as `fluidBlend`, along with the four glass backdrops that
+     replay the same blend. */
+  --blend-overlay: multiply;
+
+  /* Teal's components, for the places that want it at partial opacity. Same
+     reason as --ink-rgb: rgba() cannot take a hex variable and vary its alpha.
+     Without this, every translucent teal is a literal that silently keeps the
+     paper colour when the theme changes. */
+  --teal-rgb: 42,107,94;
+
+  /* Section headings. Its own token because it does not follow the ink and it
+     does not follow the foliage palette: on paper it is the deep moss it has
+     always been, on the night sky it is violet. */
+  --heading: var(--moss);
+}
+
+/* ── Dark ──────────────────────────────────────────────────────────────────
+   Set on <html> by the inline script in index.html before first paint, so the
+   page never shows the wrong theme and swaps.
+
+   Colour lives here. The tokens that are not colour — the paper the glass
+   repaints into a canvas, and these blend modes where canvas code needs them
+   as strings — live in src/theme.js, which keys off the same attribute. The
+   two have to be changed together; each file says so. */
+:root[data-theme="dark"] {
+  /* A trace of blue rather than pure black: a void with stars in it still
+     reads as a void. Must match paperBase in src/theme.js. */
+  --paper: #050814;
+
+  /* The ink inverts. Not pure white: #f0ead8 is the warm off-white the tile
+     labels and pips already use over the imagery, so the page's text and the
+     text sitting on photographs are finally the same colour. Pure white
+     against pure black is also harsher than this typeface wants. */
+  --ink: #f0ead8;
+  --ink-rgb: 240,234,216;
+
+  /* The accents are a foliage palette chosen to sit on pale paper, and the
+     dark half of it disappears on black: moss at #2d4a1e is 8% luminance,
+     which is a heading you cannot read. These are the same hues lifted to
+     carry on a dark ground. Gold, amber and leaf are already bright enough
+     and are deliberately left alone, so the palette keeps its warm accents
+     exactly where it had them. */
+  --moss: #7fae5c;
+  --fern: #8fc47a;
+  --rust: #d9784e;
+
+  /* Teal carries most of the interface text — the masthead overline, the
+     tagline, the section labels, the colophon links — and against a night sky
+     a blue-green reads as the foliage colour it is, left over from paper. Lilac
+     instead, so the text sits with the violet heading and the fluid's purples
+     rather than against them. Not applied to --moss: that one is mostly ink on
+     pale chips, where it is still doing a green job on a light ground. */
+  --teal: #cbb0ff;
+  --teal-rgb: 203,176,255;
+
+  /* Bright violet, and brighter than the body copy beneath it rather than
+     merely a different hue — a heading on a night sky wants to lead. Sits
+     with the fluid cursor's purples instead of against the foliage greens. */
+  --heading: #c79bff;
+
+  /* --blend-overlay is deliberately NOT overridden here. Its only readers are
+     the two grain layers, and this theme turns those off outright (below), so
+     a value here would be dead. The fluid cursor's equivalent switch to screen
+     is real, and lives in src/theme.js because a canvas cannot read this. */
+}
+
+/* The five coloured washes are dropped, leaving flat black. They are what
+   makes the light theme read as weathered paper, and exactly that quality
+   turns into a muddy grading once there is no paper under them.
+
+   paperGradients in src/theme.js must stay false alongside this. That flag
+   governs the canvas the glass refracts; this rule governs the page. Leave
+   them disagreeing and the panels glow with washes the page does not have. */
+:root[data-theme="dark"] body {
+  background: var(--paper);
+}
+
+/* The two grain layers go. They are a paper tooth, and screened onto a night
+   sky they read as sensor noise across the whole page. The star field takes
+   over as this theme's surface — see src/night-sky/, and the `stars` token in
+   src/theme.js, which keeps the glass in step. The grain needs no token: it is
+   drawn by CSS alone, so switching it off here switches it off everywhere. */
+:root[data-theme="dark"] body::before,
+:root[data-theme="dark"] body::after {
+  display: none;
+}
+
+/* The empty board's prompt. Both of these are ink at low opacity, which is a
+   soft grey on paper and nearly nothing against a night sky — the same alpha
+   has far less to work with when it is lifting off black rather than sitting
+   on cream. Raised until it reads as text again. */
+:root[data-theme="dark"] .board-empty {
+  color: rgba(var(--ink-rgb), 0.82);
+}
+:root[data-theme="dark"] .board-empty small {
+  color: rgba(var(--ink-rgb), 0.48);
+}
+
+/* The colophon's body copy, for the same reason as the empty board: 0.68 of
+   near-black on cream is comfortable reading, 0.68 of off-white on a night sky
+   is a whisper. */
+:root[data-theme="dark"] .colophon-text p {
+  color: rgba(var(--ink-rgb), 0.88);
+}
+
+/* Slightly stronger than the 25% the base rule gives it: a hairline at that
+   alpha survives on cream and disappears against a night sky. The colour
+   itself now comes from --teal-rgb, so it follows the theme rather than being
+   a second literal chasing the first. */
+:root[data-theme="dark"] .colophon-text a {
+  border-bottom-color: rgba(var(--teal-rgb), 0.4);
+}
+
+/* The toolbar's glyphs, on the path the shader is NOT drawing.
+   .icon-btn and .save-btn are what these buttons wear when the glass fails to
+   start, and they are a separate set of colours from the shader's — so pinning
+   the glass letters white (buttonGlyph in src/theme.js) left this path behind.
+   The hover state in particular went to --moss, which is still a green here
+   because --moss stays green for the pale chips it is ink on elsewhere.
+   Both paths have to be told, and this is the one that shows when WebGPU is
+   missing, blocked, or has fallen over. */
+:root[data-theme="dark"] .icon-btn {
+  color: rgba(255, 255, 255, 0.92);
+}
+:root[data-theme="dark"] .icon-btn:hover {
+  color: #fff;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -48,14 +188,14 @@ body::before {
   position: fixed; inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.10'/%3E%3C/svg%3E");
   background-size: 180px;
-  pointer-events: none; z-index: 0; mix-blend-mode: multiply;
+  pointer-events: none; z-index: 0; mix-blend-mode: var(--blend-overlay);
 }
 body::after {
   content: '';
   position: fixed; inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.30' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)' opacity='0.045'/%3E%3C/svg%3E");
   background-size: 320px;
-  pointer-events: none; z-index: 0; mix-blend-mode: multiply;
+  pointer-events: none; z-index: 0; mix-blend-mode: var(--blend-overlay);
 }
 
 /* The page runs edge to edge under the status bar and the home indicator, so
@@ -292,9 +432,11 @@ textarea {
 }
 textarea:focus {
   border-color: var(--teal);
-  box-shadow: 0 0 0 3px rgba(42,107,94,0.09);
+  /* Follows --teal, or the focus ring stays foliage green under a lilac border
+     the moment the theme changes. */
+  box-shadow: 0 0 0 3px rgba(var(--teal-rgb),0.09);
 }
-textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
+textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
 
 .render-btn {
   display: flex; flex-direction: column;
@@ -335,7 +477,7 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 
 .compose-note {
   margin-top: 0.9rem; font-size: 0.85rem;
-  color: rgba(28,26,16,0.60); font-style: italic;
+  color: rgba(var(--ink-rgb),0.60); font-style: italic;
   display: flex; align-items: flex-start; gap: 6px; line-height: 1.5;
 }
 
@@ -415,13 +557,13 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 .board-empty {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; min-height: 140px;
-  color: rgba(28,26,16,0.40); gap: 12px; text-align: center;
+  color: rgba(var(--ink-rgb),0.40); gap: 12px; text-align: center;
   position: relative; z-index: 1;
 }
 .board-empty p { font-style: italic; font-size: 1rem; }
 .board-empty small {
   font-family: 'DM Mono', monospace; font-size: 0.58rem;
-  letter-spacing: 0.14em; text-transform: uppercase; color: rgba(28,26,16,0.18);
+  letter-spacing: 0.14em; text-transform: uppercase; color: rgba(var(--ink-rgb),0.18);
 }
 
 .collage-row {
@@ -536,11 +678,11 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 .tile-error .ghost {
   font-family: 'Playfair Display', serif; font-weight: 700;
   font-style: italic; font-size: 2.8rem; line-height: 1;
-  color: rgba(28,26,16,0.1);
+  color: rgba(var(--ink-rgb),0.1);
 }
 .tile-error small {
   font-family: 'DM Mono', monospace; font-size: 0.48rem;
-  color: rgba(28,26,16,0.2); text-align: center; padding: 0 6px; line-height: 1.5;
+  color: rgba(var(--ink-rgb),0.2); text-align: center; padding: 0 6px; line-height: 1.5;
 }
 
 .tile-space { flex-shrink: 0; }
@@ -563,12 +705,12 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
 .colophon-text { flex: 1; min-width: 200px; }
 .colophon-text h3 {
   font-family: 'Playfair Display', serif; font-style: italic;
-  font-weight: 400; font-size: 1rem; color: var(--moss); margin-bottom: 0.5rem;
+  font-weight: 400; font-size: 1rem; color: var(--heading); margin-bottom: 0.5rem;
 }
-.colophon-text p { font-size: 0.86rem; color: rgba(28,26,16,0.68); line-height: 1.7; }
+.colophon-text p { font-size: 0.86rem; color: rgba(var(--ink-rgb),0.68); line-height: 1.7; }
 .colophon-text a {
   color: var(--teal); text-decoration: none;
-  border-bottom: 1px solid rgba(42,107,94,0.25); transition: border-color 0.15s;
+  border-bottom: 1px solid rgba(var(--teal-rgb),0.25); transition: border-color 0.15s;
 }
 .colophon-text a:hover { border-color: var(--teal); }
 
@@ -581,7 +723,7 @@ textarea::placeholder { color: rgba(28,26,16,0.45); font-style: italic; }
   -webkit-backdrop-filter: url(#glass-element) blur(12px) saturate(140%) brightness(1.06);
   border-radius: 6px;
   font-family: 'Playfair Display', serif; font-weight: 700;
-  font-size: 0.9rem; color: rgba(28,26,16,0.48);
+  font-size: 0.9rem; color: rgba(var(--ink-rgb),0.48);
   border: 1px solid rgba(255,255,255,0.32);
   box-shadow:
     -1px -1px 4px rgba(255,255,255,0.55),
