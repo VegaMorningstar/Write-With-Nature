@@ -210,8 +210,14 @@ export default function GlassCelestial({
           // up: summed, a press while hovering would run to twice the level a
           // press alone reaches, and the flash would read differently depending
           // on whether the cursor happened to be resting on it.
+          // Resting brightness comes from the state, not the shared pointer
+          // defaults: the moon needs far more of it than the sun, because it
+          // has a night sky behind it to refract rather than paper. Mixed
+          // through the morph so the change rides the shape rather than
+          // stepping as it passes the halfway point.
+          const idle = mix(SUN.idleGlow, MOON.idleGlow, t)
           const glow = Math.max(
-            pp.idleGlow,
+            idle,
             hoverRef.current ? pp.hoverGlow : 0,
             flash * pp.clickGlow,
           ) + energy * pp.glowGain

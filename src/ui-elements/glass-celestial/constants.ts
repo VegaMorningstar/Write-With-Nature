@@ -59,23 +59,42 @@ export const MATERIAL_DEFAULTS = {
  * page — while the moon keeps more of the background, since a crescent reads by
  * its shape and wants to look like cold glass.
  */
+/**
+ * `idleGlow` is per state rather than shared, because the two sit on opposite
+ * grounds.
+ *
+ * The lens is mostly a refraction of whatever is behind it, and on the night
+ * sky there is very little behind it to refract — so the moon at rest read as
+ * a dull grey disc, while the same number over paper gives the sun plenty. The
+ * moon has to supply its own light rather than borrow the page's, which is
+ * also, conveniently, what a moon does.
+ *
+ * Mixed through the morph alongside the colours, so pressing it does not step
+ * the brightness as the shape changes.
+ */
 export const SUN = {
   tintStrength: 0.48,
   tintR: 1, tintG: 0.66, tintB: 0.16,
   glowR: 255, glowG: 148, glowB: 40,
+  idleGlow: 0.32,
 };
 
 export const MOON = {
   tintStrength: 0.38,
   tintR: 0.76, tintG: 0.68, tintB: 1,
   glowR: 198, glowG: 164, glowB: 255,
+  // Most of the way to the shared hoverGlow of 0.62, which is what it takes to
+  // read as lit rather than grey against #050814 — but short of it, so hover
+  // is still a change rather than a no-op.
+  idleGlow: 0.56,
 };
 
 export const POINTER_DEFAULTS = {
-  // Three levels, and the brightest reason to be lit wins. Idle is not zero:
-  // the ornament sits between two hairlines on a busy ground, and something
-  // that only exists once you find it with a cursor is not an ornament.
-  idleGlow: 0.32,
+  // Three levels, and the brightest reason to be lit wins. The idle level is
+  // not here: it differs between the sun and the moon, so it lives on those
+  // two above. It is also not zero in either — the ornament sits between two
+  // hairlines on a busy ground, and something that only exists once you find
+  // it with a cursor is not an ornament.
   hoverGlow: 0.62,
   clickGlow: 0.95,
   // How fast the press burst falls back to whichever level is underneath. Short
