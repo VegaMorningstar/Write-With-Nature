@@ -28,6 +28,7 @@
  * comes through and the fluid does not.
  */
 import { paintPaper } from '../liquid-glass/backdrop.js'
+import { tokens } from '../../theme.js'
 import { LETTER_TEX_W, LETTER_TEX_H } from './scene.ts'
 
 export function createTileBackdrop() {
@@ -84,8 +85,12 @@ export function createTileBackdrop() {
     if (fluid && fluid.width > 0 && fluid.height > 0) {
       try {
         // The blend the real canvas uses, so the glass refracts what is on
-        // screen rather than a brighter version of it
-        paperCtx.globalCompositeOperation = 'multiply'
+        // screen rather than a brighter version of it. Five places make this
+        // same decision — the real canvas in FluidCursor, and each of the four
+        // glass backdrops — so all five read it from theme.js. When this one
+        // was a literal it was missed, and the alphabet tiles alone refracted
+        // a fluid multiplied against black, which is to say no fluid at all.
+        paperCtx.globalCompositeOperation = tokens().fluidBlend
         paperCtx.drawImage(fluid, 0, 0, vw, vh)
       } catch (_) { /* tainted or mid-frame; the paper still stands */ }
       paperCtx.globalCompositeOperation = 'source-over'

@@ -21,6 +21,7 @@
  * glazed tile frames the scene identically to the plain one.
  */
 import { paintPaper } from '../liquid-glass/backdrop.js'
+import { tokens } from '../../theme.js'
 import { LETTER_TEX_W, LETTER_TEX_H } from '../glass-alphabet/scene.ts'
 
 export const MASK_W = LETTER_TEX_W
@@ -94,7 +95,10 @@ export function createTitleBackdrop() {
       document.getElementById('tune-fluid-canvas')
     if (fluid && fluid.width > 0 && fluid.height > 0) {
       try {
-        paperCtx.globalCompositeOperation = 'multiply'
+        // From the theme, like the other three backdrops: multiply annihilates
+        // the fluid against a dark page, so a hardcoded one here would leave
+        // the masthead alone refracting a fluid that is not on screen.
+        paperCtx.globalCompositeOperation = tokens().fluidBlend
         paperCtx.drawImage(fluid, 0, 0, vw, vh)
       } catch (_) { /* tainted or mid-frame; the paper still stands */ }
       paperCtx.globalCompositeOperation = 'source-over'

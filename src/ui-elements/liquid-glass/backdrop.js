@@ -29,7 +29,12 @@
  * detail that is immediately destroyed.
  */
 
-const PAPER_BASE = '#d9cdb4'
+// The shader cannot sample the DOM, so this canvas is the only thing the glass
+// sees — and it cannot read --paper either. theme.js carries the same value,
+// and is read per repaint so a theme change lands on the next frame with no
+// invalidation needed here.
+import { tokens, theme } from '../../theme.js'
+import { drawStars, drawBakedStars, drawTwinklers } from '../../night-sky/stars.js'
 
 // centreX, centreY, radiusX, radiusY, 'r,g,b', alpha, stop — all as fractions,
 // lifted from the body gradients in index.css
@@ -65,10 +70,23 @@ function ellipticGrad(ctx, cw, ch, cxPct, cyPct, rxPct, ryPct, rgb, alpha, stopP
  * first — see the glass alphabet, which paints the region behind its own grid
  * at full resolution rather than downsampling the whole viewport.
  */
-export function paintPaper(ctx, w, h) {
-  ctx.fillStyle = PAPER_BASE
+export function paintPaper(ctx, w, h, { stars = 'all' } = {}) {
+  ctx.fillStyle = tokens().paperBase
   ctx.fillRect(0, 0, w, h)
-  for (const g of PAPER_GRADIENTS) ellipticGrad(ctx, w, h, ...g)
+  // Skipped entirely on a theme that does not paint them, rather than painted
+  // and overwhelmed: the glass refracts this canvas, so washes left here would
+  // show up inside every panel as colour the page itself does not have.
+  if (tokens().paperGradients) {
+    for (const g of PAPER_GRADIENTS) ellipticGrad(ctx, w, h, ...g)
+  }
+  // The same canvas the page shows, not a second field — so a panel refracts
+  // the stars that are actually behind it. See src/night-sky/stars.js.
+  // `stars: 'baked'` leaves the twinklers out, for callers that cache this
+  // paint across frames and draw them live instead.
+  if (tokens().stars) {
+    if (stars === 'baked') drawBakedStars(ctx, w, h)
+    else drawStars(ctx, w, h)
+  }
 }
 
 /**
@@ -107,12 +125,31 @@ export function createBackdrop({ scale = 0.5 } = {}) {
   const composite = document.createElement('canvas')
   const ctx = composite.getContext('2d', { willReadFrequently: false })
 
-  // The paper only changes on resize, so it is painted once and blitted
+  // The paper is expensive — a fill, five elliptic gradients and a star blit —
+  // and cheap to reuse, so it is painted once and blitted every frame.
+  //
+  // What it is NOT is constant. It changes on resize, and it changes on a theme
+  // switch, and for a while only the first of those invalidated it: switching
+  // back to light left every glass panel refracting the night sky it had
+  // cached, stars and all, over a page that had already gone beige. It looked
+  // like the themes were fighting; it was one stale canvas.
+  //
+  // Tracked by comparing the theme each frame rather than by subscribing,
+  // because a subscription needs an unsubscribe and this object has no
+  // teardown for one to hang off.
   const paper = document.createElement('canvas')
   const paperCtx = paper.getContext('2d')
+  let paperTheme = null
 
   let w = 0
   let h = 0
+
+  function repaintPaper() {
+    // Baked stars only. The twinklers are drawn live in update(), because
+    // anything baked in here would hold still until the next resize.
+    paintPaper(paperCtx, w, h, { stars: 'baked' })
+    paperTheme = theme()
+  }
 
   function resize(cssW, cssH) {
     const nw = Math.max(2, Math.round(cssW * scale))
@@ -126,15 +163,18 @@ export function createBackdrop({ scale = 0.5 } = {}) {
     paper.width = w
     paper.height = h
 
-    paintPaper(paperCtx, w, h)
+    repaintPaper()
     return true
   }
 
   function update() {
     if (!w || !h) return composite
 
+    if (paperTheme !== theme()) repaintPaper()
+
     ctx.globalCompositeOperation = 'source-over'
     ctx.drawImage(paper, 0, 0)
+    if (tokens().stars) drawTwinklers(ctx, w, h)
 
     // The tune page runs its own instance under a different id
     const fluid = document.getElementById('fluid-cursor-canvas') ||
@@ -142,8 +182,10 @@ export function createBackdrop({ scale = 0.5 } = {}) {
     if (fluid && fluid.width > 0 && fluid.height > 0) {
       try {
         // Same blend the real canvas uses, so the glass refracts what is
-        // actually on screen rather than a brighter version of it
-        ctx.globalCompositeOperation = 'multiply'
+        // actually on screen rather than a brighter version of it. Both read
+        // it from theme.js; they used to be separate literals, and the copies
+        // drifted.
+        ctx.globalCompositeOperation = tokens().fluidBlend
         ctx.drawImage(fluid, 0, 0, w, h)
         ctx.globalCompositeOperation = 'source-over'
       } catch (_) {

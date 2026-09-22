@@ -11,6 +11,7 @@
  * composited in at whatever blend the page is using.
  */
 import { paintPaper } from '../liquid-glass/backdrop.js'
+import { tokens } from '../../theme.js'
 
 /** Comfortably above the ornament's own size at any sane device ratio. */
 export const TEX_SIZE = 256
@@ -50,8 +51,9 @@ export function createCelestialBackdrop() {
     if (fluid && fluid.width > 0 && fluid.height > 0) {
       try {
         // The blend the real canvas uses, so the glass refracts what is on
-        // screen rather than a brighter version of it
-        ctx.globalCompositeOperation = 'multiply'
+        // screen rather than a brighter version of it. One of five places that
+        // make this decision; all of them read it from theme.js now.
+        ctx.globalCompositeOperation = tokens().fluidBlend
         ctx.drawImage(fluid, 0, 0, vw, vh)
       } catch (_) { /* tainted or mid-frame; the paper still stands */ }
       ctx.globalCompositeOperation = 'source-over'
