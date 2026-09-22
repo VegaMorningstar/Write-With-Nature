@@ -36,40 +36,63 @@ import { theme, setTheme } from '../theme.js'
  * sinking while the sky starts to build, and the stars come up while the last
  * of the warm light drains, which is the order these things happen in.
  */
-export const TIMELINE = {
-  /**
-   * The jelly sinks. Slower than the sky builds, on purpose: the body has to
-   * still be descending once there is a sunset behind it, or the whole thing
-   * is a sun that vanishes and then, separately, a coloured screen. The first
-   * pass had it gone by 900ms and the sky not full until 1250, so the two
-   * never shared the frame.
-   */
-  dropFrom: 0,
-  dropTo: 1250,
-  /** And goes out as it reaches the horizon, not as it starts moving. */
-  fadeOutFrom: 900,
-  fadeOutTo: 1350,
-  /** The sky fades in, at full sunset or full night depending on direction. */
-  skyFrom: 120,
-  skyTo: 1200,
-  /** Sunset cools to night, or night warms to dawn. */
-  turnFrom: 1350,
-  turnTo: 2300,
-  /** Stars arrive or leave. */
-  starsFrom: 1700,
-  starsTo: 2500,
-  /** The attribute changes here, under full cover. */
-  switchAt: 2500,
-  /** The sky clears and the other body rises into its place. */
-  clearFrom: 2650,
-  clearTo: 3350,
-  riseFrom: 2650,
-  riseTo: 3350,
-  fadeInFrom: 2750,
-  fadeInTo: 3250,
+/**
+ * The two directions are not mirror images, so they get separate schedules
+ * rather than one set of numbers bent to mean two things.
+ *
+ * Dusk: the sun goes down while the fire blooms under it, the blue front comes
+ * down from the top and darkens, the fire is pushed off the bottom, the stars
+ * fill in behind the front, and only then does the theme change.
+ *
+ * Dawn: the moon goes down, first light climbs from the bottom and erases the
+ * stars ahead of it, the theme changes while the sky is still a cold blue, and
+ * then the sun rises — bringing the warm colours up with it, which is the part
+ * that has to happen after the switch because the sun only exists once the
+ * theme is light. Then the whole sky opens out into day and clears.
+ *
+ * Everything overlaps. Almost nothing here waits for the step before it to
+ * finish; the windows are written to run together on purpose.
+ */
+const DUSK = {
+  drop: [0, 1700],
+  fadeOut: [1250, 1800],
+  sky: [100, 1150],
+  /** The blue front, from the top down. */
+  front: [250, 2900],
+  /** The fire blooms, then is squeezed out by the front. */
+  warmIn: [150, 1250],
+  warmOut: [1350, 2900],
+  /** Filling in behind the front, so they appear against sky that is already dark. */
+  stars: [1500, 3350],
+  switchAt: 3450,
+  rise: [3600, 4600],
+  fadeIn: [3650, 4350],
+  clear: [4450, 5400],
+  total: 5400,
 }
 
-export const DURATION = TIMELINE.clearTo
+const DAWN = {
+  drop: [0, 1500],
+  fadeOut: [1050, 1600],
+  sky: [100, 1000],
+  /** First light, from the bottom up. */
+  front: [250, 2350],
+  /** Erased from the bottom, ahead of the light. */
+  stars: [350, 2400],
+  switchAt: 2500,
+  /** The sun comes up, and the warm colours come up with it. */
+  rise: [2600, 4000],
+  fadeIn: [2650, 3600],
+  warmIn: [2550, 3600],
+  warmOut: [3700, 4900],
+  /** Full brightness, last. */
+  day: [3500, 4900],
+  clear: [4900, 5700],
+  total: 5700,
+}
+
+export const TIMELINE = { DUSK, DAWN }
+export const DURATION = Math.max(DUSK.total, DAWN.total)
 
 /**
  * How far the jelly sinks, as a fraction of the gap between it and the compose
@@ -154,11 +177,17 @@ function emit(frame) {
  * place; otherwise the ornament and the sky would each have their own opinion
  * about what "halfway" means.
  */
+const win = (t, w, ease = easeInOut) => (w ? ease(span(t, w[0], w[1])) : 0)
+
 function frameAt(t, from, to, distance) {
   const toDark = to === 'dark'
+  const T = toDark ? DUSK : DAWN
 
-  const sinking = easeOut(span(t, TIMELINE.dropFrom, TIMELINE.dropTo))
-  const rising = easeOut(span(t, TIMELINE.riseFrom, TIMELINE.riseTo))
+  // Eased once. `win` already applies the curve it is handed; wrapping it in
+  // easeOut again squared it, which front-loaded the descent so hard the body
+  // was most of the way down before the sky had started.
+  const sinking = win(t, T.drop, easeOut)
+  const rising = win(t, T.rise, easeOut)
 
   // Down while it sets, then back up from the same depth once it is the other
   // body. Between the two it sits below, invisible.
@@ -166,21 +195,22 @@ function frameAt(t, from, to, distance) {
 
   // Fading is its own window rather than the inverse of the descent, so the
   // body stays solid most of the way down and only goes out at the horizon.
-  const goneOut = easeInOut(span(t, TIMELINE.fadeOutFrom, TIMELINE.fadeOutTo))
-  const comeBack = easeInOut(span(t, TIMELINE.fadeInFrom, TIMELINE.fadeInTo))
-  const bodyAlpha = 1 - goneOut + comeBack
+  const bodyAlpha = 1 - win(t, T.fadeOut) + win(t, T.fadeIn)
 
-  const skyIn = easeInOut(span(t, TIMELINE.skyFrom, TIMELINE.skyTo))
-  const skyOut = easeInOut(span(t, TIMELINE.clearFrom, TIMELINE.clearTo))
+  // The fire rises and falls. Dusk blooms it early and squeezes it out; dawn
+  // brings it with the sun and then washes it into daylight.
+  const warm = clamp01(win(t, T.warmIn) - win(t, T.warmOut))
 
   return {
     from,
     to,
     toDark,
     t,
-    sky: clamp01(skyIn - skyOut),
-    turn: easeInOut(span(t, TIMELINE.turnFrom, TIMELINE.turnTo)),
-    stars: easeInOut(span(t, TIMELINE.starsFrom, TIMELINE.starsTo)),
+    sky: clamp01(win(t, T.sky) - win(t, T.clear)),
+    front: win(t, T.front),
+    warm,
+    day: win(t, T.day),
+    stars: win(t, T.stars),
     drop,
     bodyAlpha: clamp01(bodyAlpha),
   }
@@ -206,19 +236,20 @@ export function runThemeTransition(next) {
 
   const distance = dropDistance()
   const start = performance.now()
+  const schedule = next === 'dark' ? DUSK : DAWN
   let switched = false
 
   active = { from, to: next, raf: 0 }
 
   const step = now => {
     const t = now - start
-    if (t >= TIMELINE.switchAt && !switched) {
+    if (t >= schedule.switchAt && !switched) {
       switched = true
       // Under full cover: the sky is opaque here, so none of what changes on
       // this frame is visible.
       setTheme(next)
     }
-    if (t >= DURATION) {
+    if (t >= schedule.total) {
       active = null
       emit(null)
       return
