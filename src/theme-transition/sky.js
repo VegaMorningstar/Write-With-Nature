@@ -27,8 +27,11 @@ const NIGHT = '#050814'
 // thing that read as a coloured panel rather than as depth — real sky gets
 // lighter toward the horizon the entire way down, long before any sunset
 // colour starts.
-const DUSK_TOP = '#12365f'     // overhead, the darkest blue
+const DUSK_ZENITH = '#0c2344'  // straight up, where the night starts
+const DUSK_TOP = '#14395f'     // overhead
 const DUSK_BLUE = '#2f6ba8'    // midway down
+const DUSK_AZURE = '#3f76b0'   // the brightest of it, above the turn
+const DUSK_STEEL = '#42639f'   // beginning to cool toward the front
 const DUSK_INDIGO = '#465a96'  // just above the front, where blue turns
 //
 // And the fire is a ramp, not a colour. Blue straight into red is a
@@ -44,8 +47,11 @@ const DUSK_YELLOW = '#ffd27f'
 
 // ── Dawn ────────────────────────────────────────────────────────────────────
 const DAWN_DEEP = '#1d3a66'    // the night thinning overhead
+const DAWN_STEEL = '#2d4f82'   // the first hint of colour under the night
 const DAWN_INDIGO = '#4e6ea8'  // the band under it
+const DAWN_AZURE = '#6e96cc'   // between the indigo and first light
 const DAWN_BLUE = '#8fbce8'    // first light
+const DAWN_PALE = '#b3d4f2'    // the lightest, just above the horizon
 /** The sun's own colours, which arrive with it rather than before it. */
 const DAWN_VIOLET = '#a4629a'
 const DAWN_RED = '#d9603f'
@@ -85,16 +91,79 @@ function mix(a, b, k) {
 const css = c => `rgb(${c[0]},${c[1]},${c[2]})`
 
 /**
- * Stops must not run backwards, or the browser silently snaps them and the
+ * Anchors must not run backwards, or the browser silently snaps them and the
  * front stops moving. Clamped into range and forced upward in order.
  */
-function orderStops(stops) {
-  let last = -20
-  return stops.map(([pos, colour]) => {
-    const p = Math.max(last, Math.min(125, pos))
+function monotonic(anchors) {
+  let last = -40
+  const clamped = anchors.map(([pos, c]) => {
+    const p = Math.max(last, Math.min(140, pos))
     last = p
-    return `${css(colour)} ${p.toFixed(1)}%`
+    return { p, c }
   })
+
+  // Where several anchors land on the same position — which happens whenever
+  // the front has run off one end and a whole band has been pushed out of
+  // sight — only the last of them still describes the sky there. Keeping the
+  // others leaves zero-width segments, and a zero-width segment between two
+  // different colours is a hard step: at the end of the dawn, seven anchors
+  // collapsed onto 0% and the first of them won, so the very top of the sky
+  // snapped back to night for one stop. That measured as a 240-unit jump
+  // between neighbouring stops, which is about as visible as an edge gets.
+  return clamped.filter((a, i) => i === clamped.length - 1 || clamped[i + 1].p > a.p)
+}
+
+/** Continuous in value and in slope, which is the whole point of using it. */
+const smooth = x => x * x * (3 - 2 * x)
+
+/** The colour of an anchor ramp at one position, blended smoothly. */
+function sampleRamp(anchors, pos) {
+  if (pos <= anchors[0].p) return anchors[0].c
+  const last = anchors[anchors.length - 1]
+  if (pos >= last.p) return last.c
+  for (let i = 1; i < anchors.length; i++) {
+    const b = anchors[i]
+    if (pos <= b.p) {
+      const a = anchors[i - 1]
+      const width = b.p - a.p
+      if (width <= 0) return b.c
+      return mix(a.c, b.c, smooth((pos - a.p) / width))
+    }
+  }
+  return last.c
+}
+
+/**
+ * How many stops the emitted gradient carries. Around forty is where the
+ * banding stops being findable on a full-height sky at this contrast.
+ */
+const BANDS = 56
+
+/**
+ * Turns anchors into a CSS gradient by sampling, rather than handing the
+ * anchors straight to the browser.
+ *
+ * This is the part that makes it smooth, and more stops alone would not have:
+ * CSS interpolates linearly between whatever stops it is given, so a colour
+ * written at two positions is the same straight line no matter how many extra
+ * stops sit on it. What was visible was the kink where two such lines met.
+ * Linear blending is continuous in value but not in slope, and the eye is very
+ * good at finding a slope discontinuity in a large flat area — it reads as an
+ * edge, which is exactly the banding this had.
+ *
+ * Sampling a smoothstep between the anchors makes the slope continuous too, so
+ * there is no edge left at an anchor to find. The many stops are then just a
+ * fine enough quantisation of that curve to hide the linear segments between
+ * them.
+ */
+function emitGradient(anchors) {
+  const ramp = monotonic(anchors)
+  const stops = []
+  for (let i = 0; i <= BANDS; i++) {
+    const p = (i / BANDS) * 100
+    stops.push(`${css(sampleRamp(ramp, p))} ${p.toFixed(1)}%`)
+  }
+  return `linear-gradient(to bottom, ${stops.join(', ')})`
 }
 
 /**
@@ -118,8 +187,11 @@ function duskGradient(f) {
   // than the one above it, which keeps the blue a gradient the whole way down
   // instead of collapsing to one flat tone as it deepens.
   const dk = Math.min(1, f.front * 1.15)
-  const top = mix(DUSK_TOP, NIGHT, dk)
-  const upper = mix(DUSK_BLUE, NIGHT, dk * 0.95)
+  const zenith = mix(DUSK_ZENITH, NIGHT, dk)
+  const top = mix(DUSK_TOP, NIGHT, dk * 0.98)
+  const blue = mix(DUSK_BLUE, NIGHT, dk * 0.96)
+  const azure = mix(DUSK_AZURE, NIGHT, dk * 0.94)
+  const steel = mix(DUSK_STEEL, NIGHT, dk * 0.9)
   const indigo = mix(DUSK_INDIGO, NIGHT, dk * 0.85)
 
   // The fire fades toward night rather than toward transparent: it has to be
@@ -130,20 +202,28 @@ function duskGradient(f) {
   const orange = mix(NIGHT, DUSK_ORANGE, f.warm)
   const yellow = mix(NIGHT, DUSK_YELLOW, f.warm)
 
-  // The blue stops are spread across everything above the front rather than
-  // pinned near it, so the upper sky is a ramp at every moment of the descent.
-  // The warm stops trail the front at fixed distances, so the whole sunset
-  // moves down as one thing.
-  return `linear-gradient(to bottom, ${orderStops([
-    [0, top],
-    [front * 0.38, upper],
-    [front - 16, indigo],
-    [front - 1, violet],
-    [front + 14, magenta],
-    [front + 28, red],
-    [Math.max(front + 42, 82), orange],
+  // Six anchors through the blue rather than two, spread across everything
+  // above the front rather than pinned near it, so the upper sky is a full
+  // ramp at every moment of the descent. The warm anchors trail the front at
+  // fixed distances, so the whole sunset moves down as one thing.
+  // The bands are spaced widely on purpose. Every anchor is a colour the sky
+  // has to get through, and the screen is only so tall: packed close, the
+  // travel between two of them lands in a few per cent of the height and
+  // becomes a visible edge however many stops are sampled across it. Spread
+  // out, the same colours arrive as a ramp.
+  return emitGradient([
+    [0, zenith],
+    [front * 0.16, top],
+    [front * 0.36, blue],
+    [front * 0.56, azure],
+    [front - 30, steel],
+    [front - 12, indigo],
+    [front + 8, violet],
+    [front + 26, magenta],
+    [front + 44, red],
+    [Math.max(front + 60, 84), orange],
     [100, yellow],
-  ]).join(', ')})`
+  ])
 }
 
 function dawnGradient(f) {
@@ -153,9 +233,13 @@ function dawnGradient(f) {
 
   // The night thins from the top as the light comes up under it, so the dark
   // part is a gradient too rather than a flat cap.
+  const lift = Math.min(1, f.front * 1.1)
   const night = mix(NIGHT, DAWN_DEEP, f.front * 0.5)
-  const indigo = mix(NIGHT, DAWN_INDIGO, Math.min(1, f.front * 1.1))
+  const steel = mix(NIGHT, DAWN_STEEL, lift)
+  const indigo = mix(NIGHT, DAWN_INDIGO, lift)
+  const azure = mix(NIGHT, DAWN_AZURE, lift)
   const blue = DAWN_BLUE
+  const pale = DAWN_PALE
 
   // The warm band only exists once the sun is on its way up, and it sits below
   // the blue rather than replacing it — through violet again, for the same
@@ -169,16 +253,19 @@ function dawnGradient(f) {
   // so the sky arrives at the page's own colour rather than clearing off it.
   const day = c => mix(c, DAY_MID, f.day)
 
-  return `linear-gradient(to bottom, ${orderStops([
+  return emitGradient([
     [0, day(night)],
-    [Math.min(front - 30, 34), day(night)],
-    [front - 12, day(indigo)],
-    [front + 6, day(blue)],
-    [Math.max(front + 24, 62), day(violet)],
-    [Math.max(front + 38, 78), day(red)],
+    [Math.min(front - 52, 22), day(night)],
+    [front - 38, day(steel)],
+    [front - 22, day(indigo)],
+    [front - 6, day(azure)],
+    [front + 12, day(blue)],
+    [front + 30, day(pale)],
+    [Math.max(front + 46, 62), day(violet)],
+    [Math.max(front + 58, 78), day(red)],
     [91, day(orange)],
     [100, day(yellow)],
-  ]).join(', ')})`
+  ])
 }
 
 /**
