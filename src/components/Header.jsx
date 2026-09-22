@@ -25,9 +25,9 @@ export default function Header() {
   useEffect(() => onThemeChange(setMode), [])
 
   // The body that sets and rises. Driven straight from the transition's frame
-  // callback onto the node, not through state: this moves every frame for
-  // three seconds, and re-rendering the masthead that often to change a
-  // transform would be re-laying out the glass title along with it.
+  // callback onto the node, not through state: this moves every frame for the
+  // whole five-odd seconds, and re-rendering the masthead that often to change
+  // a transform would be re-laying out the glass title along with it.
   const bodyRef = useRef(null)
   useEffect(() => onTransitionFrame(frame => {
     const el = bodyRef.current

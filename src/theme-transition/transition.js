@@ -27,16 +27,14 @@
  * independent rAF loops would drift apart by a frame or two — which is exactly
  * the sort of thing that reads as "slightly broken" without being nameable.
  * Listeners are called once per frame with the current phase, and update the
- * DOM directly; React state changes only at the start and end.
+ * DOM directly; React state changes only when the overlay mounts and unmounts.
  */
 import { theme, setTheme } from '../theme.js'
+import { FRONT_OVERSHOOT } from './sky.js'
 
 /**
- * Milestones in milliseconds. The overlap is deliberate: the jelly is still
- * sinking while the sky starts to build, and the stars come up while the last
- * of the warm light drains, which is the order these things happen in.
- */
-/**
+ * Windows in milliseconds, each [from, to].
+ *
  * The two directions are not mirror images, so they get separate schedules
  * rather than one set of numbers bent to mean two things.
  *
@@ -94,15 +92,16 @@ const DAWN = {
   total: 5700,
 }
 
-export const TIMELINE = { DUSK, DAWN }
-export const DURATION = Math.max(DUSK.total, DAWN.total)
+// DUSK and DAWN are not exported. Each direction's own `total` is what the
+// runner ends on, so there is no single duration for a caller to hold, and a
+// shared one would be wrong for whichever direction was shorter.
 
 /**
  * How far the jelly sinks, as a fraction of the gap between it and the compose
  * card. Not the whole gap: it should look like it is going down behind the
  * horizon, not like it is landing on the panel.
  */
-export const DROP_FRACTION = 0.95
+const DROP_FRACTION = 0.95
 const DROP_MIN = 110
 const DROP_MAX = 320
 
@@ -128,12 +127,22 @@ function dropDistance() {
   if (typeof document === 'undefined') return DROP_MIN
   const orn = document.querySelector('.ornament')
   const card = document.querySelector('.compose-card')
-  if (!orn || !card) return 180
+  if (!orn || !card) return DROP_MIN
   const gap = card.getBoundingClientRect().top - orn.getBoundingClientRect().bottom
   return Math.max(DROP_MIN, Math.min(DROP_MAX, gap * DROP_FRACTION))
 }
 
-let active = null
+/**
+ * Whether one is running. A flag rather than a handle, because nothing can
+ * cancel a transition part-way: the theme changes in the middle of it, so
+ * stopping early would leave the sky and the attribute disagreeing about which
+ * theme has arrived. It runs to the end or not at all.
+ *
+ * The one consequence worth knowing: if the tab is backgrounded mid-sunset,
+ * rAF stops and this stays set, so further clicks are refused until the tab is
+ * focused again — at which point the loop resumes and finishes normally.
+ */
+let active = false
 const listeners = new Set()
 
 /**
@@ -143,11 +152,6 @@ const listeners = new Set()
 export function onTransitionFrame(fn) {
   listeners.add(fn)
   return () => listeners.delete(fn)
-}
-
-/** True while a transition is running. */
-export function isTransitioning() {
-  return active !== null
 }
 
 /**
@@ -170,16 +174,7 @@ function emit(frame) {
   }
 }
 
-/**
- * The state every listener works from.
- *
- * `sky` is how present the overlay is, `turn` how far it has travelled from
- * its starting palette to its ending one, `stars` the star layer's opacity,
- * and `drop` the jelly's offset in pixels with `bodyAlpha` its opacity. Giving
- * listeners finished numbers rather than the raw clock keeps the easing in one
- * place; otherwise the ornament and the sky would each have their own opinion
- * about what "halfway" means.
- */
+/** One eased window, or 0 for a direction that does not have that window. */
 const win = (t, w, ease = easeInOut) => (w ? ease(span(t, w[0], w[1])) : 0)
 
 /**
@@ -197,10 +192,20 @@ const win = (t, w, ease = easeInOut) => (w ? ease(span(t, w[0], w[1])) : 0)
  * not simultaneously, or stars appear inside the lit edge of the front itself.
  */
 const STAR_LAG = 0.16
-/** The front's overshoot, which the lag has to be measured against. */
-const FRONT_SPAN = 1.25
 
-function frameAt(t, from, to, distance) {
+/**
+ * Per-frame state for the listeners.
+ *
+ * `sky` is how present the overlay is, `front` how far the sky's leading edge
+ * has travelled, `warm` how present the fire is, `day` how far the dawn has
+ * opened into morning, `stars` where the star mask's boundary sits, and `drop`
+ * the jelly's offset in pixels with `bodyAlpha` its opacity.
+ *
+ * Listeners get finished numbers rather than the raw clock, which keeps the
+ * easing in one place — otherwise the ornament and the sky would each have
+ * their own opinion about what "halfway" means, and they have to agree.
+ */
+function frameAt(t, to, distance) {
   const toDark = to === 'dark'
   const T = toDark ? DUSK : DAWN
 
@@ -229,14 +234,11 @@ function frameAt(t, from, to, distance) {
   // from the bottom while the stars go out ahead of it, and the two want
   // different speeds.
   const stars = toDark
-    ? clamp01(front * FRONT_SPAN - STAR_LAG)
+    ? clamp01(front * FRONT_OVERSHOOT - STAR_LAG)
     : win(t, T.stars)
 
   return {
-    from,
-    to,
     toDark,
-    t,
     sky: clamp01(win(t, T.sky) - win(t, T.clear)),
     front,
     warm,
@@ -249,7 +251,7 @@ function frameAt(t, from, to, distance) {
 
 /**
  * Run the transition to `next`, or switch immediately if animation is
- * unwanted or already under way.
+ * unwanted. Does nothing at all if one is already under way.
  *
  * Re-entry is refused rather than queued. A second click mid-sunset should do
  * nothing; interrupting would leave the attribute and the overlay disagreeing
@@ -265,12 +267,25 @@ export function runThemeTransition(next) {
     return
   }
 
-  const distance = dropDistance()
   const start = performance.now()
   const schedule = next === 'dark' ? DUSK : DAWN
   let switched = false
 
-  active = { from, to: next, raf: 0 }
+  // Measured once, then again only if the layout actually changes under it.
+  // Re-reading it every frame would force a synchronous layout twice per
+  // frame, on a page already running four glass shaders and a fluid sim —
+  // and the gap it measures only moves when the viewport does.
+  let distance = dropDistance()
+  const remeasure = () => { distance = dropDistance() }
+  window.addEventListener('resize', remeasure)
+
+  active = true
+
+  const finish = () => {
+    window.removeEventListener('resize', remeasure)
+    active = false
+    emit(null)
+  }
 
   const step = now => {
     const t = now - start
@@ -281,14 +296,13 @@ export function runThemeTransition(next) {
       setTheme(next)
     }
     if (t >= schedule.total) {
-      active = null
-      emit(null)
+      finish()
       return
     }
-    emit(frameAt(t, from, next, distance))
-    active.raf = requestAnimationFrame(step)
+    emit(frameAt(t, next, distance))
+    requestAnimationFrame(step)
   }
 
-  emit(frameAt(0, from, next, distance))
-  active.raf = requestAnimationFrame(step)
+  emit(frameAt(0, next, distance))
+  requestAnimationFrame(step)
 }

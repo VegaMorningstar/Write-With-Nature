@@ -17,12 +17,27 @@
  * no edge anywhere, so nothing reads as moving.
  */
 
-/** The theme's own background, which is where the whole sky ends up. */
-const NIGHT = '#050814'
+/**
+ * The theme's own background, which is where the whole sky ends up — imported
+ * rather than copied, because a sunset that cooled to a slightly different
+ * black than the page under it would show its own edge as it cleared.
+ */
+import { NIGHT_PAPER as NIGHT } from '../theme.js'
+
+/**
+ * How far past the bottom of the screen the front travels.
+ *
+ * Exported because the dusk star lag is measured against it: the stars trail
+ * the front by a fraction of the SCREEN, and converting the front's progress
+ * into a screen position needs this number. It was a literal here and a
+ * separate constant there, and retuning one would have silently desynchronised
+ * the stars from the sky they are supposed to be following.
+ */
+export const FRONT_OVERSHOOT = 1.25
 
 // ── Dusk, top of the sky to the horizon ─────────────────────────────────────
 //
-// Eight stops rather than five, and the extra three are all in the blue.
+// Six blue anchors rather than one, and they are what this section is for.
 // A single blue stop makes the whole upper sky one flat colour, which is the
 // thing that read as a coloured panel rather than as depth — real sky gets
 // lighter toward the horizon the entire way down, long before any sunset
@@ -134,7 +149,7 @@ function sampleRamp(anchors, pos) {
 }
 
 /**
- * How many stops the emitted gradient carries. Around forty is where the
+ * How many stops the emitted gradient carries. Around this many is where the
  * banding stops being findable on a full-height sky at this contrast.
  */
 const BANDS = 56
@@ -173,14 +188,14 @@ function emitGradient(anchors) {
  *
  * Fronts overshoot 100 on purpose. A front that stops exactly at the bottom
  * leaves a sliver of the colour it was pushing still visible at the last pixel;
- * running it to 118 pushes that off the screen.
+ * running it past the bottom pushes that off the screen — see FRONT_OVERSHOOT.
  */
 export function skyGradient(toDark, f) {
   return toDark ? duskGradient(f) : dawnGradient(f)
 }
 
 function duskGradient(f) {
-  const front = f.front * 125
+  const front = f.front * FRONT_OVERSHOOT * 100
 
   // The blue darkens as it grows, so the top of the screen is already night by
   // the time the front reaches the bottom. Each band darkens a little less
@@ -229,7 +244,7 @@ function duskGradient(f) {
 function dawnGradient(f) {
   // Travels the other way: the leading edge starts at the bottom of the screen
   // and climbs.
-  const front = 100 - f.front * 125
+  const front = 100 - f.front * FRONT_OVERSHOOT * 100
 
   // The night thins from the top as the light comes up under it, so the dark
   // part is a gradient too rather than a flat cap.

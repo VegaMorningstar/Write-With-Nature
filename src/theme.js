@@ -58,7 +58,12 @@
  *   glass-buttons/GlassButtons.jsx buttonGlyph
  *   cursor-butterflies/follow.ts   cursorCreature
  *   night-sky/NightSky.jsx         stars
- *   components/Header.jsx          drives the switch from the sun/moon jelly
+ *   components/Header.jsx          the sun/moon jelly, which asks for a switch
+ *   theme-transition/transition.js the only caller of setTheme for that jelly.
+ *                                  Header no longer calls it directly: pressing
+ *                                  the ornament starts a sunset, and the theme
+ *                                  changes part-way through it, under cover.
+ *                                  NIGHT_PAPER below is shared with its sky.
  *
  * There are FOUR glass backdrops, not three. Every one of them repaints the
  * page for a shader that cannot read the DOM, and every one of them needs the
@@ -81,6 +86,17 @@
  * the only thing that ever selects dark.
  */
 const CSS_BASE_THEME = 'light'
+
+/**
+ * The night sky's background, named because more than one place needs it.
+ *
+ * It is `--paper` under [data-theme="dark"] in index.css, it is this theme's
+ * paperBase for the canvas that the glass refracts, and it is where the
+ * theme-transition's sunset has to end up — a sky that cooled to a slightly
+ * different black than the page it uncovers would show its own edge as it
+ * cleared. Exported so that third one reads it rather than keeping a copy.
+ */
+export const NIGHT_PAPER = '#050814'
 
 const THEMES = {
   light: {
@@ -115,7 +131,7 @@ const THEMES = {
     // Not pure black: a trace of blue is the difference between a void and a
     // sky, and it gives the stars something to sit in. Still dark enough to
     // read as black next to anything else on the page. Must match --paper.
-    paperBase: '#050814',
+    paperBase: NIGHT_PAPER,
     // Light on a dark ground: the fluid adds rather than subtracts.
     fluidBlend: 'screen',
     // Off, so the fluid cursor is the only colour on the page and reads as
