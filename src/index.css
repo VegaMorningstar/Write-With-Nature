@@ -909,10 +909,13 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
 }
 
 /* ── RENDER, asking to be pressed ──
-   Wrapped around the button rather than applied to it, so it works whether
-   the liquid-glass canvas started or the plain fallback is showing. */
+   The real ask is a glow inside the glass itself, driven by the button's own
+   shader (see GlassButtons). This is only the fallback's version of it, for
+   when the lens never started — hence :has(), which matches nothing while the
+   canvas is up. The jiggle stays here either way, since it moves the whole
+   control rather than lighting it. */
 .render-cta { position: relative; border-radius: 999px; }
-.render-cta.urging {
+.render-cta.urging:has(.render-btn) {
   animation: render-urge 1.9s ease-in-out infinite;
 }
 .render-cta.jiggled {

@@ -176,8 +176,19 @@ export default function App() {
   }, [showToast])
 
   const renderButton = useMemo(() => [
-    { key: 'render', label: 'RENDER', title: 'Render the collage', onClick: handleRender, width: RENDER_WIDTH, fallbackClass: 'render-btn' },
-  ], [handleRender])
+    {
+      key: 'render',
+      label: 'RENDER',
+      title: 'Render the collage',
+      onClick: handleRender,
+      width: RENDER_WIDTH,
+      fallbackClass: 'render-btn',
+      // Lit from inside the glass while there is something waiting to be
+      // rendered. The CSS class below only carries the fallback button's
+      // version of this, for when the lens never started.
+      glow: pending ? 1 : 0,
+    },
+  ], [handleRender, pending])
 
   const handleResizeTiles = useCallback(delta => {
     setTileW(prev => Math.max(32, Math.min(200, prev + delta)))

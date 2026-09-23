@@ -55,7 +55,7 @@
  *   glass-title/backdrop.js       fluidBlend
  *   components/FluidCursor.jsx    fluidBlend, via React state and onThemeChange
  *   components/fluidHue.js        fluidHue
- *   glass-buttons/GlassButtons.jsx buttonGlyph
+ *   glass-buttons/GlassButtons.jsx buttonGlyph, buttonGlow
  *   cursor-butterflies/follow.ts   cursorCreature
  *   night-sky/NightSky.jsx         stars
  *   components/Header.jsx          the sun/moon jelly, which asks for a switch
@@ -123,6 +123,10 @@ const THEMES = {
     // null leaves the glass buttons' adaptive ink alone: dark glyphs, lightened
     // only where the backdrop behind them is bright.
     buttonGlyph: null,
+    // What a button glows when it is asking to be pressed. Warm, because on
+    // paper the light in this world is sunlight; the celestial sun jelly
+    // glows the same family of orange.
+    buttonGlow: { r: 226, g: 148, b: 56 },
     // The sheet's pager and close buttons pick their own ink; null leaves them
     // to it. See src/ui-elements/glass-sheet/GlassSheet.jsx.
     sheetInk: null,
@@ -162,6 +166,9 @@ const THEMES = {
     // one that is simply always white. Only the buttons; the masthead glyphs
     // sit over photographs, where adapting is still the right behaviour.
     buttonGlyph: { r: 255, g: 255, b: 255 },
+    // The moon jelly's own lilac, so a glowing button at night is lit by the
+    // same light as everything else on the page.
+    buttonGlow: { r: 198, g: 164, b: 255 },
     // White, for the same reason the toolbar glyphs are: the sheet floats over
     // the fluid cursor, and a deep green chevron or a deep red cross on a dark
     // lens over moving colour is unreadable.

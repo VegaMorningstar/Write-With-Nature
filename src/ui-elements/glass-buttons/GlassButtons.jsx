@@ -129,6 +129,18 @@ export default function GlassButtons({
           const mm = matRef.current
           // Read per frame, so a theme switch lands on the next one.
           const glyph = tokens().buttonGlyph
+
+          // A button can ask to be pressed. The ask is a steady glow in the
+          // glass itself — the same halo the celestial jellies carry, not a
+          // shadow cast behind a picture of one — breathing slowly so it reads
+          // as lit rather than as a border. Its colour comes from the theme,
+          // so it is sunlight on paper and moonlight at night.
+          const urging = itemsRef.current.some(b => (b.glow ?? 0) > 0)
+          const glowTint = urging ? tokens().buttonGlow : null
+          // A narrow swing: the glow should look like it is breathing, not
+          // blinking, and at full strength it fills the lens instead of
+          // haloing it.
+          const breath = 0.78 + 0.22 * Math.sin((performance.now() / 1000) * 1.4)
           const springs = springsRef.current
           const rect = host.getBoundingClientRect()
           if (!rect.width || !rect.height) return
@@ -169,13 +181,17 @@ export default function GlassButtons({
             const hx = (w / 2) * (1 + sq) - mm.edge
             const hy = (mm.size / 2) * (1 - sq * 0.7) - mm.edge
 
-            const glow = springs
+            // Press energy, plus whatever steady glow this button is asking
+            // with. Kept well under the press glow's ceiling: the ask should
+            // be noticeable and never look like the button is already down.
+            const pressed = springs
               ? Math.min(
                 (Math.abs(springs.squash[i].velocity) * 0.05 +
                   Math.abs(springs.squash[i].value) * 1.4) * ptrRef.current.glowGain,
                 1.2,
               )
               : 0
+            const glow = Math.min(pressed + (list[i].glow ?? 0) * 0.4 * breath, 1.4)
 
             tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H, glow, tint: list[i].tint })
             glyphs.push({ letter: list[i].label, x: cx, y: cy, alpha: 1 })
@@ -213,8 +229,15 @@ export default function GlassButtons({
             inkLumHi: mm.inkLumHi,
             inkSampleLevel: mm.inkSampleLevel,
             glowStrength: mm.glowStrength,
-            glowHalo: mm.glowHalo / H,
-            glowR: mm.glowR, glowG: mm.glowG, glowB: mm.glowB,
+            // A wider halo while a button is asking, so the light reads as
+            // coming off the glass rather than tracing its rim. The canvas
+            // leaves about 17px of margin around the button for exactly this;
+            // going past it would let the border shape the glow instead of
+            // the glass.
+            glowHalo: (urging ? mm.glowHalo * 3.2 : mm.glowHalo) / H,
+            glowR: glowTint?.r ?? mm.glowR,
+            glowG: glowTint?.g ?? mm.glowG,
+            glowB: glowTint?.b ?? mm.glowB,
             lightAzimuth: mm.lightAzimuth,
             lightElevation: mm.lightElevation,
             specularStrength: mm.specularStrength,
