@@ -18,6 +18,13 @@
   --rust:   #b8542a;
   --teal:   #2a6b5e;
 
+  /* The toast is the one surface that appears over anything — the board, the
+     imagery, the night sky — so it carries its own pair rather than borrowing
+     an accent that has to work in half a dozen other places. Deep teal here,
+     white on it at about 10:1. */
+  --toast-bg:  #174a42;
+  --toast-ink: #ffffff;
+
   /* How the paper grain combines with what is behind it. A blend mode rather
      than a colour, but it belongs with the palette because it has to change
      with it: multiply can only darken, so on a dark ground it is multiplication
@@ -90,6 +97,13 @@
      rather than against them. Not applied to --moss: that one is mostly ink on
      pale chips, where it is still doing a green job on a light ground. */
   --teal: #cbb0ff;
+
+  /* The toast turns violet to sit with the lilac and the fluid's purples,
+     rather than staying a green chip on a night sky. Dark enough to read as a
+     surface against the page, light enough to read as violet rather than
+     black; white on it at about 13:1. */
+  --toast-bg:  #3e2668;
+  --toast-ink: #ffffff;
   --teal-rgb: 203,176,255;
 
   /* Bright violet, and brighter than the body copy beneath it rather than
@@ -801,7 +815,7 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
 .toast {
   position: fixed; bottom: 2rem; left: 50%;
   transform: translateX(-50%) translateY(12px);
-  background: var(--moss); color: var(--amber);
+  background: var(--toast-bg); color: var(--toast-ink);
   font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.06em;
   padding: 10px 24px; border-radius: 40px;
   opacity: 0; transition: all 0.22s; pointer-events: none; z-index: 1000;
