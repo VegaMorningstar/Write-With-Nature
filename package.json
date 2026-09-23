@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bricks": "node scripts/prerender-bricks.mjs",
+    "geology": "node scripts/harvest-geo.mjs"
   },
   "dependencies": {
     "@typegpu/noise": "^0.12.0",
@@ -13,11 +15,13 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "smokey-fluid-cursor": "^1.0.7",
+    "three": "^0.186.0",
     "typegpu": "^0.12.4",
     "wgpu-matrix": "^3.4.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "playwright": "^1.63.0",
     "unplugin-typegpu": "^0.12.3",
     "vite": "^5.4.0"
   }

@@ -1,5 +1,6 @@
 import { forwardRef, useMemo } from 'react'
-import Tile from './Tile'
+import Tile3D from './Tile3D'
+import FlockLayer from './FlockLayer'
 import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
 import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
@@ -70,6 +71,10 @@ const Board = forwardRef(function Board(
           </div>
         )}
 
+        {/* Flamingos cross the whole panel, not the word — the flyway belongs
+            to the board, so it reads the same whatever is written on it. */}
+        {hasContent && <FlockLayer />}
+
         {renderedLines.map((line, idx) => {
           if (line.type === 'break') {
             return <div key={`break-${idx}`} className="stanza-break" />
@@ -87,7 +92,7 @@ const Board = forwardRef(function Board(
                   )
                 }
                 return (
-                  <Tile
+                  <Tile3D
                     key={key}
                     ch={ch}
                     tileKey={key}

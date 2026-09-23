@@ -823,3 +823,39 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
     -webkit-backdrop-filter: blur(20px);
   }
 }
+
+/* ── Tile, in three dimensions ──
+   The brick renderer hands back a still with its own soft contact shadow, so
+   this wears none of the flat tile's chrome: no border, no rounded crop, no
+   glass sheen. Anything drawn on top of it would sit on the shadow too. */
+.tile3d {
+  flex-shrink: 0;
+  position: relative; cursor: pointer;
+  transition: transform 0.16s;
+  will-change: transform;
+  contain: layout style;
+}
+.tile3d:hover { transform: translateY(-5px) scale(1.03); z-index: 5; }
+.tile3d:hover .tile-tip { opacity: 1; }
+
+.tile3d-img {
+  width: 100%; height: 100%; display: block;
+  object-fit: contain;
+  /* The blocks are baked with their own contact shadow, so the browser must
+     not add one, and must not smooth away the engraved letter. */
+  image-rendering: auto;
+  user-select: none; -webkit-user-drag: none;
+}
+
+/* ── Flamingos over the collage ──
+   A canvas across the whole panel, under nothing and over everything, taking
+   no pointer events: the tiles below it stay clickable. */
+.flock-layer {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* The variant pips sit over the block's own sky, so they need to be quiet. */
+.tile3d .tile-pips { top: 4px; left: 6px; opacity: 0.55; }
+.tile3d:hover .tile-pips { opacity: 1; }

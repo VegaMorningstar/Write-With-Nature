@@ -23,6 +23,23 @@ The page title itself is rendered in Landsat tiles. Every letter you see is a re
 
 &nbsp;
 
+## Geological blocks
+
+Each letter is a block of ground, not a flat tile: the Landsat scene as its top
+face displaced into real relief, over the stratigraphic section that place
+actually has — bedrock from Macrostrat, local relief from SRTM — with the
+character cut into the cut face. Flamingo skeins migrate across the collage.
+
+Blocks are baked ahead of time, so a tile costs one `<img>`. See
+[docs/geo-bricks.md](docs/geo-bricks.md).
+
+```bash
+npm run dev       # then, in another terminal:
+npm run bricks    # re-bake after changing how blocks look
+```
+
+&nbsp;
+
 ## Aesthetic
 
 Solarpunk · botanical illustration · retro-futurist. Warm parchment tones, Playfair Display italic headings, hand-drawn SVG vine dividers, paper grain texture. Designed to feel like a field journal from a hopeful future.

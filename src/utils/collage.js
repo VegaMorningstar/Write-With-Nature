@@ -74,7 +74,7 @@ export async function downloadCollage(exportCanvas, showToast) {
   const GAP = 6, ROW_GAP = 14, PAD = 52
 
   // Tile width: use DOM value but at least 160px for export quality
-  const firstTile = document.querySelector('.collage-row .tile')
+  const firstTile = document.querySelector('.collage-row .tile, .collage-row .tile3d')
   const domTileW = firstTile ? firstTile.offsetWidth : 118
   const tileW = Math.max(domTileW, 160)
   const scale = tileW / domTileW         // scale factor relative to DOM
@@ -86,7 +86,9 @@ export async function downloadCollage(exportCanvas, showToast) {
 
   for (const row of rows) {
     const domItems = [...row.children].filter(el =>
-      el.classList.contains('tile') || el.classList.contains('tile-space'))
+      el.classList.contains('tile') ||
+      el.classList.contains('tile3d') ||
+      el.classList.contains('tile-space'))
 
     let rowW = 0, rowH = tileW
     const cells = []
@@ -95,6 +97,20 @@ export async function downloadCollage(exportCanvas, showToast) {
       if (el.classList.contains('tile-space')) {
         cells.push({ space: true, w: spW })
         rowW += spW
+      } else if (el.classList.contains('tile3d')) {
+        // A block is a picture of an object, not a crop of a photograph: it
+        // already carries its own edges and contact shadow. It keeps its own
+        // proportions, and is drawn straight — no rounded clip to cut the
+        // shadow off, no wash over the top.
+        const img = el.querySelector('img')
+        const ratio =
+          img?.complete && img.naturalHeight > 0
+            ? img.naturalWidth / img.naturalHeight
+            : 0.9
+        const w = Math.round(tileW * ratio)
+        rowH = Math.max(rowH, tileW)
+        cells.push({ space: false, block: true, w, h: tileW, img, letter: '' })
+        rowW += w
       } else {
         const img = el.querySelector('img')
         let h = tileW // fallback square
@@ -164,6 +180,17 @@ export async function downloadCollage(exportCanvas, showToast) {
 
       const { img, w, letter } = cell
       const h = cell.h || rowH
+
+      if (cell.block) {
+        // Bottom-aligned, so a row of blocks stands on one line however tall
+        // each one's terrain happens to be.
+        if (img?.complete && img.naturalWidth > 0) {
+          ctx.drawImage(img, x, y + (rowH - h), w, h)
+        }
+        x += w + GAP
+        continue
+      }
+
       const radius = Math.max(6, Math.round(w * 0.055))
 
       ctx.save()
