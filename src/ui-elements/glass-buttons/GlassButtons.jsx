@@ -191,7 +191,7 @@ export default function GlassButtons({
                 1.2,
               )
               : 0
-            const glow = Math.min(pressed + (list[i].glow ?? 0) * 0.4 * breath, 1.4)
+            const glow = Math.min(pressed + (list[i].glow ?? 0) * 0.5 * breath, 1.4)
 
             tiles.push({ cx: cx / H, cy: cy / H, hx: hx / H, hy: hy / H, glow, tint: list[i].tint })
             glyphs.push({ letter: list[i].label, x: cx, y: cy, alpha: 1 })
@@ -229,12 +229,15 @@ export default function GlassButtons({
             inkLumHi: mm.inkLumHi,
             inkSampleLevel: mm.inkSampleLevel,
             glowStrength: mm.glowStrength,
-            // A wider halo while a button is asking, so the light reads as
-            // coming off the glass rather than tracing its rim. The canvas
-            // leaves about 17px of margin around the button for exactly this;
-            // going past it would let the border shape the glow instead of
-            // the glass.
-            glowHalo: (urging ? mm.glowHalo * 3.2 : mm.glowHalo) / H,
+            // Barely wider than the material's own while a button is asking.
+            // The glow falls off as exp(-distance / halo), and the canvas only
+            // leaves `pad` — edge + 6, so 17px here — around the button. A
+            // halo anywhere near that is still at a quarter strength when it
+            // reaches the canvas edge, and what you see is the square border
+            // cutting it off rather than a glow around the button. At this
+            // width it is down to a couple of per cent by then, so the shape
+            // it takes is the button's.
+            glowHalo: (urging ? mm.glowHalo * 1.3 : mm.glowHalo) / H,
             glowR: glowTint?.r ?? mm.glowR,
             glowG: glowTint?.g ?? mm.glowG,
             glowB: glowTint?.b ?? mm.glowB,
