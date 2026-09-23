@@ -594,8 +594,11 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
 .board {
   background: rgba(255,255,255,0.08);
   border: 1px solid rgba(255,255,255,0.30);
-  border-radius: 20px; padding: 1.75rem;
-  min-height: 190px; display: flex; flex-direction: column;
+  border-radius: 20px;
+  /* Extra headroom at the top: a hovered block lifts and grows, and its label
+     sits above it, and the panel clips anything that leaves it. */
+  padding: 3rem 1.75rem 1.75rem;
+  min-height: 210px; display: flex; flex-direction: column;
   gap: 6px;
   box-shadow:
     -4px -4px 10px rgba(255,255,255,0.60),
@@ -854,6 +857,15 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   position: absolute; inset: 0;
   pointer-events: none;
   z-index: 4;
+}
+
+/* Blocks carry their own spacing in their margins — a row gap on top of that
+   would push them apart again. */
+.collage-row:has(.tile3d) {
+  gap: 0;
+  /* Blocks differ slightly in height with their terrain, and each sits centred
+     in its own frame, so centring the frames lines the blocks up. */
+  align-items: center;
 }
 
 /* The variant pips sit over the block's own sky, so they need to be quiet. */

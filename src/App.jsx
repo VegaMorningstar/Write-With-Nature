@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { LETTERS } from './data/letters'
+import { BRICK_ADVANCE, BRICK_WIDTH } from './lib/brickAssets'
 import Header from './components/Header'
 import Board from './components/Board'
 import Colophon from './components/Colophon'
@@ -42,7 +43,10 @@ function computeTileW(lines, boardEl) {
     const spaces  = line.chars.filter(c => c.type === 'space').length
     const n = letters + spaces
     if (n < 2) continue
-    const fit = (availW - (n - 1) * gap) / (letters + spaces * 0.37)
+    // Blocks overlap, so each costs less room than its own width — except the
+    // last one in the row, which has nothing to tuck under and pays in full.
+    const run = letters > 0 ? (letters - 1) * BRICK_ADVANCE + BRICK_WIDTH : 0
+    const fit = (availW - (n - 1) * gap) / (run + spaces * 0.37)
     if (fit > 0) size = Math.min(size, fit)
   }
   return Math.max(72, Math.floor(size))

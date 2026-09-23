@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react'
 import { LETTERS } from '../data/letters'
-import { loadBrick, brickUrl, brickAspect } from '../lib/brickAssets'
+import {
+  loadBrick,
+  brickUrl,
+  brickAspect,
+  brickPitch,
+  BRICK_WIDTH,
+} from '../lib/brickAssets'
 
 /**
  * A letter as a geological block.
@@ -44,10 +50,21 @@ export default function Tile3D({ ch, tileKey, variantIdx, tileW, onCycle }) {
 
   if (!variants) return null
 
+  // Width first, height from the picture's own shape: see BRICK_WIDTH. The
+  // blocks then all stand at one scale, and centre on one line.
+  const width = Math.round(tileW * BRICK_WIDTH)
+  const height = Math.round(width / brickAspect(ch, vi))
+
   return (
     <div
       className="tile3d"
-      style={{ width: Math.round(tileW * brickAspect(ch, vi)), height: tileW }}
+      style={{
+        width,
+        height,
+        // Pulled left into the previous block's frame, so the row stands as
+        // close together as the same blocks would in one 3D scene.
+        marginRight: Math.round(-(1 - brickPitch(ch, vi)) * width),
+      }}
       onClick={() => onCycle(tileKey, ch)}
     >
       {variants.length > 1 && (

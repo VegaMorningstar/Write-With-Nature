@@ -17,7 +17,7 @@ import { makeFlocks } from '../lib/flocks'
 
 // The angles the bricks are baked at. Kept in step with BRICK_VIEW so the
 // birds and the ground agree about where the camera is.
-import { BRICK_VIEW } from '../lib/brickAssets'
+import { BRICK_VIEW } from '../lib/brickView'
 
 const DEPTH = 2.4 // how deep the airspace is, in panel heights
 const HEIGHT = 1.0

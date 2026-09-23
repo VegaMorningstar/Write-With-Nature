@@ -42,7 +42,10 @@ export default function PrerenderPage() {
           letter: ch,
           ...BRICK_VIEW.model,
         })
-        return { src: out.src, aspect: out.aspect, width: out.width, height: out.height }
+        return {
+          src: out.src, aspect: out.aspect,
+          width: out.width, height: out.height, frame: out.frame,
+        }
       },
     }
     setReady(true)

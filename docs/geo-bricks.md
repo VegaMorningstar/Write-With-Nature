@@ -17,7 +17,8 @@ the rendered pixel is the pixel NASA shot.
 | `src/lib/strata.js` | What is *under* a scene — picks a stratigraphic column from real geology, or from the image when there is none. |
 | `src/data/geology.js` | Harvested bedrock and elevation, keyed by place name. Generated. |
 | `src/data/brick-index.js` | The pixel size of every baked block. Generated. |
-| `src/lib/brickAssets.js` | Where a block's picture comes from, and the camera it was baked with. |
+| `src/lib/brickView.js` | The one camera every block is seen from, and the layout maths that follows from it. No three.js, so anything may import it. |
+| `src/lib/brickAssets.js` | Where a block's picture comes from, and how wide a tile has to be. |
 | `src/lib/brickRenderer.js` | One offscreen WebGL context that draws blocks on demand. |
 | `src/lib/flocks.js` | Migrating flamingos, over bounds you pass in. |
 | `src/components/Tile3D.jsx` | One block as a board tile. |
@@ -53,6 +54,39 @@ node scripts/prerender-bricks.mjs --force    # in another
 
 `--only S,R,9` limits it to a few characters while iterating; without
 `--force` it only fills in what is missing.
+
+&nbsp;
+
+## Laying blocks in a row
+
+Three things have to agree about the camera — the renderer that bakes the
+blocks, the row that lays them out, and the flocks that fly over them — so it
+is defined once, in `brickView.js`.
+
+**The camera is rolled** so world +X lands flat on screen. Without it, moving
+one block to the right also moves it *down*, and a row laid out level in the
+page would not be level in the world it is pretending to be part of. Rolling
+turns the picture rather than the blocks, so each is still seen from exactly
+the same azimuth and elevation. It cannot be had both ways: under an
+orthographic camera the on-screen angle between the row axis and the blocks'
+depth axis is fixed by the view direction, and is a right angle only at
+azimuth 0.
+
+**Blocks are sized by width, never height.** Every baked frame is the same
+width in world units — measured across the library they agree to within one
+per cent — while heights differ with how much relief the terrain has. Sizing
+by height, as an ordinary square tile does, quietly shrinks a mountain range
+against a floodplain and the row stops standing on one line.
+
+**Tiles overlap.** A baked frame is much wider than the block inside it: a
+block is a slab seen at three-quarters, so its bounding box is far wider than
+the slab is at any given height. Laid out as touching boxes, blocks stand much
+further apart than the same blocks in one 3D scene. Each tile therefore pulls
+left into its neighbour's frame by the difference, which `brickPitch` works
+out from the frame width recorded at bake time and `BRICK_GAP` — the same gap
+the `?word` page uses. Right-hand blocks are nearer the camera at this
+azimuth, so a later tile belongs in front of an earlier one; DOM order already
+paints it that way.
 
 &nbsp;
 

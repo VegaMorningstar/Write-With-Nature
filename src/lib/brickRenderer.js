@@ -13,9 +13,8 @@
 
 import * as THREE from 'three'
 import { makeBrick } from './landsat-brick'
+import { BRICK_VIEW } from './brickView'
 
-const AZIMUTH = 32 // degrees — the diorama three-quarter view
-const ELEVATION = 46 // high enough that the letter on the top face still reads
 const PAD = 1.04 // room for the contact shadow
 
 let renderer = null
@@ -64,14 +63,29 @@ function init() {
 }
 
 function placeCamera() {
-  const az = THREE.MathUtils.degToRad(AZIMUTH)
-  const el = THREE.MathUtils.degToRad(ELEVATION)
+  const az = THREE.MathUtils.degToRad(BRICK_VIEW.azimuth)
+  const el = THREE.MathUtils.degToRad(BRICK_VIEW.elevation)
   const r = 14
   camera.position.set(
     r * Math.cos(el) * Math.sin(az),
     r * Math.sin(el),
     r * Math.cos(el) * Math.cos(az)
   )
+
+  // Roll until world +X lands flat on screen, so that stepping one block to
+  // the right is a purely horizontal step. A row of these pictures is then
+  // spaced exactly like a row of blocks in one scene. See brickView.
+  if (BRICK_VIEW.levelRow) {
+    const fwd = new THREE.Vector3().sub(camera.position).normalize()
+    const along = new THREE.Vector3(1, 0, 0)
+    along.addScaledVector(fwd, -along.dot(fwd)).normalize()
+    const up = new THREE.Vector3().crossVectors(fwd.clone().negate(), along)
+    if (up.y < 0) up.negate()
+    camera.up.copy(up.normalize())
+  } else {
+    camera.up.set(0, 1, 0)
+  }
+
   camera.lookAt(0, 0, 0)
   camera.updateMatrixWorld(true)
 }
@@ -159,7 +173,12 @@ function draw(image, size, opts) {
 
   scene.remove(brick)
   disposeTree(brick)
-  return { src, width: w, height: h, aspect: w / h }
+
+  // How wide the picture is in world units. A board laying blocks side by side
+  // needs this to space them: on screen the frame is wider than the block it
+  // holds, so tiles have to overlap by the difference to sit as close as they
+  // do in a single 3D scene.
+  return { src, width: w, height: h, aspect: w / h, frame: halfW * 2 }
 }
 
 const cache = new Map()

@@ -54,7 +54,7 @@ export default function WordPage() {
   const [text, setText] = useState(Q.get('w') || 'RIVERS')
   const [elev, setElev] = useState(q('elev', 42))
   const [azi, setAzi] = useState(q('azi', 20))
-  const [gap, setGap] = useState(q('gap', 0.05))
+  const [gap, setGap] = useState(q('gap', 0.2))
   const [relief, setRelief] = useState(q('relief', 0.13))
   const [depth, setDepth] = useState(q('depth', 0.68))
   const [level, setLevel] = useState(Q.get('level') !== '0')

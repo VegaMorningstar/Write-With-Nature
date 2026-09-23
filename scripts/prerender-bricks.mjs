@@ -104,12 +104,15 @@ for (const job of wanted) {
       c.width = img.width
       c.height = img.height
       c.getContext('2d').drawImage(img, 0, 0)
-      return { data: c.toDataURL('image/webp', 0.9), width: img.width, height: img.height }
+      return {
+        data: c.toDataURL('image/webp', 0.9),
+        width: img.width, height: img.height, frame: out.frame,
+      }
     }, job)
     const dataUrl = shot.data
 
     fs.writeFileSync(file, Buffer.from(dataUrl.split(',')[1], 'base64'))
-    sizes[job.name] = [shot.width, shot.height]
+    sizes[job.name] = [shot.width, shot.height, +shot.frame.toFixed(4)]
     made++
     const kb = (fs.statSync(file).size / 1024).toFixed(0)
     console.log(`  ✓ ${job.name.padEnd(6)} ${String(kb).padStart(4)} kB  ${job.label}`)
