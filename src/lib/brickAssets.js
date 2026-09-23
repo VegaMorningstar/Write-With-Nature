@@ -45,10 +45,38 @@ export const BRICK_SIZE = 560
  */
 export const BRICK_ASPECT = 0.7
 
+/** Everything measured about one block's baked picture, or null. */
+export function brickMeta(ch, variantIndex) {
+  return BRICK_INDEX[brickName(ch, variantIndex)] ?? null
+}
+
 /** Width ÷ height of one block's baked picture. */
 export function brickAspect(ch, variantIndex) {
-  const size = BRICK_INDEX[brickName(ch, variantIndex)]
-  return size ? size[0] / size[1] : BRICK_ASPECT
+  const m = brickMeta(ch, variantIndex)
+  return m ? m.w / m.h : BRICK_ASPECT
+}
+
+/**
+ * Where to draw a copy of the engraved letter over a tile, and how.
+ *
+ * Returns the glyph square's centre as a fraction of the tile, its width in
+ * the same units, and the CSS matrix that lays a square element onto the face
+ * it is cut into — a shear and a squash, since the face is seen at an angle.
+ *
+ * DOM y runs down and the face's own y runs up, so the second column is
+ * negated on the way in.
+ */
+export function brickEtch(ch, variantIndex) {
+  const m = brickMeta(ch, variantIndex)
+  if (!m?.etch) return null
+  const { cx, cy, ax, ay } = m.etch
+  const side = Math.hypot(ax[0], ax[1]) || 1
+  return {
+    left: cx / m.w,
+    top: cy / m.h,
+    width: side / m.w,
+    matrix: `matrix(${ax[0] / side}, ${ax[1] / side}, ${-ay[0] / side}, ${-ay[1] / side}, 0, 0)`,
+  }
 }
 
 /**
@@ -73,8 +101,7 @@ export const BRICK_GAP = 0.2
  * belongs in front of an earlier one; DOM order already paints it that way.
  */
 export function brickPitch(ch, variantIndex) {
-  const rec = BRICK_INDEX[brickName(ch, variantIndex)]
-  const frame = rec?.[2] ?? DEFAULT_FRAME
+  const frame = brickMeta(ch, variantIndex)?.frame ?? DEFAULT_FRAME
   return Math.min(1, ((1 + BRICK_GAP) * X_ON_SCREEN) / frame)
 }
 

@@ -1,4 +1,5 @@
 import { forwardRef, useMemo } from 'react'
+import Tile from './Tile'
 import Tile3D from './Tile3D'
 import FlockLayer from './FlockLayer'
 import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
@@ -8,7 +9,11 @@ import GlassButtons from '../ui-elements/glass-buttons/GlassButtons'
 import { WIDE_WIDTH, INSTALL_WIDTH, SAVE_TINT } from '../ui-elements/glass-buttons/constants.ts'
 
 const Board = forwardRef(function Board(
-  { renderedLines, tileW, vs, onShuffle, onResize, onClear, onCycleVariant, onSave, onInstall, installVisible },
+  {
+    renderedLines, tileW, vs,
+    display = 'brick', onToggleDisplay,
+    onShuffle, onResize, onClear, onCycleVariant, onSave, onInstall, installVisible,
+  },
   ref
 ) {
   usePanelGlass(ref, { scale: -60, chroma: 4, blur: 2.5, saturate: 1.3, mode: 'prominent', aberrationIntensity: 8, elasticity: 0 })
@@ -20,7 +25,16 @@ const Board = forwardRef(function Board(
 
   // One lens each, in one canvas. `fallbackClass` is what they wear if the
   // glass never starts — the buttons these were before it existed.
+  const blocks = display === 'brick'
+
   const toolbar = useMemo(() => [
+    {
+      key: 'display',
+      label: blocks ? '◨' : '▦',
+      title: blocks ? 'Show flat scenes instead of blocks' : 'Show 3D blocks instead of flat scenes',
+      onClick: onToggleDisplay,
+      fallbackClass: 'icon-btn',
+    },
     { key: 'shuffle', label: '⇌', title: 'Shuffle all tiles', onClick: onShuffle, fallbackClass: 'icon-btn' },
     // Off the bar for now, pending a decision on how tile size gets changed.
     // Everything behind them is still wired: onResize is still passed in, and
@@ -29,7 +43,7 @@ const Board = forwardRef(function Board(
     // { key: 'larger', label: '+', title: 'Larger tiles', onClick: () => onResize(16), fallbackClass: 'icon-btn' },
     { key: 'clear', label: '✕', title: 'Clear', onClick: onClear, fallbackClass: 'icon-btn' },
     { key: 'save', label: 'Save', title: 'Save as PNG', onClick: onSave, width: WIDE_WIDTH, tint: SAVE_TINT, fallbackClass: 'save-btn' },
-  ], [onShuffle, onResize, onClear, onSave])
+  ], [blocks, onToggleDisplay, onShuffle, onResize, onClear, onSave])
 
   const installButton = useMemo(() => [
     { key: 'install', label: 'Install App', title: 'Install this app', onClick: onInstall, width: INSTALL_WIDTH, fallbackClass: 'install-btn visible' },
@@ -72,8 +86,10 @@ const Board = forwardRef(function Board(
         )}
 
         {/* Flamingos cross the whole panel, not the word — the flyway belongs
-            to the board, so it reads the same whatever is written on it. */}
-        {hasContent && <FlockLayer />}
+            to the board, so it reads the same whatever is written on it. They
+            fly over the blocks, which share their camera; over flat scenes
+            there is no ground for them to be above. */}
+        {hasContent && blocks && <FlockLayer />}
 
         {renderedLines.map((line, idx) => {
           if (line.type === 'break') {
@@ -91,8 +107,9 @@ const Board = forwardRef(function Board(
                     />
                   )
                 }
+                const Cell = blocks ? Tile3D : Tile
                 return (
-                  <Tile3D
+                  <Cell
                     key={key}
                     ch={ch}
                     tileKey={key}

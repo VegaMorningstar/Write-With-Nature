@@ -31,11 +31,23 @@ function parseLines(rawText) {
   })
 }
 
-function computeTileW(lines, boardEl) {
-  if (!boardEl) return 118
+/** How large a letter may be drawn, in pixels. Blocks want the room. */
+const MAX_TILE = 190
+const MIN_TILE = 84
+
+/**
+ * The largest letter size whose longest row still fits the board.
+ *
+ * Blocks and flat tiles take different amounts of room for the same letter:
+ * blocks overlap their neighbours and are narrower than they are tall, while a
+ * flat tile is a square that touches the next one. Sizing both the same way
+ * either overflows the panel or shrinks for space nothing is using.
+ */
+function computeTileW(lines, boardEl, blocks) {
+  if (!boardEl) return MAX_TILE
   const availW = boardEl.clientWidth - 56
-  if (availW <= 0) return 118
-  let size = 118
+  if (availW <= 0) return MAX_TILE
+  let size = MAX_TILE
   const gap = 6
   for (const line of lines) {
     if (line.type !== 'row') continue
@@ -45,22 +57,53 @@ function computeTileW(lines, boardEl) {
     if (n < 2) continue
     // Blocks overlap, so each costs less room than its own width — except the
     // last one in the row, which has nothing to tuck under and pays in full.
-    const run = letters > 0 ? (letters - 1) * BRICK_ADVANCE + BRICK_WIDTH : 0
+    // A flat tile is simply a square.
+    const run = !blocks
+      ? letters
+      : letters > 0
+        ? (letters - 1) * BRICK_ADVANCE + BRICK_WIDTH
+        : 0
     const fit = (availW - (n - 1) * gap) / (run + spaces * 0.37)
     if (fit > 0) size = Math.min(size, fit)
   }
-  return Math.max(72, Math.floor(size))
+  return Math.max(MIN_TILE, Math.floor(size))
 }
 
 export default function App() {
   const [text,          setText]          = useState('')
   const [renderedLines, setRenderedLines] = useState([])
-  const [tileW,         setTileW]         = useState(118)
+  const [tileW,         setTileW]         = useState(MAX_TILE)
   const [vs,            setVs]            = useState({})
   const [toastMsg,      setToastMsg]      = useState('')
   const [toastVisible,  setToastVisible]  = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installVisible,setInstallVisible]= useState(false)
+
+  /** 'brick' shows each letter as a 3D block; 'tile' is the flat scene. */
+  const [display, setDisplay] = useState(() => {
+    try { return localStorage.getItem('wwn-display') === 'tile' ? 'tile' : 'brick' }
+    catch { return 'brick' }
+  })
+  const toggleDisplay = useCallback(() => {
+    setDisplay(prev => {
+      const next = prev === 'brick' ? 'tile' : 'brick'
+      try { localStorage.setItem('wwn-display', next) } catch { /* private mode */ }
+      return next
+    })
+  }, [])
+
+  // Blocks and flat tiles take different room, so the letter size has to be
+  // worked out again whenever the board switches between them.
+  useEffect(() => {
+    if (!renderedLines.length) return
+    setTileW(computeTileW(renderedLines, boardRef.current, display === 'brick'))
+  }, [display, renderedLines])
+
+  // Whether the composer holds something not yet on the board. Drives the
+  // RENDER button's glow, so it is obvious there is a step left to take.
+  const [rendered, setRendered] = useState('')
+  const pending = text.trim().length > 0 && text !== rendered
+  const [jiggle, setJiggle] = useState(false)
 
   // Butterfly loading screen. What covers the page is the cluster itself —
   // the butterflies and the shadows they cast — so the page is revealed as
@@ -88,9 +131,16 @@ export default function App() {
   }, [])
 
   const handleRender = useCallback(() => {
+    if (!text.trim()) {
+      showToast('Type something first — a word, a line, a whole poem')
+      composeRef.current?.querySelector('textarea')?.focus()
+      return
+    }
+    setJiggle(true)
+    setTimeout(() => setJiggle(false), 600)
+    setRendered(text)
     const lines = parseLines(text)
-    const newTileW = computeTileW(lines, boardRef.current)
-    setTileW(newTileW)
+    setTileW(computeTileW(lines, boardRef.current, display === 'brick'))
     const newVs = {}
     lines.forEach(line => {
       if (line.type !== 'row') return
@@ -103,7 +153,7 @@ export default function App() {
     setVs(newVs)
     setRenderedLines(lines)
     setTimeout(() => boardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
-  }, [text])
+  }, [text, display, showToast])
 
   const handleShuffleAll = useCallback(() => {
     setVs(prev => {
@@ -135,6 +185,7 @@ export default function App() {
 
   const handleClearAll = useCallback(() => {
     setText('')
+    setRendered('')
     setRenderedLines([])
     setVs({})
   }, [])
@@ -154,7 +205,9 @@ export default function App() {
     })
   }, [installPrompt, showToast])
 
-  // Keyboard shortcut: Cmd/Ctrl + Enter → render
+  // Cmd/Ctrl + Enter renders from anywhere on the page. Plain Enter does it
+  // from inside the composer — see onKeyDown on the textarea, where Shift
+  // still has to mean a new line, because a poem needs them.
   useEffect(() => {
     const handler = e => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleRender() }
@@ -274,7 +327,15 @@ export default function App() {
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}
-              placeholder={'Paste a poem, a sentence, a whole essay…\nPunctuation & numbers are stripped automatically.\nEach line becomes its own row of Earth tiles.'}
+              onKeyDown={e => {
+                // Enter renders. Shift+Enter is the new line, as it is
+                // everywhere else that sends on Enter.
+                if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+                  e.preventDefault()
+                  handleRender()
+                }
+              }}
+              placeholder={'Paste a poem, a sentence, a whole essay…\nEnter renders it; Shift+Enter starts a new line.\nPunctuation and numbers are stripped automatically.'}
               rows={4}
               style={{ width: '100%' }}
             />
@@ -287,7 +348,11 @@ export default function App() {
                   The WebGPU jelly this replaced is still here, in
                   ui-elements/jelly-wireframe-button, and still driven by ?ui,
                   ?tune and ?preview — it is off the live page, not gone. */}
-              <GlassButtons items={renderButton} material={RENDER_MATERIAL} />
+              <div
+                className={`render-cta${pending ? ' urging' : ''}${jiggle ? ' jiggled' : ''}`}
+              >
+                <GlassButtons items={renderButton} material={RENDER_MATERIAL} />
+              </div>
             </div>
             <p className="compose-note">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
@@ -295,7 +360,8 @@ export default function App() {
                 <path d="M7 6v4M7 4.5v.5" stroke="rgba(28,26,16,0.25)" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
               Punctuation and numbers are stripped automatically. Only letters and spaces pass through.
-              Each line becomes a row; blank lines add a stanza break. Click any tile to cycle its satellite scene.
+              Press Enter to render, Shift+Enter for a new line; blank lines add a stanza break.
+              Click any letter to cycle its satellite scene.
             </p>
           </div>
         </section>
@@ -305,6 +371,8 @@ export default function App() {
           renderedLines={renderedLines}
           tileW={tileW}
           vs={vs}
+          display={display}
+          onToggleDisplay={toggleDisplay}
           onShuffle={handleShuffleAll}
           onResize={handleResizeTiles}
           onClear={handleClearAll}

@@ -106,13 +106,18 @@ for (const job of wanted) {
       c.getContext('2d').drawImage(img, 0, 0)
       return {
         data: c.toDataURL('image/webp', 0.9),
-        width: img.width, height: img.height, frame: out.frame,
+        width: img.width, height: img.height, frame: out.frame, etch: out.etch,
       }
     }, job)
     const dataUrl = shot.data
 
     fs.writeFileSync(file, Buffer.from(dataUrl.split(',')[1], 'base64'))
-    sizes[job.name] = [shot.width, shot.height, +shot.frame.toFixed(4)]
+    sizes[job.name] = {
+      w: shot.width,
+      h: shot.height,
+      frame: +shot.frame.toFixed(4),
+      ...(shot.etch ? { etch: shot.etch } : {}),
+    }
     made++
     const kb = (fs.statSync(file).size / 1024).toFixed(0)
     console.log(`  ✓ ${job.name.padEnd(6)} ${String(kb).padStart(4)} kB  ${job.label}`)
@@ -136,12 +141,15 @@ for (const k of Object.keys(sizes)) if (!sizes[k]) delete sizes[k]
 fs.writeFileSync(
   INDEX,
   `/**
- * The shape of every baked block picture, in pixels.
+ * What every baked block picture is, measured when it was baked.
  *
- * Blocks are not all the same shape: relief is scaled by how much real
- * landform a scene has, so a mountain range stands taller in frame than a
- * floodplain does. A tile reserves the exact size before the image loads, so
- * the row never reflows as pictures arrive.
+ *   w, h    its size in pixels
+ *   frame   how wide it is in world units — the same for every block, which is
+ *           what lets a row of them be spaced as if it were one 3D scene
+ *   etch    where the engraved character landed: the centre of the glyph
+ *           square, and the two vectors an on-screen copy has to be built on.
+ *           The camera is orthographic, so the square projects to a
+ *           parallelogram, which CSS can reproduce exactly.
  *
  * Written by scripts/prerender-bricks.mjs. Do not edit by hand.
  */

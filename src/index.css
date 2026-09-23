@@ -868,6 +868,55 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   align-items: center;
 }
 
-/* The variant pips sit over the block's own sky, so they need to be quiet. */
-.tile3d .tile-pips { top: 4px; left: 6px; opacity: 0.55; }
-.tile3d:hover .tile-pips { opacity: 1; }
+/* ── The engraved letter, lit ──
+   A second copy of the character laid onto the face it is cut into, using the
+   glyph's measured position and the shear of that face. Invisible until the
+   block is hovered, when it lights the cut rather than covering it. */
+.tile3d-glow {
+  position: absolute;
+  display: block;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 3;
+  transition: opacity 0.18s ease-out;
+  text-shadow:
+    0 0 2px rgba(255,255,255,0.95),
+    0 0 8px rgba(255,255,255,0.75),
+    0 0 18px rgba(214,240,255,0.55);
+}
+.tile3d:hover .tile3d-glow { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .tile3d-glow { transition: none; }
+}
+
+/* ── RENDER, asking to be pressed ──
+   Wrapped around the button rather than applied to it, so it works whether
+   the liquid-glass canvas started or the plain fallback is showing. */
+.render-cta { position: relative; border-radius: 999px; }
+.render-cta.urging {
+  animation: render-urge 1.9s ease-in-out infinite;
+}
+.render-cta.jiggled {
+  animation: render-jiggle 0.55s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes render-urge {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(200,150,42,0)); }
+  50%      { filter: drop-shadow(0 0 14px rgba(200,150,42,0.75)); }
+}
+@keyframes render-jiggle {
+  0%, 100% { transform: translateX(0) }
+  15% { transform: translateX(-5px) rotate(-1.5deg) }
+  30% { transform: translateX(5px) rotate(1.5deg) }
+  45% { transform: translateX(-4px) rotate(-1deg) }
+  60% { transform: translateX(4px) rotate(1deg) }
+  80% { transform: translateX(-2px) }
+}
+@media (prefers-reduced-motion: reduce) {
+  .render-cta.urging, .render-cta.jiggled { animation: none; }
+  .render-cta.urging { filter: drop-shadow(0 0 10px rgba(200,150,42,0.6)); }
+}

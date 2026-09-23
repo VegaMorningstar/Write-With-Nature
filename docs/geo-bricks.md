@@ -21,7 +21,7 @@ the rendered pixel is the pixel NASA shot.
 | `src/lib/brickAssets.js` | Where a block's picture comes from, and how wide a tile has to be. |
 | `src/lib/brickRenderer.js` | One offscreen WebGL context that draws blocks on demand. |
 | `src/lib/flocks.js` | Migrating flamingos, over bounds you pass in. |
-| `src/components/Tile3D.jsx` | One block as a board tile. |
+| `src/components/Tile3D.jsx` | One block as a board tile, and the hover glow on its engraved letter. |
 | `src/components/FlockLayer.jsx` | The flyway across the collage panel. |
 | `scripts/harvest-geo.mjs` | Fetches the geology. Run rarely. |
 | `scripts/prerender-bricks.mjs` | Bakes every block to an image. Run after changing how blocks look. |
@@ -87,6 +87,28 @@ out from the frame width recorded at bake time and `BRICK_GAP` — the same gap
 the `?word` page uses. Right-hand blocks are nearer the camera at this
 azimuth, so a later tile belongs in front of an earlier one; DOM order already
 paints it that way.
+
+&nbsp;
+
+## On the board
+
+The board draws blocks by default and can be switched to the flat scenes it
+replaced — the toggle is the first button on the collage bar, and the choice
+is remembered. The two are sized differently on purpose: a block overlaps its
+neighbours and is taller than it is wide, a flat tile is a square that touches
+the next one, so the row-sizing pass is told which it is laying out. Sizing
+both the same way either overflows the panel or shrinks letters for room
+nothing is using.
+
+**Hovering a block lights its engraved letter.** The glow is a second copy of
+the character laid onto the same face the letter is cut into, positioned and
+sheared from measurements taken when the block was baked — `etch` in the
+index. The camera is orthographic, so a square on that face projects to a
+parallelogram; that is an affine map, and CSS reproduces it exactly. Nothing
+is guessed, and nothing has to be baked twice.
+
+Blocks carry no pips or hover card. The letter is cut into the block, the
+place name is the tile's `title`, and clicking still cycles the scene.
 
 &nbsp;
 

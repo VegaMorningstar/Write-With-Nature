@@ -14,7 +14,9 @@ Rivers, glaciers, dunes and coastlines — naturally shaped into letters by Eart
 
 - Type any text (A–Z, spaces, multi-line) into the composer
 - Each letter renders as a real NASA Landsat satellite scene — a river bend in Virginia, a glacier in Iceland, a salt pan in Namibia
-- Click any tile to cycle through alternative scenes for that letter
+- Click any letter to cycle through alternative scenes for it; hover to light the character cut into its face
+- Switch between 3D blocks and flat scenes from the collage bar
+- Press Enter to render, Shift+Enter for a new line
 - Shuffle all tiles at once for a new composition
 - Download the full collage as a PNG
 - Install as a PWA — works offline once images are cached

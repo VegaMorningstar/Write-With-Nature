@@ -113,6 +113,30 @@ function projectedExtent(object) {
   return { minX, maxX, minY, maxY }
 }
 
+/** Project the block's glyph square into pixels of the rendered picture. */
+function measureEtch(brick, camera, w, h) {
+  const e = brick.userData.etch
+  if (!e) return null
+
+  const toPixels = (x, y, z) => {
+    const v = new THREE.Vector3(x, y, z).project(camera)
+    return [(v.x * 0.5 + 0.5) * w, (1 - (v.y * 0.5 + 0.5)) * h]
+  }
+
+  const [cx, cy] = toPixels(e.x, e.y, e.z)
+  const [rx, ry] = toPixels(e.x + e.size, e.y, e.z)
+  const [ux, uy] = toPixels(e.x, e.y + e.size, e.z)
+
+  return {
+    // Centre of the glyph square.
+    cx: +cx.toFixed(2),
+    cy: +cy.toFixed(2),
+    // One glyph-width step along the face's horizontal, and along its vertical.
+    ax: [+(rx - cx).toFixed(3), +(ry - cy).toFixed(3)],
+    ay: [+(ux - cx).toFixed(3), +(uy - cy).toFixed(3)],
+  }
+}
+
 function disposeTree(object) {
   object.traverse(o => {
     if (o.geometry) o.geometry.dispose()
@@ -168,6 +192,12 @@ function draw(image, size, opts) {
   camera.bottom = cy - halfH
   camera.updateProjectionMatrix()
 
+  // Where the engraved letter landed, in this picture's own pixels: the centre
+  // of the glyph square, and the two vectors an on-screen copy of it has to be
+  // built on. The camera is orthographic, so the glyph square projects to a
+  // parallelogram — an affine transform, exactly reproducible in CSS.
+  const etch = measureEtch(brick, camera, w, h)
+
   renderer.render(scene, camera)
   const src = renderer.domElement.toDataURL('image/png')
 
@@ -178,7 +208,14 @@ function draw(image, size, opts) {
   // needs this to space them: on screen the frame is wider than the block it
   // holds, so tiles have to overlap by the difference to sit as close as they
   // do in a single 3D scene.
-  return { src, width: w, height: h, aspect: w / h, frame: halfW * 2 }
+  return {
+    src,
+    width: w,
+    height: h,
+    aspect: w / h,
+    frame: halfW * 2,
+    etch,
+  }
 }
 
 const cache = new Map()

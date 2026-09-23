@@ -5,15 +5,15 @@ import {
   brickUrl,
   brickAspect,
   brickPitch,
+  brickEtch,
   BRICK_WIDTH,
 } from '../lib/brickAssets'
 
 /**
  * A letter as a geological block.
  *
- * Same contract as Tile — click cycles the scene, the pips and the label
- * behave the same — but what gets painted is the place modelled in three
- * dimensions: the satellite image as the top face displaced into relief, the
+ * Same contract as Tile — click cycles the scene — but what gets painted is
+ * the place modelled in three dimensions: the satellite image as the top face displaced into relief, the
  * section that place actually has cut below it, and the character engraved
  * into the face.
  *
@@ -21,6 +21,12 @@ import {
  * <img> and costs what the flat tile cost. The first paint uses the baked URL
  * directly rather than waiting to confirm it exists; only if the browser
  * cannot load it does this fall back to drawing the block live.
+ *
+ * On hover the engraved character lights up. The glow is a second copy of the
+ * letter laid exactly over the cut one, from the glyph's position and the
+ * shear of the face it sits on, both measured when the block was baked — the
+ * camera is orthographic, so that projection is affine and CSS reproduces it
+ * exactly.
  */
 export default function Tile3D({ ch, tileKey, variantIdx, tileW, onCycle }) {
   const variants = LETTERS[ch]
@@ -54,6 +60,7 @@ export default function Tile3D({ ch, tileKey, variantIdx, tileW, onCycle }) {
   // blocks then all stand at one scale, and centre on one line.
   const width = Math.round(tileW * BRICK_WIDTH)
   const height = Math.round(width / brickAspect(ch, vi))
+  const etch = brickEtch(ch, vi)
 
   return (
     <div
@@ -66,15 +73,8 @@ export default function Tile3D({ ch, tileKey, variantIdx, tileW, onCycle }) {
         marginRight: Math.round(-(1 - brickPitch(ch, vi)) * width),
       }}
       onClick={() => onCycle(tileKey, ch)}
+      title={variant.label}
     >
-      {variants.length > 1 && (
-        <div className="tile-pips">
-          {variants.map((_, i) => (
-            <span key={i} className={i === vi ? 'on' : ''} />
-          ))}
-        </div>
-      )}
-
       {failed ? (
         <div className="tile-error">
           <div className="ghost">{ch}</div>
@@ -92,9 +92,23 @@ export default function Tile3D({ ch, tileKey, variantIdx, tileW, onCycle }) {
         />
       )}
 
-      {/* No character overlay: the letter is cut into the block's own face,
-          and a second one in the corner reads as a duplicate. */}
-      <div className="tile-tip">{variant.label}</div>
+      {/* The engraved letter, lit. Laid onto the same face it is cut into, so
+          hovering makes the cut glow rather than putting a label over it. */}
+      {etch && (
+        <span
+          className="tile3d-glow"
+          style={{
+            left: `${etch.left * 100}%`,
+            top: `${etch.top * 100}%`,
+            width: `${etch.width * 100}%`,
+            fontSize: `${etch.width * width}px`,
+            transform: `translate(-50%, -50%) ${etch.matrix}`,
+          }}
+          aria-hidden="true"
+        >
+          {ch}
+        </span>
+      )}
     </div>
   )
 }

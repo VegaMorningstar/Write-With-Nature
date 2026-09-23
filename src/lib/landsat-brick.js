@@ -804,7 +804,14 @@ export function makeBrick(texture, image, opts = {}) {
     )
   )
 
-  group.userData = { W, D, topY, bottomY, column, stats: field.stats }
+  group.userData = {
+    W, D, topY, bottomY, column,
+    stats: field.stats,
+    // Where the engraved character sits, so anything drawn over a picture of
+    // this block can land exactly on it: the centre of the glyph square on the
+    // front face, and how big that square is, in world units.
+    etch: o.letter ? { x: 0, y: faceMidY, z: D / 2, size: glyph } : null,
+  }
   return group
 }
 

@@ -44,7 +44,7 @@ export default function PrerenderPage() {
         })
         return {
           src: out.src, aspect: out.aspect,
-          width: out.width, height: out.height, frame: out.frame,
+          width: out.width, height: out.height, frame: out.frame, etch: out.etch,
         }
       },
     }
