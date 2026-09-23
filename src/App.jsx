@@ -102,7 +102,12 @@ export default function App() {
   // Whether the composer holds something not yet on the board. Drives the
   // RENDER button's glow, so it is obvious there is a step left to take.
   const [rendered, setRendered] = useState('')
-  const pending = text.trim().length > 0 && text !== rendered
+  const [composing, setComposing] = useState(false)
+
+  // The button only asks while somebody is at the composer with something
+  // unrendered in it. Left lit on a page nobody is typing on it stops being a
+  // prompt and becomes decoration, so it fades out when the box loses focus.
+  const pending = composing && text.trim().length > 0 && text !== rendered
   const [jiggle, setJiggle] = useState(false)
 
   // Butterfly loading screen. What covers the page is the cluster itself —
@@ -338,6 +343,8 @@ export default function App() {
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}
+              onFocus={() => setComposing(true)}
+              onBlur={() => setComposing(false)}
               onKeyDown={e => {
                 // Enter renders. Shift+Enter is the new line, as it is
                 // everywhere else that sends on Enter.

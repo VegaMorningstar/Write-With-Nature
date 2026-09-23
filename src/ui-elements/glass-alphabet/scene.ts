@@ -124,6 +124,16 @@ const Params = d.struct({
   inkSampleLevel: d.f32,
   glowStrength: d.f32,
   glowHalo: d.f32,
+  // How much of the glow is shaped by the letters rather than by the lens.
+  // 0 keeps the original behaviour — lit right through the body and spilling
+  // past the rim. 1 confines it to a bloom around the glyphs, inside the
+  // glass, which is what a control that wants attention without shouting
+  // needs: the light never gets near the canvas border, so the border can
+  // never be what shapes it.
+  glowInk: d.f32,
+  // Which mip the bloom is read from. Higher is a wider, softer spread of the
+  // same letters; too low and it is a second copy of the glyph.
+  glowInkLevel: d.f32,
   glowColor: d.vec3f,
   // Unit vector toward the light, in screen space with y downward like uv.
   // Built on the CPU from an azimuth and an elevation, which are what a person
@@ -170,6 +180,10 @@ export type SceneParams = {
   inkSampleLevel?: number;
   glowStrength: number;
   glowHalo: number;
+  /** 0 lights the whole lens, 1 blooms around the letters only. Default 0. */
+  glowInk?: number;
+  /** Mip the bloom is read from. Default 3. */
+  glowInkLevel?: number;
   glowR: number;
   glowG: number;
   glowB: number;
@@ -506,8 +520,30 @@ export async function setupTileGlass(
     // OURS: emission from residual wobble energy, as the jelly does it. Full
     // strength anywhere inside the lens and decaying outside it, so one term is
     // both the tile brightening and the light it throws into the gaps.
+    const haloLens =
+      std.exp(-std.max(sdfDist - paramsUniform.$.end, 0) / std.max(paramsUniform.$.glowHalo, 1e-5));
+
+    // OURS: the same light, shaped by the letters instead of the lens. A coarse
+    // mip of the glyph texture is the letters' own light spread out rather than
+    // a second copy of them, and multiplying by `inside` keeps every bit of it
+    // within the glass — so it cannot reach the rim, the gap past it, or the
+    // canvas border, and the border can never be the thing shaping it.
+    //
+    // Read from w. This texture carries the glyphs in alpha and nothing in
+    // rgb — which is why sampleMaskWithChromaticAberration takes .w too, and
+    // why reading .r here returns a uniform zero and no glow at all.
+    // The wide read minus the sharp one: light spilling out from the letters
+    // rather than sitting on them. Laid straight on, the bloom peaks exactly
+    // where the glyph is and washes the ink out — the word goes the colour of
+    // the light and stops being easy to read, which is the opposite of what
+    // lighting it is for.
+    const inkWide =
+      std.textureSampleLevel(letterView.$, sampler.$, uv, paramsUniform.$.glowInkLevel).w;
+    const inkSharp = std.textureSampleLevel(letterView.$, sampler.$, uv, 0).w;
+    const inkBloom = std.saturate(inkWide - inkSharp * 0.9) * weights.inside;
+
     const halo =
-      std.exp(-std.max(sdfDist - paramsUniform.$.end, 0) / std.max(paramsUniform.$.glowHalo, 1e-5)) *
+      std.mix(haloLens, inkBloom, paramsUniform.$.glowInk) *
       glow * paramsUniform.$.glowStrength;
 
     // OURS: a lit highlight, which the ring gives us almost for free. The bevel
@@ -643,6 +679,8 @@ export async function setupTileGlass(
         inkSampleLevel: p.inkSampleLevel ?? 4,
         glowStrength: p.glowStrength,
         glowHalo: Math.max(p.glowHalo, 1e-5),
+        glowInk: p.glowInk ?? 0,
+        glowInkLevel: p.glowInkLevel ?? 3,
         glowColor: d.vec3f(p.glowR / 255, p.glowG / 255, p.glowB / 255),
         // Azimuth is measured on screen with 90 straight down from the top, and
         // y grows downward in uv — so a light "from above" has a negative y.
