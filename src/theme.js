@@ -123,10 +123,12 @@ const THEMES = {
     // null leaves the glass buttons' adaptive ink alone: dark glyphs, lightened
     // only where the backdrop behind them is bright.
     buttonGlyph: null,
-    // What a button glows when it is asking to be pressed. Warm, because on
-    // paper the light in this world is sunlight; the celestial sun jelly
-    // glows the same family of orange.
-    buttonGlow: { r: 226, g: 148, b: 56 },
+    // No glow on paper. A lit lens reads as light coming through glass, and
+    // on a pale ground there is nothing for it to read against — it came out
+    // as a stain on the button rather than a light in it. Null switches the
+    // whole thing off: no bloom, no tint, and the button stays clear glass
+    // however hard it is asking. Dark has it.
+    buttonGlow: null,
     // The sheet's pager and close buttons pick their own ink; null leaves them
     // to it. See src/ui-elements/glass-sheet/GlassSheet.jsx.
     sheetInk: null,

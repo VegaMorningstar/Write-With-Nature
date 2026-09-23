@@ -145,9 +145,14 @@ export default function GlassButtons({
           const dt = Math.min(0.05, (now - (litClockRef.current || now)) / 1000)
           litClockRef.current = now
 
+          // A theme with no glow colour does not light its buttons at all.
+          // Driving the target to zero rather than skipping the work means a
+          // theme switch fades the light out instead of cutting it.
+          const canGlow = !!tokens().buttonGlow
+
           const lit = litRef.current
           itemsRef.current.forEach((b, i) => {
-            const target = b.glow ?? 0
+            const target = canGlow ? (b.glow ?? 0) : 0
             const at = lit[i] ?? 0
             // ~0.45s to arrive, ~0.7s to leave: coming up should feel prompt,
             // going out should feel like it is fading rather than switching.
