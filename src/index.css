@@ -58,6 +58,12 @@
   /* The two hairlines flanking the masthead ornament. On paper this is exactly
      the gold it always was. */
   --rule: var(--gold);
+
+  /* The halo on a hovered word's caption. Not the white the etched letter
+     uses: that glow sits on a dark block where white reads as light, and the
+     caption sits on pale paper where it would read as nothing at all. Gold is
+     the page's own light. */
+  --word-glow: 200,150,42;
 }
 
 /* ── Dark ──────────────────────────────────────────────────────────────────
@@ -122,6 +128,10 @@
      saturated is what makes a hairline look like it is glowing rather than
      stained. Only the rules change; gold text and the sun keep their colour. */
   --rule: #f0dcaa;
+
+  /* On the night sky the caption can borrow the etched letter's own glow — the
+     same blue-white — so the block and its word light with one colour. */
+  --word-glow: 214,240,255;
 
   /* --blend-overlay is deliberately NOT overridden here. Its only readers are
      the two grain layers, and this theme turns those off outright (below), so
@@ -757,6 +767,59 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
 .board-exit:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 3px;
+}
+
+/* ── A word, and the caption under it ──────────────────────────────────────
+   The tiles keep their own row so the caption can sit beneath the whole set
+   rather than beside the last tile. Everything the row used to say about
+   spacing now applies here, because these are the tiles' parent now. */
+.word {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.word-tiles {
+  display: flex; flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 6px;
+}
+/* Blocks sit flush and overlap by their own pitch, and they differ in height
+   with their terrain, so they centre rather than sit on a line. Same pair of
+   rules the row carried before the word existed. */
+.collage-row:has(.tile3d) .word-tiles {
+  gap: 0;
+  align-items: center;
+}
+
+.word-label {
+  margin-top: 0.5rem;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.22em;
+  /* The tracking is all trailing, so a centred word sits half a space right of
+     where it looks like it should. Taking it back off the end re-centres it. */
+  text-indent: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(var(--ink-rgb), 0.42);
+  transition: color 0.18s ease-out, text-shadow 0.18s ease-out;
+  pointer-events: none;
+}
+
+/* Hovering anywhere in the set lights the caption, alongside the letter cut
+   into the block that the cursor is actually over. The two are one gesture:
+   the block says which letter, the caption says which word. */
+.word:hover .word-label {
+  color: rgba(var(--ink-rgb), 0.95);
+  text-shadow:
+    0 0 2px rgba(var(--word-glow), 0.55),
+    0 0 10px rgba(var(--word-glow), 0.45),
+    0 0 22px rgba(var(--word-glow), 0.28);
+}
+@media (prefers-reduced-motion: reduce) {
+  .word-label { transition: none; }
 }
 
 .collage-row {

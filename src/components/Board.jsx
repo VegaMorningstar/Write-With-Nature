@@ -30,6 +30,32 @@ const FIT = (() => {
  */
 const FIT_TILE_MIN = 26
 
+/**
+ * Splits a row's characters into words and the spaces between them.
+ *
+ * The row used to be a flat run of tiles, which is all it needed to be while
+ * nothing belonged to anything. A word now has a caption under it and lights
+ * up as a unit, so the word has to exist as an element rather than as a
+ * stretch of siblings that happen to have no space among them.
+ */
+function toWords(chars) {
+  const out = []
+  let current = null
+  for (const c of chars) {
+    if (c.type === 'space') {
+      current = null
+      out.push({ kind: 'space', key: c.key })
+      continue
+    }
+    if (!current) {
+      current = { kind: 'word', key: c.key, chars: [] }
+      out.push(current)
+    }
+    current.chars.push(c)
+  }
+  return out
+}
+
 /** Breathing room around the collage when it fills the screen. */
 const FULL_PADDING = 40
 /** Kept clear at the top for the close control and a hovered block's label. */
@@ -315,11 +341,11 @@ const Board = forwardRef(function Board(
             }
             return (
               <div key={`row-${idx}`} className="collage-row">
-                {line.chars.map(({ ch, type, key }) => {
-                  if (type === 'space') {
+                {toWords(line.chars).map(group => {
+                  if (group.kind === 'space') {
                     return (
                       <div
-                        key={key}
+                        key={group.key}
                         className="tile-space"
                         style={{ width: Math.round(shownTileW * 0.37) }}
                       />
@@ -327,14 +353,30 @@ const Board = forwardRef(function Board(
                   }
                   const Cell = blocks ? Tile3D : Tile
                   return (
-                    <Cell
-                      key={key}
-                      ch={ch}
-                      tileKey={key}
-                      variantIdx={vs[key] || 0}
-                      tileW={shownTileW}
-                      onCycle={onCycleVariant}
-                    />
+                    <div key={group.key} className="word">
+                      <div className="word-tiles">
+                        {group.chars.map(({ ch, key }) => (
+                          <Cell
+                            key={key}
+                            ch={ch}
+                            tileKey={key}
+                            variantIdx={vs[key] || 0}
+                            tileW={shownTileW}
+                            onCycle={onCycleVariant}
+                          />
+                        ))}
+                      </div>
+                      {/* Sized from the tile rather than fixed, so the caption
+                          stays in proportion whether the collage has been
+                          shrunk to a narrow screen or blown up full screen —
+                          and never ends up wider than the word it names. */}
+                      <span
+                        className="word-label"
+                        style={{ fontSize: Math.max(9, Math.round(shownTileW * 0.13)) }}
+                      >
+                        {group.chars.map(c => c.ch).join('')}
+                      </span>
+                    </div>
                   )
                 })}
               </div>
