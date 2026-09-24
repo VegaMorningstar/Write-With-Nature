@@ -635,6 +635,87 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   letter-spacing: 0.14em; text-transform: uppercase; color: rgba(var(--ink-rgb),0.18);
 }
 
+/* Exists only to be measured. `contents` means it generates no box of its own,
+   so the rows remain direct flex children of .board and every rule targeting
+   them still applies — but it is switched to a real flex column while the
+   board is full screen, because a `display: contents` element has no size to
+   measure and the fit needs one. */
+.collage-rows { display: contents; }
+
+/* ── The collage, full screen ───────────────────────────────────────────────
+   Restyled in place rather than moved: the board owns a WebGPU canvas and a
+   three.js canvas per block, and remounting it would rebuild all of them.
+
+   Fixed positioning here is relative to the viewport even though .page is a
+   positioned ancestor, because .page sets no transform or filter. Its z-index
+   of 20 does seal this inside that stacking context, which is why the z-index
+   below only has to beat the rest of the page and not the whole document. */
+.board.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  margin: 0;
+  max-width: none;
+  border: none;
+  border-radius: 0;
+  /* Only reaches the element when the glass is NOT running. With it running,
+     usePanelGlass sets background transparent inline and inline wins — which
+     is what .board-floor below is for. */
+  background: var(--paper);
+  box-shadow: none;
+  padding: var(--full-headroom) 40px 40px;
+  overflow: auto;
+  /* Centred both ways: a short word at a large tile size would otherwise sit
+     in the top-left corner of an empty screen. */
+  justify-content: center;
+}
+
+.board.is-full .collage-rows {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  /* Shrink to the collage rather than stretching to the board, so a short word
+     sits centred instead of pinned to the left of an empty screen. */
+  width: max-content;
+  margin: auto;
+}
+
+:root { --full-headroom: 64px; }
+
+/* The opaque floor the glass sits on while the board is full screen. See the
+   comment where it is rendered: it exists because the background cannot be set
+   in CSS at all once the shader has claimed the element inline. */
+.board-floor {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background: var(--paper);
+  pointer-events: none;
+}
+
+.board-exit {
+  position: absolute;
+  top: 16px; right: 18px;
+  z-index: 3;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(var(--ink-rgb), 0.06);
+  border: 1px solid rgba(var(--ink-rgb), 0.18);
+  border-radius: 10px;
+  color: rgba(var(--ink-rgb), 0.75);
+  font-size: 1rem; cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.board-exit:hover {
+  background: rgba(var(--ink-rgb), 0.12);
+  color: rgba(var(--ink-rgb), 0.95);
+}
+.board-exit:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+}
+
 .collage-row {
   display: flex; flex-wrap: nowrap;
   align-self: flex-start;
