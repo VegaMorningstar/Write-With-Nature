@@ -632,49 +632,21 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   contain: layout style; isolation: isolate;
 }
 
-/* Where the pseudo-elements exist, use them instead — and hand the standard
-   properties back to `auto` so they do.
+/* No scrollbar drawn at all, on either styling system.
 
-   That second line is the whole point. Chrome supports both, and since 121 it
-   prefers the standard ones when both are set: with `scrollbar-width: thin`
-   present it drew its own thin bar and ignored every ::-webkit- rule below,
-   which is why the stepper arrows survived being told to display: none. They
-   were not being disobeyed, they were being styled in a mode that was not in
-   use. */
-/* Declared after .collage-rows sets `thin`, below, and it has to be: the two
-   rules have the same specificity, so this only wins by coming later. Moved up
-   here it lost, Chrome stayed on the standard path, and the stepper arrows
-   came back — which is how the ordering earned this note. */
+   The rows still scroll: wheel, trackpad, touch drag, keyboard and
+   scrollLeft all work exactly as before. Only the bar is gone — hiding it
+   does not change overflow, which is still auto on .collage-rows.
 
-/* And the WebKit pseudo-elements, for the Chrome and Safari versions that do
-   not take the above. Both are declared on purpose: neither covers everything
-   this app runs on, and they do not conflict — a browser uses whichever it
-   understands.
-
-   iOS is not really either. Its scrollbars are overlays that appear while you
-   are scrolling and fade out, so there is nothing sitting in the layout there
-   to make minimal; this is for the desktop bar in the screenshot. */
-.collage-rows::-webkit-scrollbar { height: 10px; }
-.collage-rows::-webkit-scrollbar-track { background: transparent; }
-/* The stepper arrows at each end. Styling the bar does not remove them — they
-   are their own pseudo-element and keep their default appearance until told
-   otherwise, which is why a "custom" bar can still turn up wearing them. */
-.collage-rows::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-.collage-rows::-webkit-scrollbar-thumb {
-  /* Painted into the content box of a thumb with a transparent border, which
-     is how you inset a track-less bar: the border reserves the gap and the
-     colour stops short of it. */
-  background: rgba(var(--ink-rgb), 0.22);
-  background-clip: content-box;
-  border: 3px solid transparent;
-  border-radius: 99px;
+   Both declarations are needed because they are two separate systems and no
+   single one of them covers every browser this runs on. Chrome takes either
+   and prefers the standard one; Safari only has the pseudo-element; Firefox
+   only has the standard property. They agree here, so unlike the previous
+   version there is no cascade order to get wrong. */
+.collage-rows {
+  scrollbar-width: none;
 }
-.collage-rows::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--ink-rgb), 0.40);
-  background-clip: content-box;
-}
-/* The square where two bars would meet, which would otherwise be a grey chip. */
-.collage-rows::-webkit-scrollbar-corner { background: transparent; }
+.collage-rows::-webkit-scrollbar { display: none; }
 
 .board-empty {
   display: flex; flex-direction: column; align-items: center;
@@ -708,22 +680,8 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   overflow-x: auto;
   padding-top: 2.25rem;
   margin-top: -2.25rem;
-
-  /* Firefox and anything else without the WebKit pseudo-elements: a slim
-     native bar tinted to the page's ink. */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--ink-rgb), 0.26) transparent;
-}
-
-/* Where the WebKit pseudo-elements exist, hand the standard properties back to
-   `auto` so the browser uses them instead. See the note further up: Chrome
-   supports both and prefers the standard ones, so leaving `thin` set meant
-   every ::-webkit- rule above was styling a mode that was not in use. */
-@supports selector(::-webkit-scrollbar) {
-  .collage-rows {
-    scrollbar-width: auto;
-    scrollbar-color: auto;
-  }
+  /* The bar itself is hidden further up. overflow stays auto, which is what
+     actually makes this scroll; hiding the bar only stops it being drawn. */
 }
 
 /* ── The collage, full screen ───────────────────────────────────────────────
