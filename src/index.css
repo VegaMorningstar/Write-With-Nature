@@ -619,9 +619,62 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
     5px 5px 18px rgba(0,0,0,0.16),
     inset 1px 1px 5px rgba(255,255,255,0.42),
     inset -1px -1px 4px rgba(0,0,0,0.05);
-  position: relative; overflow-x: auto;
+  /* The board does NOT scroll — .collage-rows inside it does.
+
+     It used to, and the glass went with it. The shader's canvas is an
+     absolutely positioned child, and an absolutely positioned child of a
+     scroll container scrolls with the content: sideways by 15px and the panel
+     had moved 15px too, sliding out from under the tiles and leaving the far
+     end of the collage sitting on bare page. Scrolling an inner element keeps
+     the panel still and the tiles moving across it, which is the relationship
+     a panel is supposed to have with what is on it. */
+  position: relative; overflow: hidden;
   contain: layout style; isolation: isolate;
 }
+
+/* Where the pseudo-elements exist, use them instead — and hand the standard
+   properties back to `auto` so they do.
+
+   That second line is the whole point. Chrome supports both, and since 121 it
+   prefers the standard ones when both are set: with `scrollbar-width: thin`
+   present it drew its own thin bar and ignored every ::-webkit- rule below,
+   which is why the stepper arrows survived being told to display: none. They
+   were not being disobeyed, they were being styled in a mode that was not in
+   use. */
+/* Declared after .collage-rows sets `thin`, below, and it has to be: the two
+   rules have the same specificity, so this only wins by coming later. Moved up
+   here it lost, Chrome stayed on the standard path, and the stepper arrows
+   came back — which is how the ordering earned this note. */
+
+/* And the WebKit pseudo-elements, for the Chrome and Safari versions that do
+   not take the above. Both are declared on purpose: neither covers everything
+   this app runs on, and they do not conflict — a browser uses whichever it
+   understands.
+
+   iOS is not really either. Its scrollbars are overlays that appear while you
+   are scrolling and fade out, so there is nothing sitting in the layout there
+   to make minimal; this is for the desktop bar in the screenshot. */
+.collage-rows::-webkit-scrollbar { height: 10px; }
+.collage-rows::-webkit-scrollbar-track { background: transparent; }
+/* The stepper arrows at each end. Styling the bar does not remove them — they
+   are their own pseudo-element and keep their default appearance until told
+   otherwise, which is why a "custom" bar can still turn up wearing them. */
+.collage-rows::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.collage-rows::-webkit-scrollbar-thumb {
+  /* Painted into the content box of a thumb with a transparent border, which
+     is how you inset a track-less bar: the border reserves the gap and the
+     colour stops short of it. */
+  background: rgba(var(--ink-rgb), 0.22);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 99px;
+}
+.collage-rows::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--ink-rgb), 0.40);
+  background-clip: content-box;
+}
+/* The square where two bars would meet, which would otherwise be a grey chip. */
+.collage-rows::-webkit-scrollbar-corner { background: transparent; }
 
 .board-empty {
   display: flex; flex-direction: column; align-items: center;
@@ -635,12 +688,43 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   letter-spacing: 0.14em; text-transform: uppercase; color: rgba(var(--ink-rgb),0.18);
 }
 
-/* Exists only to be measured. `contents` means it generates no box of its own,
-   so the rows remain direct flex children of .board and every rule targeting
-   them still applies — but it is switched to a real flex column while the
-   board is full screen, because a `display: contents` element has no size to
-   measure and the fit needs one. */
-.collage-rows { display: contents; }
+/* The scroll container, and the thing that gets measured.
+
+   This is a real box rather than `display: contents` because it has to be
+   both: a contents element has no size to measure and cannot scroll. The board
+   above deliberately does not scroll, so that the glass stays put while the
+   collage moves across it.
+
+   The negative top margin against an equal padding is for the hovered block.
+   A block lifts and grows on hover, and any scroll container clips what leaves
+   it — setting overflow-x alone is not an option, because a box that scrolls
+   on one axis clips on the other whatever overflow-y says. Pulling the box up
+   and padding it back down leaves the rows exactly where they were and puts
+   the clip edge above them instead of through them. */
+.collage-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-x: auto;
+  padding-top: 2.25rem;
+  margin-top: -2.25rem;
+
+  /* Firefox and anything else without the WebKit pseudo-elements: a slim
+     native bar tinted to the page's ink. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--ink-rgb), 0.26) transparent;
+}
+
+/* Where the WebKit pseudo-elements exist, hand the standard properties back to
+   `auto` so the browser uses them instead. See the note further up: Chrome
+   supports both and prefers the standard ones, so leaving `thin` set meant
+   every ::-webkit- rule above was styling a mode that was not in use. */
+@supports selector(::-webkit-scrollbar) {
+  .collage-rows {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
 
 /* ── The collage, full screen ───────────────────────────────────────────────
    Restyled in place rather than moved: the board owns a WebGPU canvas and a
@@ -664,20 +748,21 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   background: var(--paper);
   box-shadow: none;
   padding: var(--full-headroom) 40px 40px;
-  overflow: auto;
+  /* Still not the scroller, for the same reason as above. */
+  overflow: hidden;
   /* Centred both ways: a short word at a large tile size would otherwise sit
      in the top-left corner of an empty screen. */
   justify-content: center;
 }
 
 .board.is-full .collage-rows {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
   /* Shrink to the collage rather than stretching to the board, so a short word
-     sits centred instead of pinned to the left of an empty screen. */
+     sits centred instead of pinned to the left of an empty screen — but never
+     past the screen, or the scroll it would need lives on a box that is wider
+     than the thing clipping it. */
   width: max-content;
+  max-width: 100%;
   margin: auto;
 }
 

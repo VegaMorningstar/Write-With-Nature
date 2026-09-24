@@ -8,6 +8,28 @@ import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 import GlassButtons from '../ui-elements/glass-buttons/GlassButtons'
 import { WIDE_WIDTH, INSTALL_WIDTH, SAVE_TINT } from '../ui-elements/glass-buttons/constants.ts'
 
+/**
+ * How the board behaves when the collage is wider than it is — the two
+ * approaches, side by side, so they can be compared on the same page:
+ *
+ *   ?fit=scroll   keep the tiles at their size and scroll (the default)
+ *   ?fit=shrink   shrink the tiles until the line fits, and never scroll
+ *
+ * A URL switch rather than a setting because this is here to be chosen
+ * between. Whichever wins, the other goes.
+ */
+const FIT = (() => {
+  if (typeof location === 'undefined') return 'scroll'
+  return new URLSearchParams(location.search).get('fit') === 'shrink' ? 'shrink' : 'scroll'
+})()
+
+/**
+ * Floor on the shrunk tile. Past this a Landsat scene is a smudge and the
+ * letter cut into it is unreadable, so it is better to let it scroll — which
+ * it still can, because overflow-x is untouched.
+ */
+const FIT_TILE_MIN = 26
+
 /** Breathing room around the collage when it fills the screen. */
 const FULL_PADDING = 40
 /** Kept clear at the top for the close control and a hovered block's label. */
@@ -141,9 +163,66 @@ const Board = forwardRef(function Board(
     return () => window.removeEventListener('resize', fit)
   }, [expanded, tileW, renderedLines, display])
 
-  // Falls back to the page's own size until the measurement lands, which is
-  // one frame, so the collage never renders at nothing.
-  const shownTileW = expanded && fullTileW ? fullTileW : tileW
+  /**
+   * ?fit=shrink — the tile size that makes the longest line fit the board.
+   *
+   * Converges in one pass and then holds still, which is the only reason this
+   * is safe to run from a ResizeObserver on the thing it resizes. Tile width
+   * and line width are proportional, so `line / tile` is a constant for a
+   * given piece of text: measure it once at whatever size the rows happen to
+   * be drawn at, and the size that fits is `available / that`. Applying it
+   * changes both numbers and leaves the ratio alone, so the next measurement
+   * agrees with the last and nothing oscillates.
+   *
+   * The observer also ignores anything but a width change. Shrinking the tiles
+   * changes the board's height, which would otherwise call this straight back.
+   */
+  const appliedFit = useRef(null)
+  const lastBoardW = useRef(0)
+  const [fitTileW, setFitTileW] = useState(null)
+
+  useLayoutEffect(() => {
+    if (FIT !== 'shrink' || expanded) {
+      appliedFit.current = null
+      setFitTileW(null)
+      return
+    }
+    const rows = rowsRef.current
+    if (!rows) return
+
+    const measure = () => {
+      // The wrapper is the scroll container now, so its own client width is
+      // the space a line has. Reading the board's would include its padding
+      // and overstate it.
+      const avail = rows.clientWidth
+      let line = 0
+      for (const row of rows.querySelectorAll('.collage-row')) {
+        line = Math.max(line, row.scrollWidth)
+      }
+      if (!line || avail <= 0) return
+      const perTile = line / (appliedFit.current ?? tileW)
+      const next = Math.min(tileW, Math.max(FIT_TILE_MIN, Math.floor(avail / perTile)))
+      if (next === appliedFit.current) return
+      appliedFit.current = next
+      setFitTileW(next)
+    }
+
+    measure()
+    const ro = new ResizeObserver(entries => {
+      const w = Math.round(entries[0].contentRect.width)
+      if (w === lastBoardW.current) return
+      lastBoardW.current = w
+      measure()
+    })
+    ro.observe(rows)
+    return () => ro.disconnect()
+  }, [expanded, tileW, renderedLines, display])
+
+  // Falls back to the page's own size until a measurement lands, which is one
+  // frame, so the collage never renders at nothing.
+  const shownTileW = expanded
+    ? (fullTileW || tileW)
+    : (FIT === 'shrink' && fitTileW ? fitTileW : tileW)
 
   const installButton = useMemo(() => [
     { key: 'install', label: 'Install App', title: 'Install this app', onClick: onInstall, width: INSTALL_WIDTH, fallbackClass: 'install-btn visible' },
