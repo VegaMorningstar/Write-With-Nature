@@ -22,6 +22,23 @@ import { BRICK_VIEW } from '../lib/brickView'
 const DEPTH = 2.4 // how deep the airspace is, in panel heights
 const HEIGHT = 1.0
 
+/**
+ * How long a bird is on screen, in CSS pixels.
+ *
+ * In pixels rather than in world units, and that is the whole point. The
+ * field is built in units where the camera's vertical span is fixed, so a
+ * size given in those units is a fraction of the panel's HEIGHT — the birds
+ * were about 13px over the board and about 36px with the board full screen,
+ * nearly three times the size, which is what made them crowd the collage
+ * there. Deriving the world size from a pixel size each time the panel is laid
+ * out keeps them the same bird at any panel size.
+ */
+const BIRD_PX = 13
+/** Bounds on the derived world size, so an extreme panel cannot produce an
+ *  extreme bird. */
+const BIRD_MIN = 0.02
+const BIRD_MAX = 0.14
+
 export default function FlockLayer({ count = 3, className = 'flock-layer' }) {
   const holder = useRef(null)
 
@@ -46,6 +63,7 @@ export default function FlockLayer({ count = 3, className = 'flock-layer' }) {
 
     let field = null
     let width = 1
+    let builtSize = 0.075
 
     /**
      * Rebuild the field for the panel's current shape, and frame it.
@@ -62,8 +80,23 @@ export default function FlockLayer({ count = 3, className = 'flock-layer' }) {
 
       const aspect = w / h
       const next = Math.max(1, aspect * 1.6)
-      if (!field || Math.abs(next - width) > 0.15) {
+
+      // World units per panel height, which is what the camera below frames.
+      // BIRD_PX divided by the panel's pixel height gives the fraction of the
+      // panel a bird should occupy; multiplying by the span converts that
+      // fraction into the units the field is built in.
+      const span = next / aspect
+      const size = Math.min(BIRD_MAX, Math.max(BIRD_MIN, (BIRD_PX / h) * span))
+
+      // Rebuilt when the shape changes, and now also when the size does. Going
+      // full screen can leave the aspect close enough to slip under the first
+      // test while the height has more than doubled, which would keep the old,
+      // too-large birds.
+      const reshaped = Math.abs(next - width) > 0.15
+      const resized = Math.abs(size - builtSize) > builtSize * 0.1
+      if (!field || reshaped || resized) {
         width = next
+        builtSize = size
         if (field) {
           scene.remove(field)
           field.traverse(o => {
@@ -72,7 +105,7 @@ export default function FlockLayer({ count = 3, className = 'flock-layer' }) {
         }
         field = makeFlocks(
           { x0: 0, x1: width, y0: 0, y1: HEIGHT, z0: -DEPTH / 2, z1: DEPTH / 2 },
-          { flocks: count, size: 0.075, speed: 0.5, seed: 20260923 }
+          { flocks: count, size, speed: 0.5, seed: 20260923 }
         )
         scene.add(field)
       }
