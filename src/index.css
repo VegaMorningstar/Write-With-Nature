@@ -732,6 +732,20 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   width: max-content;
   max-width: 100%;
   margin: auto;
+  /* Full screen does not scroll. On the page the rows scroll sideways because
+     the board is only as wide as the column it sits in and the writing can be
+     longer; full screen the collage is fitted to the window instead (see the
+     fit in Board.jsx), so there is nothing to scroll to.
+
+     Visible rather than hidden, which is the difference between not scrolling
+     and cutting the writing off. A block is drawn wider than the tile it is
+     laid out in and overlaps its neighbour, so the last one in a line sits
+     about ten pixels past the box the line occupies — measured: a 676px row
+     box with 686px of block in it. Hidden would take that sliver off the last
+     block of every line. The board is the one that clips, and the fit keeps
+     the whole collage inside it with room to spare; this box just stops being
+     a scroller. */
+  overflow: visible;
 }
 
 :root { --full-headroom: 64px; }

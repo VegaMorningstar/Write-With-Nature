@@ -60,9 +60,22 @@ function toWords(chars) {
 const FULL_PADDING = 40
 /** Kept clear at the top for the close control and a hovered block's label. */
 const FULL_HEADROOM = 64
-/** Bounds on the fitted tile, so one letter does not become the whole screen. */
-const FULL_TILE_MIN = 44
+/**
+ * Bounds on the fitted tile, so one letter does not become the whole screen.
+ *
+ * The floor is deliberately far below anything a real collage reaches. Full
+ * screen does not scroll — the whole point of it is seeing the collage at once
+ * — so the fit has to be free to shrink until it fits. A floor set where the
+ * blocks stay comfortably readable would be the one thing stopping it, and a
+ * long line on a narrow window would hit that floor and overflow a box that
+ * cannot scroll, which clips the end of the writing off the screen. Small is
+ * recoverable; cut off is not.
+ */
+const FULL_TILE_MIN = 8
 const FULL_TILE_MAX = 340
+/** Passes the fit is allowed. Two or three is the usual answer; the rest is
+ *  headroom for a pass that can only take a pixel off. */
+const FULL_FIT_PASSES = 6
 
 const Board = forwardRef(function Board(
   {
@@ -126,6 +139,9 @@ const Board = forwardRef(function Board(
   const [expanded, setExpanded] = useState(false)
   const rowsRef = useRef(null)
   const [fullTileW, setFullTileW] = useState(null)
+  // The size the fit last applied, read back by the next pass. A ref rather
+  // than the state because a pass runs before React has re-rendered with it.
+  const appliedFull = useRef(null)
 
   const collapse = useCallback(() => setExpanded(false), [])
 
@@ -157,36 +173,105 @@ const Board = forwardRef(function Board(
    * step with landsat-brick.js forever. Asking the laid-out rows how big they
    * are is exact and stays exact.
    *
-   * One pass is enough because the relationship is linear: the rows are
-   * measured at the size they are currently drawn, and the tile size is scaled
-   * by how far that is from fitting.
+   * Measured repeatedly rather than once. A single pass would be enough if the
+   * collage scaled linearly with the tile, and it very nearly does — but the
+   * captions have a minimum font size, so below a certain tile they stop
+   * shrinking and start setting the width themselves. One pass past that point
+   * lands short. Each pass measures what is actually drawn and rescales from
+   * there, so the error shrinks every time; it stops as soon as a pass asks for
+   * no real change, which for an ordinary collage is the second one.
    */
   useLayoutEffect(() => {
     if (!expanded) {
+      appliedFull.current = null
       setFullTileW(null)
       return
     }
+    let raf = 0
+
+    /** One measure-and-rescale. Returns whether it moved the tile at all. */
     const fit = () => {
       const el = rowsRef.current
-      if (!el) return
+      if (!el) return false
       // The widest row, not the wrapper. The wrapper is a flex item and
       // stretches to the board's full width, so measuring it measures the
       // screen and the scale comes out as 1 — which is exactly what happened:
       // the tiles grew from 133px to 135.
       let w = 0
+      let overhang = 0
       for (const row of el.querySelectorAll('.collage-row')) {
         w = Math.max(w, row.scrollWidth)
+        // How far the blocks are painted past the box the line is laid out in.
+        // They are drawn wider than their tile and overlap their neighbours, so
+        // the last one in a line sticks out to the right — and only to the
+        // right, while the line itself is centred on its layout width. That
+        // makes the ink off-centre by half the overhang, and a collage fitted
+        // exactly hangs over the right edge by that much. Budgeted for below.
+        overhang = Math.max(overhang, row.scrollWidth - row.clientWidth)
       }
       const h = el.scrollHeight
-      if (!w || !h) return
-      const availW = Math.max(120, window.innerWidth - FULL_PADDING * 2)
-      const availH = Math.max(120, window.innerHeight - FULL_PADDING * 2 - FULL_HEADROOM)
-      const k = Math.min(availW / w, availH / h)
-      setFullTileW(Math.round(Math.max(FULL_TILE_MIN, Math.min(FULL_TILE_MAX, tileW * k))))
+      if (!w || !h) return false
+      // The board's own content box, not the window less the padding this file
+      // thinks the board has. Those are not the same number — measured, the
+      // window gave 722px of room where the box actually had 700 — and fitting
+      // to the larger one leaves the collage over the edge of the smaller.
+      // Asking the element keeps the fit honest if the padding ever changes
+      // too, since these constants exist only as a fallback now.
+      const box = el.parentElement
+      let availW = window.innerWidth - FULL_PADDING * 2
+      let availH = window.innerHeight - FULL_PADDING * 2 - FULL_HEADROOM
+      if (box) {
+        const cs = getComputedStyle(box)
+        availW = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+        availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+      }
+      // Taking the overhang off the budget is what centres the ink rather than
+      // the layout. With a line of layout width L and overhang v inside a box
+      // of width A, the painted right edge sits at (A - L) / 2 + L + v, which
+      // stays inside A exactly when L + v — the scrollWidth measured above —
+      // is at most A - v. Off both axes, since a block is taller than its tile
+      // as well as wider.
+      availW -= overhang
+      availH -= overhang
+      const k = Math.min(Math.max(120, availW) / w, Math.max(120, availH) / h)
+      // Scaled from the size the rows were just measured at, which is the last
+      // size this effect applied — not from the page's tile size. Rescaling a
+      // measurement of one size by a ratio taken at another is how a fit walks
+      // away from the answer instead of towards it.
+      const base = appliedFull.current ?? tileW
+      // Floored, not rounded. The tile is whole pixels and the collage is tens
+      // of them wide, so rounding the last fraction up multiplies into a row a
+      // few pixels over the window — which is exactly where this landed: 738px
+      // of writing in 722px of window, at a tile of 37 where 36 fits.
+      let next = Math.floor(Math.min(FULL_TILE_MAX, base * k))
+      // A pass that still does not fit must move. Once the tile is small the
+      // ratio can be close enough to one that the floor gives back the size we
+      // came in with, and the fit would sit there a pixel over for good.
+      if (k < 1 && next >= base) next = base - 1
+      next = Math.max(FULL_TILE_MIN, next)
+      if (next === appliedFull.current) return false
+      appliedFull.current = next
+      setFullTileW(next)
+      return true
     }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
+
+    const refine = passes => {
+      if (!fit() || passes + 1 >= FULL_FIT_PASSES) return
+      // The next frame, so the rows have been re-laid-out at the size just set
+      // and the following pass measures that rather than the previous one.
+      raf = requestAnimationFrame(() => refine(passes + 1))
+    }
+    const run = () => {
+      cancelAnimationFrame(raf)
+      refine(0)
+    }
+
+    run()
+    window.addEventListener('resize', run)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', run)
+    }
   }, [expanded, tileW, renderedLines, display])
 
   /**
