@@ -38,6 +38,27 @@ const FIT_TILE_MIN = 26
  * up as a unit, so the word has to exist as an element rather than as a
  * stretch of siblings that happen to have no space among them.
  */
+/**
+ * How a word is spelled under its blocks: a capital, then lower case.
+ *
+ * The blocks themselves are always capitals and have to be — the scenes are
+ * only cut for A-Z, and every LETTERS lookup in the app is keyed by that
+ * character. The caption is not under the same constraint, and setting it in
+ * capitals to match reads as shouting rather than as a label.
+ *
+ * Derived here rather than kept from what was typed. The writer's own case is
+ * gone by this point, thrown away by parseLines long before a caption exists,
+ * and going back for it would mean carrying a second spelling of every
+ * character through the app to serve one line of text. A word under a block
+ * set is a label for that word, and a label is spelled one way whether it was
+ * typed shouting or whispering.
+ */
+function captionOf(chars) {
+  const word = chars.map(c => c.ch).join('')
+  // charAt(0) is already upper case, coming from `ch`; the work is the tail.
+  return word.charAt(0) + word.slice(1).toLowerCase()
+}
+
 function toWords(chars) {
   const out = []
   let current = null
@@ -459,7 +480,7 @@ const Board = forwardRef(function Board(
                         className="word-label"
                         style={{ fontSize: Math.max(9, Math.round(shownTileW * 0.13)) }}
                       >
-                        {group.chars.map(c => c.typed ?? c.ch).join('')}
+                        {captionOf(group.chars)}
                       </span>
                     </div>
                   )
