@@ -307,15 +307,14 @@ export default function WorldMap() {
   }), [])
 
   /**
-   * A rolled map holds nothing open and catches no keyboard.
+   * A rolled map catches no keyboard.
    *
-   * The detail panel hangs below the scroll, so leaving it up under a rolled
-   * map reads as a caption with nothing above it. And a clipped map is still
-   * in the document: without `inert` its zoom buttons and all 84 markers stay
-   * tabbable, so a keyboard would disappear into a map nobody can see.
+   * A clipped map is still in the document: without `inert` its zoom buttons
+   * and all 84 markers stay tabbable, and a keyboard would disappear into a
+   * map nobody can see. Only ever runs once now, since the scroll does not
+   * close again, but it has to run before the first tab reaches it.
    */
   useEffect(() => {
-    if (!unrolled) setOpen(null)
     const el = rollRef.current
     if (!el) return
     // Set as an attribute rather than a prop: React 18 does not pass `inert`
@@ -447,14 +446,14 @@ export default function WorldMap() {
   const latchButton = useMemo(() => [
     {
       key: 'latch',
-      label: unrolled ? 'ROLL IT UP' : 'UNROLL MAP',
-      title: unrolled ? 'Roll the map up' : 'Unroll the map',
-      onClick: () => setUnrolled(u => !u),
+      label: 'UNROLL MAP',
+      title: 'Unroll the map',
+      onClick: () => setUnrolled(true),
       width: LATCH_WIDTH,
       fallbackClass: 'world-map-latch',
-      aria: { 'aria-expanded': unrolled, 'aria-controls': 'world-map-roll' },
+      aria: { 'aria-expanded': false, 'aria-controls': 'world-map-roll' },
     },
-  ], [unrolled])
+  ], [])
 
   const count = placesFrom(LETTERS).length
 
@@ -494,9 +493,15 @@ export default function WorldMap() {
           Every scene in the alphabet, on the ground it was photographed from — {count} places
           across the Earth. Pick one to see the letters cut from it.
         </p>
-        <div className="world-map-latch-holder">
-          <GlassButtons items={latchButton} material={LATCH_MATERIAL} />
-        </div>
+        {/* Opens once and then goes. A map you have asked for stays open —
+            offering to roll it back up again is offering to undo the thing
+            the reader just asked for, and it leaves a control on the page
+            whose only job is to hide what they came to see. */}
+        {!unrolled && (
+          <div className="world-map-latch-holder">
+            <GlassButtons items={latchButton} material={LATCH_MATERIAL} />
+          </div>
+        )}
       </div>
 
       {/* The scroll: a clipping box whose height is the thing that animates,
@@ -514,7 +519,7 @@ export default function WorldMap() {
           leave something on the page, or the panel is a heading with nothing
           under it. Kept in normal flow rather than positioned, so nothing has
           to drive the foot roller down — the box growing does it. */}
-      <div className="world-map-scroll">
+      <div className="world-map-scroll" data-unrolled={unrolled ? 'true' : 'false'}>
         <div className="world-map-roller is-head" aria-hidden="true" />
         <div
           className="world-map-roll"

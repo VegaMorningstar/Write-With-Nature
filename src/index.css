@@ -1419,9 +1419,9 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
   position: relative; z-index: 1;
   height: 0;
   overflow: hidden;
-  /* Rolling up: quicker, and eased into the finish like a sheet snapping
-     back around its rod. */
-  transition: height 620ms cubic-bezier(0.55, 0, 0.85, 0.35);
+  /* No transition on the closed state. The scroll opens once and stays open,
+     so height only ever runs one way, and a closing curve would be a duration
+     nothing can reach. */
 }
 .world-map-roll[data-unrolled="true"] {
   height: var(--wm-height);
@@ -1526,7 +1526,13 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
   background: linear-gradient(to bottom, rgba(0,0,0,0.34), rgba(0,0,0,0));
   pointer-events: none;
   z-index: 3;
+  /* Nothing to shade until there is a sheet. Rolled up, these two fell on
+     bare panel and read as a pair of smudges above and below the roll. They
+     fade in with the paper they belong to. */
+  opacity: 0;
+  transition: opacity 420ms ease-out;
 }
+.world-map-scroll[data-unrolled="true"] .world-map-roller::after { opacity: 1; }
 .world-map-roller.is-head::after { top: 100%; }
 .world-map-roller.is-foot::after { bottom: 100%; transform: scaleY(-1); }
 
