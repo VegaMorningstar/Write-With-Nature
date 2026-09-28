@@ -828,7 +828,8 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   /* The tracking is all trailing, so a centred word sits half a space right of
      where it looks like it should. Taking it back off the end re-centres it. */
   text-indent: 0.22em;
-  text-transform: uppercase;
+  /* No text-transform. The caption spells the word as it was typed, and the
+     blocks being cut only for capitals is no reason to shout it back. */
   white-space: nowrap;
   color: rgba(var(--ink-rgb), 0.42);
   transition: color 0.18s ease-out, text-shadow 0.18s ease-out;

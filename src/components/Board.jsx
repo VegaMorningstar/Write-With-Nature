@@ -459,7 +459,7 @@ const Board = forwardRef(function Board(
                         className="word-label"
                         style={{ fontSize: Math.max(9, Math.round(shownTileW * 0.13)) }}
                       >
-                        {group.chars.map(c => c.ch).join('')}
+                        {group.chars.map(c => c.typed ?? c.ch).join('')}
                       </span>
                     </div>
                   )

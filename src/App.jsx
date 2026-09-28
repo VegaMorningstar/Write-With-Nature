@@ -20,12 +20,22 @@ function parseLines(rawText) {
   return rawText.split('\n').map((line, lineIdx) => {
     // Digits are kept as well as letters — NASA's gallery gained numerals in its
     // 2026 refresh, so a year or a house number has scenes behind it now.
-    const cleaned = line.toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/ {2,}/g, ' ').trim()
+    // Cleaned with the case left alone. The scenes are only cut for A-Z, so a
+    // block still has to be asked for by its capital — but the caption under
+    // the blocks spells the word back to the writer, and it should spell it
+    // the way they wrote it. Someone who types Rahul is not shouting.
+    const cleaned = line.replace(/[^A-Za-z0-9 ]/g, '').replace(/ {2,}/g, ' ').trim()
     if (!cleaned) return { type: 'break', lineIdx }
     const chars = cleaned.split('').map((ch, charIdx) => ({
-      ch,
+      // `ch` is what the collage is built from and stays upper case: every
+      // LETTERS lookup in the app is keyed by it. `typed` is the same
+      // character as it was written, and only the caption reads it.
+      ch: ch.toUpperCase(),
+      typed: ch,
       type: ch === ' ' ? 'space' : 'letter',
-      key: `${lineIdx}-${charIdx}-${ch}`,
+      // Keyed on the upper-case form, so changing a letter's case re-labels
+      // the word without remounting the block and rebuilding its canvas.
+      key: `${lineIdx}-${charIdx}-${ch.toUpperCase()}`,
     }))
     return { type: 'row', lineIdx, chars }
   })
