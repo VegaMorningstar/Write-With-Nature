@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+// Just a string at runtime; the worker itself is emitted as its own chunk.
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { LETTERS } from '../data/letters'
 import { theme, onThemeChange } from '../theme'
 import { mapStyle, landColour } from './basemap'
@@ -75,7 +77,21 @@ function warmLibrary() {
     libraryPromise = Promise.all([
       import('maplibre-gl'),
       import('maplibre-gl/dist/maplibre-gl.css'),
-    ]).then(([lib]) => lib)
+    ]).then(([lib]) => {
+      // Tell MapLibre where its worker actually is.
+      //
+      // It works the URL out itself, as `new URL('./maplibre-gl-worker.mjs',
+      // import.meta.url)`. That is right until the library is bundled: then
+      // import.meta.url is assets/maplibre-gl-<hash>.js and it goes looking
+      // for a sibling that was never emitted. The request 503s, the worker
+      // never starts, and the map draws its background and its markers and
+      // no tiles at all — which is exactly what shipped.
+      //
+      // ?worker&url makes Vite bundle the worker with its own dependencies
+      // and hand back the emitted URL, in dev and in the build alike.
+      lib.setWorkerUrl(workerUrl)
+      return lib
+    })
     // A failed warm-up must not be cached as a permanent failure; the next
     // attempt should be allowed to try the network again.
     libraryPromise.catch(() => { libraryPromise = null })
@@ -98,6 +114,7 @@ export default function WorldMap() {
   // of the page.
   const [unrolled, setUnrolled] = useState(false)
   const rollRef = useRef(null)
+  const rodRef = useRef(null)
 
   useEffect(() => {
     const el = holder.current
@@ -325,11 +342,106 @@ export default function WorldMap() {
     return () => el.removeEventListener('transitionend', settle)
   }, [unrolled])
 
+  /**
+   * Let the page follow the sheet down.
+   *
+   * The document does grow when the scroll opens — measured, 2056px to
+   * 2474px — but the viewport stays where it was, so the map unrolls past
+   * the bottom of the screen and the reader has to go after it. Following
+   * the foot roller each frame keeps the leading edge on screen, which is
+   * also the right gesture: the page travels with the sheet rather than the
+   * sheet disappearing off it.
+   *
+   * Only ever scrolls down, only by the overshoot, and only while the
+   * animation is running. Any deliberate scroll of their own hands control
+   * straight back — a page that insists on a scroll position is worse than
+   * one that never moved.
+   */
+  useEffect(() => {
+    if (!unrolled) return
+    const rod = rodRef.current
+    if (!rod) return
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    let raf = 0
+    let following = true
+    const stop = () => { following = false; cancelAnimationFrame(raf) }
+
+    const follow = () => {
+      if (!following) return
+      const gap = rod.getBoundingClientRect().bottom - (window.innerHeight - 24)
+      // Recomputed from the live position every frame, so this converges
+      // instead of accumulating the way a fixed step would.
+      if (gap > 0) window.scrollBy(0, gap)
+      raf = requestAnimationFrame(follow)
+    }
+    raf = requestAnimationFrame(follow)
+
+    /**
+     * One last correction when the sheet stops moving.
+     *
+     * Following frame by frame converges only as fast as frames arrive, and
+     * on a slow one it can finish short — measured at 5fps it ended 40px
+     * below the fold. Settling it once at the end makes the result the same
+     * whatever the frame rate; smooth, so it reads as the page coming to
+     * rest rather than jumping.
+     */
+    const settleScroll = () => {
+      const gap = rod.getBoundingClientRect().bottom - (window.innerHeight - 24)
+      if (gap > 1) window.scrollBy({ top: gap, behavior: 'smooth' })
+    }
+    const done = e => {
+      if (e.propertyName !== 'height') return
+      stop()
+      settleScroll()
+    }
+    rollRef.current?.addEventListener('transitionend', done)
+    for (const ev of ['wheel', 'touchmove', 'keydown']) {
+      window.addEventListener(ev, stop, { passive: true })
+    }
+    // A backstop, in case the transition never reports finishing.
+    const bail = setTimeout(stop, 2000)
+
+    return () => {
+      stop()
+      clearTimeout(bail)
+      rollRef.current?.removeEventListener('transitionend', done)
+      for (const ev of ['wheel', 'touchmove', 'keydown']) window.removeEventListener(ev, stop)
+    }
+  }, [unrolled])
+
   const count = placesFrom(LETTERS).length
 
   return (
     <section className="world-map" ref={panelRef} aria-labelledby="world-map-title">
       {glassSupported && <LiquidGlassPanel params={PANEL_GLASS} />}
+
+      {/* The torn edge of the sheet.
+
+          feTurbulence stretched along one axis — very low frequency across,
+          high frequency down — makes noise that varies quickly top to bottom
+          and barely at all side to side. Displacing the parchment by it eats
+          irregular bites out of its left and right edges and leaves the top
+          and bottom, where the rollers are, alone. A fixed seed so the tear
+          is the same tear on every load rather than new paper each time. */}
+      <svg className="world-map-defs" aria-hidden="true" focusable="false">
+        <filter id="wm-torn" x="-8%" y="-2%" width="116%" height="104%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.006 0.09"
+            numOctaves="5"
+            seed="11"
+            result="grain"
+          />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="grain"
+            scale="22"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </svg>
       <div className="world-map-text">
         <h3 id="world-map-title">Where the letters are</h3>
         <p>
@@ -354,18 +466,33 @@ export default function WorldMap() {
           would clip the rod away too and leave nothing on the page to say a
           map was ever there. Left in flow rather than positioned, so growing
           the box carries the rod down with the leading edge on its own. */}
+      {/* The scroll. A roller at the head, a clipping box whose height is the
+          thing that animates, and a roller at the foot that the growing box
+          carries down with it.
+
+          The rollers are outside the clip on purpose: a rolled-up map has to
+          leave something on the page, or the panel is a heading with nothing
+          under it. Kept in normal flow rather than positioned, so nothing has
+          to drive the foot roller down — the box growing does it. */}
+      <div className="world-map-roller is-head" aria-hidden="true" />
       <div
         className="world-map-roll"
         id="world-map-roll"
         ref={rollRef}
         data-unrolled={unrolled ? 'true' : 'false'}
       >
+        {/* The sheet, behind the map rather than around it. The torn edge is
+            an SVG displacement filter, and putting the map inside a filtered
+            element would push a WebGL canvas through it every frame. The map
+            sits on top, held in far enough that the ragged parchment shows
+            down both sides. */}
+        <div className="world-map-parchment" aria-hidden="true" />
         <div className="world-map-canvas" style={{ background: landColour(theme()) }}>
           <div ref={holder} className="world-map-gl" />
           {failed && <p className="world-map-failed">{failed}</p>}
         </div>
       </div>
-      <div className="world-map-dowel" aria-hidden="true" />
+      <div className="world-map-roller is-foot" ref={rodRef} aria-hidden="true" />
 
       {open && (
         <div className="world-map-detail">

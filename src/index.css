@@ -61,8 +61,16 @@
   --wm-ctrl-filter: none;
   /* The rod the map winds onto: a turned wooden dowel, so it takes the
      page's gold rather than a colour of its own. */
-  --wm-rod-rgb: 168,124,58;
-  --wm-rod-shade-rgb: 118,84,36;
+  /* The scroll: wound parchment, not wood. Three tones for the roller so it
+     reads as a cylinder, a sheet colour a shade warmer than the page's own
+     paper so it looks older than the panel it lies on, and a stain for the
+     blotching. */
+  --wm-roll-lit-rgb: 226,211,178;
+  --wm-roll-mid-rgb: 198,178,140;
+  --wm-roll-dark-rgb: 150,128,92;
+  --wm-sheet-rgb: 209,192,155;
+  --wm-sheet-shade-rgb: 191,172,133;
+  --wm-stain-rgb: 150,118,64;
   --sheet-caption: rgba(var(--ink-rgb), 0.62);
 
   /* The two hairlines flanking the masthead ornament. On paper this is exactly
@@ -144,8 +152,14 @@
   --wm-ctrl-filter: invert(1);
   /* Lifted against the night sky, where the light-theme rod reads as a
      smear of brown rather than as a turned piece of wood. */
-  --wm-rod-rgb: 154,126,86;
-  --wm-rod-shade-rgb: 86,68,46;
+  /* Old paper by moonlight: the same parchment, most of its warmth taken
+     out, so it sits on the night sky without glowing off it. */
+  --wm-roll-lit-rgb: 120,112,96;
+  --wm-roll-mid-rgb: 88,82,70;
+  --wm-roll-dark-rgb: 54,50,43;
+  --wm-sheet-rgb: 74,70,60;
+  --wm-sheet-shade-rgb: 58,55,47;
+  --wm-stain-rgb: 30,26,18;
   --sheet-caption: rgba(var(--ink-rgb), 0.82);
 
   /* A pale warm gold rather than #c8962a. At one pixel there is no area for a
@@ -1417,41 +1431,6 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
   transition: height 1050ms cubic-bezier(0.16, 0.84, 0.32, 1);
 }
 
-/* The rod the sheet is wound on.
-
-   In flow directly under the roll, so the growing box pushes it down and it
-   arrives at the leading edge for free. Wider than the panel's text column by
-   a few pixels at each end, the way a scroll's dowel projects past its
-   paper. */
-.world-map-dowel {
-  position: relative; z-index: 2;
-  height: 12px;
-  margin: 0 -6px;
-  border-radius: 6px;
-  background:
-    linear-gradient(to bottom,
-      rgba(255,255,255,0.34) 0%,
-      rgba(var(--wm-rod-rgb), 1) 38%,
-      rgba(var(--wm-rod-shade-rgb), 1) 78%,
-      rgba(var(--wm-rod-shade-rgb), 1) 100%);
-  box-shadow:
-    0 3px 8px rgba(0,0,0,0.30),
-    inset 0 1px 0 rgba(255,255,255,0.22);
-  pointer-events: none;
-}
-
-/* The curl: the sheet darkening as it turns under the rod. Sits just above
-   it, so while the map is unrolling this shadow sweeps down the map with the
-   rod and the paper looks like it is coming off a roll rather than a blind
-   being lowered. */
-.world-map-dowel::before {
-  content: '';
-  position: absolute; left: 6px; right: 6px; bottom: 100%;
-  height: 22px;
-  background: linear-gradient(to top, rgba(0,0,0,0.30), rgba(0,0,0,0));
-  pointer-events: none;
-}
-
 /* The catch that opens it. Quiet until wanted, like the rest of the panel. */
 .world-map-latch {
   margin-top: 0.9rem;
@@ -1477,4 +1456,102 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
   .world-map-roll,
   .world-map-roll[data-unrolled="true"] { transition: none; }
   .world-map-latch { transition: none; }
+}
+
+/* ── The scroll itself ─────────────────────────────────────────────────────
+   Two rollers of wound parchment with a torn sheet between them. The first
+   attempt drew a single turned rod, which read as a blind on a pole rather
+   than as a map an explorer would carry. */
+
+/* The filter lives in a zero-sized svg; it is referenced, never displayed. */
+.world-map-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* A roller: paper wound on itself, seen end-on.
+
+   Built from stacked gradients rather than an image so it takes the theme.
+   The vertical band across the middle is the lit top of the cylinder, the
+   dark line near the bottom is where it turns under, and the two soft marks
+   inset from each end are the ends of the wound sheet. */
+.world-map-roller {
+  position: relative; z-index: 2;
+  height: 20px;
+  margin: 0 -10px;
+  border-radius: 11px / 10px;
+  background:
+    /* the spiral ends, just inside each cap */
+    radial-gradient(ellipse 10px 9px at 16px 50%,
+      rgba(var(--wm-roll-dark-rgb),0.55), rgba(var(--wm-roll-dark-rgb),0) 70%),
+    radial-gradient(ellipse 10px 9px at calc(100% - 16px) 50%,
+      rgba(var(--wm-roll-dark-rgb),0.55), rgba(var(--wm-roll-dark-rgb),0) 70%),
+    /* the cylinder, lit from above */
+    linear-gradient(to bottom,
+      rgba(var(--wm-roll-dark-rgb),0.85) 0%,
+      rgba(var(--wm-roll-lit-rgb),1) 18%,
+      rgba(var(--wm-roll-mid-rgb),1) 52%,
+      rgba(var(--wm-roll-dark-rgb),1) 88%,
+      rgba(var(--wm-roll-dark-rgb),0.9) 100%);
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.32),
+    inset 0 1px 0 rgba(255,255,255,0.28);
+  pointer-events: none;
+}
+
+/* The head roller is the one the sheet hangs from, so its shadow falls down
+   onto the map; the foot roller's falls away below. */
+.world-map-roller.is-head { margin-bottom: -2px; }
+.world-map-roller.is-foot { margin-top: -2px; }
+
+/* The sheet turning under the roller, drawn on whichever side the map is. */
+.world-map-roller::after {
+  content: '';
+  position: absolute; left: 10px; right: 10px;
+  height: 16px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.26), rgba(0,0,0,0));
+  pointer-events: none;
+}
+.world-map-roller.is-head::after { top: 100%; }
+.world-map-roller.is-foot::after { bottom: 100%; transform: scaleY(-1); }
+
+/* The parchment behind the map: aged, blotched, and torn down both sides.
+
+   Absolutely placed and filtered on its own, with the map laid over it. The
+   filter is a displacement map, and running a live WebGL canvas through one
+   every frame is not a cost worth paying for an edge nobody is looking at. */
+.world-map-parchment {
+  /* A dark rim on the sheet itself. Without it the tear is the boundary
+     between two near-identical creams and simply does not read. */
+  outline: 1px solid rgba(var(--wm-stain-rgb),0.30);
+  outline-offset: -1px;
+  /* Inset from the clip, not flush to it. The filter displaces the edge both
+     ways, and against the box edge the outward half is cut off by the very
+     overflow that makes the animation work — a tear only shows if there is
+     parchment on both sides of where it bites. */
+  position: absolute; inset: 0 8px;
+  background:
+    radial-gradient(ellipse at 18% 22%, rgba(var(--wm-stain-rgb),0.30), transparent 42%),
+    radial-gradient(ellipse at 82% 68%, rgba(var(--wm-stain-rgb),0.26), transparent 46%),
+    radial-gradient(ellipse at 52% 92%, rgba(var(--wm-stain-rgb),0.22), transparent 40%),
+    radial-gradient(ellipse at 66% 12%, rgba(var(--wm-stain-rgb),0.18), transparent 38%),
+    linear-gradient(to bottom,
+      rgba(var(--wm-sheet-rgb),1), rgba(var(--wm-sheet-shade-rgb),1));
+  filter: url(#wm-torn);
+  pointer-events: none;
+}
+
+/* Held in from the edges so the torn parchment shows down both sides, and
+   off the rollers so the sheet appears to pass under them. */
+.world-map .world-map-canvas {
+  /* Held well in, so a band of torn parchment shows down both sides. */
+  margin: 0 30px;
+  height: calc(var(--wm-height) - 4px);
+  /* No frame, barely any rounding: inside a scroll the map is the sheet, not
+     a card lying on one. The border and 14px radius it had read as a
+     photograph pasted onto the parchment. */
+  border: none;
+  border-radius: 3px;
+  box-shadow: inset 0 0 14px rgba(0,0,0,0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-map-roller { transition: none; }
 }

@@ -62,6 +62,9 @@ export default defineConfig({
   plugins: [typegpu({ include: [/\.m?[jt]sx?/] }), react(), serveLocalImages(), siteUrl()],
   base: BASE_PATH,
   publicDir: 'public',
+  // MapLibre's worker is an ES module that imports its own shared chunk, so it
+  // has to stay a module when Vite emits it.
+  worker: { format: 'es' },
   optimizeDeps: {
     /**
      * MapLibre decodes vector tiles in a web worker, which it starts from a
