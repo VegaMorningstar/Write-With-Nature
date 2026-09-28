@@ -62,6 +62,17 @@ export default defineConfig({
   plugins: [typegpu({ include: [/\.m?[jt]sx?/] }), react(), serveLocalImages(), siteUrl()],
   base: BASE_PATH,
   publicDir: 'public',
+  optimizeDeps: {
+    /**
+     * MapLibre decodes vector tiles in a web worker, which it starts from a
+     * URL relative to its own module. Pre-bundling rewrites the library into
+     * node_modules/.vite/deps/ and that URL stops resolving, so in dev the
+     * worker never started: the map drew its background colour and nothing
+     * else, reporting only "Worker failed to load" through its error event.
+     * Served unbundled, the worker resolves and the tiles arrive.
+     */
+    exclude: ['maplibre-gl'],
+  },
   build: {
     outDir: 'dist',
     assetsInlineLimit: 8192,

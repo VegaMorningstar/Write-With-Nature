@@ -53,6 +53,12 @@
      themes need different numbers rather than the same number in a different
      colour. */
   --sheet-sub: rgba(var(--ink-rgb), 0.5);
+
+  /* The world map panel. --paper-rgb is the paper as a triple so the map's
+     attribution strip can sit on it at part opacity; --wm-ctrl-filter is for
+     MapLibre's zoom glyphs, which ship as dark images for a white control. */
+  --paper-rgb: 217,205,180;
+  --wm-ctrl-filter: none;
   --sheet-caption: rgba(var(--ink-rgb), 0.62);
 
   /* The two hairlines flanking the masthead ornament. On paper this is exactly
@@ -127,6 +133,11 @@
   /* Lifted, for the reason given where these are declared: the same alpha has
      far less to work with lifting off a dark ground than sitting on cream. */
   --sheet-sub: rgba(var(--ink-rgb), 0.72);
+
+  /* Inverted rather than replaced: MapLibre's + and - are single-colour
+     images, so flipping them is exactly right and costs no second sprite. */
+  --paper-rgb: 5,8,20;
+  --wm-ctrl-filter: invert(1);
   --sheet-caption: rgba(var(--ink-rgb), 0.82);
 
   /* A pale warm gold rather than #c8962a. At one pixel there is no area for a
@@ -1184,4 +1195,189 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   text-decoration: underline;
   text-decoration-color: currentColor;
   text-underline-offset: 2px;
+}
+
+/* ── The world map ─────────────────────────────────────────────────────────
+   The panel under the colophon that puts every scene on the ground it came
+   from. Built to sit beside .colophon rather than under it as a different
+   kind of thing, so it borrows that panel's glass, radius and shadow. */
+.world-map {
+  position: relative;
+  margin-top: 1.5rem; padding: 1.8rem 2rem;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.30);
+  box-shadow:
+    -3px -3px 9px rgba(255,255,255,0.58),
+    4px 4px 15px rgba(0,0,0,0.15),
+    inset 1px 1px 5px rgba(255,255,255,0.40),
+    inset -1px -1px 4px rgba(0,0,0,0.04);
+  display: flex; flex-direction: column; gap: 1.2rem;
+  contain: layout style; isolation: isolate;
+}
+
+.world-map-text { position: relative; z-index: 1; }
+.world-map-text h3 {
+  margin: 0 0 0.5rem; font-size: 0.95rem; letter-spacing: 0.04em;
+  color: var(--heading);
+}
+.world-map-text p {
+  margin: 0; max-width: 62ch;
+  font-size: 0.82rem; line-height: 1.7; color: rgba(var(--ink-rgb),0.72);
+}
+
+/* The map itself, inset into the panel. Rounded and clipped, so the tiles
+   stop at the panel's own curve instead of squaring off inside it. */
+.world-map-canvas {
+  position: relative; z-index: 1;
+  height: clamp(320px, 52vh, 560px);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--ink-rgb),0.14);
+  /* An inner shadow rather than an outer one: the map is a hole in the panel,
+     not a card resting on it. */
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.16);
+}
+/* Sized explicitly, and with enough specificity to mean it.
+
+   MapLibre puts its own `maplibregl-map` class on whatever element it is
+   given, and its stylesheet sets `position: relative` on that. Its CSS is
+   imported with the library, so it lands after this file and wins the tie at
+   equal specificity — which turned `position: absolute; inset: 0` back into a
+   static block with nothing in the flow to give it height, and the map came
+   out 850x0 with every marker projected off-screen. Two guards: the extra
+   class beats their selector, and the explicit width and height hold whether
+   the box ends up positioned or not. */
+.world-map .world-map-gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.world-map-failed {
+  position: absolute; inset: 0; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-size: 0.72rem;
+  color: rgba(var(--ink-rgb),0.55);
+}
+
+/* A scene standing on its own coordinates. Round, so a grid of squares does
+   not read as a mosaic laid over the map, and ringed in the page's ink so it
+   keeps an edge over both pale ground and dark. */
+.wm-pin {
+  /* Set on the map container by WorldMap.jsx as the zoom changes, with a
+     fallback so a marker is never zero-sized if that has not run yet. */
+  width: var(--wm-pin, 44px); height: var(--wm-pin, 44px);
+  padding: 0; border-radius: 50%; cursor: pointer;
+  border: 2px solid rgba(var(--ink-rgb),0.55);
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  overflow: visible; position: relative;
+  transition: transform .16s ease-out, box-shadow .16s ease-out, border-color .16s ease-out;
+}
+.wm-pin img {
+  width: 100%; height: 100%; border-radius: 50%; display: block; object-fit: cover;
+}
+.wm-pin:hover, .wm-pin:focus-visible {
+  transform: scale(1.22);
+  border-color: rgba(var(--ink-rgb),0.9);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+  z-index: 2;
+}
+
+/* The letters this ground spells, on the rim of its own thumbnail. */
+.wm-pin-chars {
+  position: absolute; right: -4px; bottom: -4px;
+  min-width: 15px; height: 15px; padding: 0 3px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-size: 9px; line-height: 1;
+  background: var(--paper); color: rgba(var(--ink-rgb),0.9);
+  border: 1px solid rgba(var(--ink-rgb),0.45);
+  pointer-events: none;
+}
+
+/* What opens under the map when a place is picked. */
+.world-map-detail {
+  position: relative; z-index: 1;
+  border-top: 1px solid rgba(var(--ink-rgb),0.14);
+  padding-top: 1rem;
+}
+.world-map-detail-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+}
+.world-map-detail-head h4 {
+  margin: 0; font-size: 0.86rem; letter-spacing: 0.02em; color: var(--heading);
+}
+.world-map-detail-head button {
+  background: none; border: none; cursor: pointer; padding: 2px 6px;
+  font-size: 0.8rem; color: rgba(var(--ink-rgb),0.6); line-height: 1;
+}
+.world-map-detail-head button:hover { color: rgba(var(--ink-rgb),0.95); }
+
+.world-map-dms {
+  display: block; margin-top: 0.25rem;
+  font-family: 'DM Mono', monospace; font-size: 0.6rem;
+  color: var(--sheet-sub); text-decoration: none;
+}
+a.world-map-dms:hover, a.world-map-dms:focus-visible {
+  text-decoration: underline; text-underline-offset: 2px;
+}
+
+.world-map-scenes {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.8rem; margin-top: 0.9rem;
+}
+.world-map-scenes figure { margin: 0; }
+.world-map-scenes img {
+  width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block;
+  border-radius: 10px; border: 1px solid rgba(255,255,255,0.32);
+  box-shadow: 0 6px 18px rgba(28,26,16,0.24);
+}
+.world-map-scenes figcaption {
+  margin-top: 0.4rem;
+  font-family: 'DM Mono', monospace; font-size: 0.56rem; line-height: 1.5;
+  color: var(--sheet-caption);
+}
+.world-map-scenes figcaption b {
+  color: var(--heading); margin-right: 0.35em; font-weight: 400;
+}
+
+/* MapLibre's own chrome, brought into the page's colours. It ships a white
+   card with blue focus rings, which is the one part of a keyless basemap that
+   still looks like somebody else's. */
+.world-map .maplibregl-ctrl-group {
+  background: var(--paper);
+  border: 1px solid rgba(var(--ink-rgb),0.2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.world-map .maplibregl-ctrl-group button + button {
+  border-top: 1px solid rgba(var(--ink-rgb),0.14);
+}
+.world-map .maplibregl-ctrl-group button span {
+  /* The glyphs are background images tinted for a white control. Inverting
+     them in the dark theme is cheaper and truer than shipping a second set. */
+  filter: var(--wm-ctrl-filter, none);
+}
+/* The compact class has to be named. MapLibre styles this pill with
+   `.maplibregl-ctrl-attrib.maplibregl-compact`, which is two classes, so a
+   selector of `.world-map .maplibregl-ctrl-attrib` only ties it and loses on
+   order — their stylesheet is imported with the library and lands after this
+   one. Measured: the pill stayed white with black text in both themes while
+   the link rule below, being one specificity point heavier, did apply. That
+   left cream links on a white pill in the dark theme, which is invisible. */
+.world-map .maplibregl-ctrl-attrib,
+.world-map .maplibregl-ctrl-attrib.maplibregl-compact {
+  background: rgba(var(--paper-rgb), 0.86);
+  color: rgba(var(--ink-rgb),0.7);
+  font-size: 10px;
+}
+.world-map .maplibregl-ctrl-attrib-inner { color: rgba(var(--ink-rgb),0.7); }
+.world-map .maplibregl-ctrl-attrib a { color: rgba(var(--ink-rgb),0.85); }
+/* The (i) that opens the pill is a dark glyph drawn for a white control. */
+.world-map .maplibregl-ctrl-attrib-button { filter: var(--wm-ctrl-filter, none); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wm-pin { transition: none; }
 }

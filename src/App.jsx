@@ -4,6 +4,7 @@ import { BRICK_ADVANCE, BRICK_WIDTH } from './lib/brickAssets'
 import Header from './components/Header'
 import Board from './components/Board'
 import Colophon from './components/Colophon'
+import WorldMap from './world-map/WorldMap'
 import { downloadCollage } from './utils/collage'
 import usePanelGlass, { glassSupported } from './hooks/usePanelGlass'
 import LiquidGlassPanel from './ui-elements/liquid-glass/LiquidGlassPanel'
@@ -405,6 +406,10 @@ export default function App() {
         </svg>
 
         <Colophon />
+
+        {/* Under the colophon, which has just said the scenes are real places.
+            This is where that claim is shown rather than made. */}
+        <WorldMap />
       </div>
 
       <div className={`toast${toastVisible ? ' show' : ''}`}>{toastMsg}</div>
