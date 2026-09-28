@@ -1166,3 +1166,22 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
     filter: drop-shadow(0 0 10px rgba(198,164,255,0.55));
   }
 }
+
+/* The coordinate under a scene in the alphabet sheet.
+
+   It is a link to NASA's map pin, but it is also the quietest line in the
+   panel, and a link drawn the usual way — coloured and underlined — would
+   pull the eye past the picture it is labelling. So it inherits the dim text
+   colour it sits in and only draws a rule when the pointer or the keyboard
+   is actually on it. Colour comes from --sheet-sub on the span, so both
+   themes are already handled. */
+.sheet-coord a {
+  color: inherit;
+  text-decoration: none;
+}
+.sheet-coord a:hover,
+.sheet-coord a:focus-visible {
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-underline-offset: 2px;
+}

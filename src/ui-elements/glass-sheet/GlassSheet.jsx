@@ -291,6 +291,35 @@ export default function GlassSheet({
                 marginTop: '0.45rem',
               }}>
                 {item.label}
+                {/* Where the scene actually is, the way NASA writes it.
+                    Under the name and dimmer than it, because the name is what
+                    the tile is and the coordinate is what it is about.
+                    --sheet-sub is already the theme's quieter text, so this
+                    follows the theme without a token of its own.
+
+                    Not every scene has one — NASA's interactive carries no
+                    coordinate for two of ours — so the whole line is dropped
+                    rather than left as an empty row under those. */}
+                {item.coords && (
+                  <span className="sheet-coord" style={{
+                    display: 'block',
+                    marginTop: '0.25rem',
+                    color: 'var(--sheet-sub)',
+                    fontSize: '0.54rem',
+                    letterSpacing: '0.01em',
+                  }}>
+                    {item.coords.map ? (
+                      <a
+                        href={item.coords.map}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`${item.coords.place} on a map`}
+                      >
+                        {item.coords.dms}
+                      </a>
+                    ) : item.coords.dms}
+                  </span>
+                )}
               </figcaption>
             </figure>
           ))}
