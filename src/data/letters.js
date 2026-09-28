@@ -1,3 +1,5 @@
+import { COORDS } from './coords'
+
 const BASE = import.meta.env.BASE_URL
 
 const u = (letter, file) =>
@@ -17,8 +19,11 @@ const u = (letter, file) =>
  *
  * Generated from images/ by scripts/gen_letters.cjs; hand-written labels are
  * preserved on regeneration, so editing one here survives.
+ *
+ * Each scene carries a `coords` of where on Earth it is, attached below from
+ * coords.js. Two of them have none — see that file.
  */
-export const LETTERS = {
+const SCENES = {
   '0':[{url:u('0','0-0-LakeWaccamaw-NorthCarolina-USA-NIR.png'),label:'Lake Waccamaw, North Carolina (false colour, NIR)'},{url:u('0','0-1-LakeWaccamaw-NorthCarolina-USA-SWIR.png'),label:'Lake Waccamaw, North Carolina (false colour, SWIR)'}],
   '1':[{url:u('1','1-0-ConsensusLake-NewYork-US.png'),label:'Conesus Lake, New York'}],
   '2':[{url:u('2','2-0-PennsylvaniaHills-US.png'),label:'Pennsylvania Hills'},{url:u('2','2-1-PennsylvaniaHills-US-NIR.png'),label:'Pennsylvania Hills (false colour, NIR)'},{url:u('2','2-2-GreatFishRiverNatureReserve-SouthAfrica.png'),label:'Great Fish River Nature Reserve, South Africa'},{url:u('2','2-3-GreatFishRiverNatureReserve-SouthAfrica-NIR.png'),label:'Great Fish River Nature Reserve, South Africa (false colour, NIR)'}],
@@ -56,5 +61,36 @@ export const LETTERS = {
   Y:[{url:u('Y','y-0-BíobíoRiver-Chile.png'),label:'Biobío River, Chile'},{url:u('Y','y-1-EstuariodeVirrila-Peru.png'),label:'Estuario de Virrila, Peru'},{url:u('Y','y-2-tasmanGlacier-newZealand.png'),label:'Tasman Glacier, New Zealand'}],
   Z:[{url:u('Z','z-0-PrimaveradoLeste-Brazil.png'),label:'Primavera do Leste, Brazil'},{url:u('Z','z-1-MohammedBoudiaf-Algeria.png'),label:'Mohammed Boudiaf, Algeria'}],
 }
+
+/**
+ * Attach each scene's real-world position.
+ *
+ * Joined here rather than written into the literal above, which is generated:
+ * the numbers would then live in two files and a regeneration would be free to
+ * disagree with the harvest. coords.js stays the one place they come from, and
+ * the literal stays a plain list of pictures and labels.
+ *
+ * Keyed by the image's path under images/, which is what the url is built from,
+ * so the join is on the file itself rather than on a label that two different
+ * scenes can share.
+ */
+function withCoords(scenes) {
+  const prefix = `${BASE}images/`
+  const out = {}
+  for (const [ch, list] of Object.entries(scenes)) {
+    out[ch] = list.map(scene => {
+      const stem = scene.url.startsWith(prefix)
+        ? scene.url.slice(prefix.length).replace(/\.webp$/, '')
+        : null
+      const coords = stem ? COORDS[stem] : undefined
+      // Left off entirely rather than set to null, so `scene.coords?.lat` is
+      // the only shape a reader has to handle.
+      return coords ? { ...scene, coords } : scene
+    })
+  }
+  return out
+}
+
+export const LETTERS = withCoords(SCENES)
 
 export const TITLE_LINES = ['WRITE WITH', 'NATURE']

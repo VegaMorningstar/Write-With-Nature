@@ -113,7 +113,9 @@ const body = keys.map(key =>
   out[key].map(e => `{url:u('${key}','${e.file}'),label:'${esc(e.label)}'}`).join(',') +
   '],').join('\n')
 
-const header = `const BASE = import.meta.env.BASE_URL
+const header = `import { COORDS } from './coords'
+
+const BASE = import.meta.env.BASE_URL
 
 const u = (letter, file) =>
   \`\${BASE}images/\${letter}/\${file.replace('.png', '.webp')}\`
@@ -132,9 +134,48 @@ const u = (letter, file) =>
  *
  * Generated from images/ by scripts/gen_letters.cjs; hand-written labels are
  * preserved on regeneration, so editing one here survives.
+ *
+ * Each scene carries a \`coords\` of where on Earth it is, attached below from
+ * coords.js. Two of them have none — see that file.
  */
-export const LETTERS = {
+const SCENES = {
 `
 
-fs.writeFileSync(DATA, header + body + '\n}\n\nexport const TITLE_LINES = [\'WRITE WITH\', \'NATURE\']\n')
+const footer = `}
+
+/**
+ * Attach each scene's real-world position.
+ *
+ * Joined here rather than written into the literal above, which is generated:
+ * the numbers would then live in two files and a regeneration would be free to
+ * disagree with the harvest. coords.js stays the one place they come from, and
+ * the literal stays a plain list of pictures and labels.
+ *
+ * Keyed by the image's path under images/, which is what the url is built from,
+ * so the join is on the file itself rather than on a label that two different
+ * scenes can share.
+ */
+function withCoords(scenes) {
+  const prefix = \`\${BASE}images/\`
+  const out = {}
+  for (const [ch, list] of Object.entries(scenes)) {
+    out[ch] = list.map(scene => {
+      const stem = scene.url.startsWith(prefix)
+        ? scene.url.slice(prefix.length).replace(/\\.webp$/, '')
+        : null
+      const coords = stem ? COORDS[stem] : undefined
+      // Left off entirely rather than set to null, so \`scene.coords?.lat\` is
+      // the only shape a reader has to handle.
+      return coords ? { ...scene, coords } : scene
+    })
+  }
+  return out
+}
+
+export const LETTERS = withCoords(SCENES)
+
+export const TITLE_LINES = ['WRITE WITH', 'NATURE']
+`
+
+fs.writeFileSync(DATA, header + body + '\n' + footer)
 console.log(`wrote ${Object.values(out).flat().length} entries across ${keys.length} keys (${derived} new)`)
