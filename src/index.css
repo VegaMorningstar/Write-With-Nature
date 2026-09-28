@@ -59,11 +59,18 @@
      the gold it always was. */
   --rule: var(--gold);
 
-  /* The halo on a hovered word's caption. Not the white the etched letter
-     uses: that glow sits on a dark block where white reads as light, and the
-     caption sits on pale paper where it would read as nothing at all. Gold is
-     the page's own light. */
-  --word-glow: 200,150,42;
+  /* The halo on a hovered word's caption — none of one on paper.
+
+     It had one, in gold, on the reasoning that pale paper needs a warm light
+     where the etched letter can glow white. On the page that is not how it
+     reads. The caption goes almost black on hover, and a saturated glow
+     behind near-black text does not read as light coming off the word, it
+     reads as a gold outline drawn around the letters. The darkening is the
+     whole signal here and it carries on its own.
+
+     Held as the finished text-shadow rather than a colour so that light can
+     say `none`, which a colour cannot. */
+  --word-hover-glow: none;
 }
 
 /* ── Dark ──────────────────────────────────────────────────────────────────
@@ -130,8 +137,14 @@
   --rule: #f0dcaa;
 
   /* On the night sky the caption can borrow the etched letter's own glow — the
-     same blue-white — so the block and its word light with one colour. */
+     same blue-white — so the block and its word light with one colour. Here it
+     does read as light: the caption turns near-white against a near-black sky,
+     so the halo sits behind pale text and spreads instead of outlining it. */
   --word-glow: 214,240,255;
+  --word-hover-glow:
+    0 0 2px rgba(var(--word-glow), 0.55),
+    0 0 10px rgba(var(--word-glow), 0.45),
+    0 0 22px rgba(var(--word-glow), 0.28);
 
   /* --blend-overlay is deliberately NOT overridden here. Its only readers are
      the two grain layers, and this theme turns those off outright (below), so
@@ -824,13 +837,14 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
 
 /* Hovering anywhere in the set lights the caption, alongside the letter cut
    into the block that the cursor is actually over. The two are one gesture:
-   the block says which letter, the caption says which word. */
+   the block says which letter, the caption says which word.
+
+   How it lights is the theme's to say. On paper the caption just darkens;
+   on the night sky it darkens and takes the halo the etched letter has. See
+   --word-hover-glow, which is none in one theme and a shadow in the other. */
 .word:hover .word-label {
   color: rgba(var(--ink-rgb), 0.95);
-  text-shadow:
-    0 0 2px rgba(var(--word-glow), 0.55),
-    0 0 10px rgba(var(--word-glow), 0.45),
-    0 0 22px rgba(var(--word-glow), 0.28);
+  text-shadow: var(--word-hover-glow);
 }
 @media (prefers-reduced-motion: reduce) {
   .word-label { transition: none; }
