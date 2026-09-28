@@ -1617,14 +1617,19 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
    which is the point of it: it is the shadow the roll casts on the paper
    coming off it. Held in to the sheet width so it does not hang past the torn
    edge, and lifted above the map so it lands on it rather than under it. */
-/* Only as wide as the map. It used to run to within 18px of the panel,
-   which took it out over the torn parchment either side, where a straight
-   edged shadow on a ragged edge reads as a rectangle laid on the paper. The
-   sheet's own shading is in the parchment layer now, where the tear filter
-   displaces it along with everything else. */
+/* Exactly as wide as the map, and not a pixel more.
+
+   Measured against the roller, which is the element this is drawn on, and
+   the roller is 4px wider than the sheet at each end (its margin: 0 -4px).
+   So 30px in from the roller is 26px in from the sheet, while the map begins
+   30px in from the sheet: 4px of straight-edged shadow was landing on the
+   torn band beside the map and reading as a second, rectangular shadow next
+   to the ragged one. The 4px is the roller's outset; if either number moves,
+   this one has to move with it. The sheet's own shading lives in the
+   parchment layer, where the tear filter bends it. */
 .world-map-roller::after {
   content: '';
-  position: absolute; left: 30px; right: 30px;
+  position: absolute; left: calc(30px + 4px); right: calc(30px + 4px);
   height: 22px;
   background: linear-gradient(to bottom,
     rgba(var(--wm-shade-rgb),0.42), rgba(var(--wm-shade-rgb),0));
