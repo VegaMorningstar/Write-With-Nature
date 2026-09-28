@@ -360,6 +360,10 @@ export default function GlassButtons({
           type="button"
           title={item.title}
           aria-label={item.title}
+          // Anything else the button has to say about itself. A jelly that
+          // opens something needs aria-expanded, and only the caller knows
+          // that; spread last so an item can also correct what is set above.
+          {...(item.aria ?? {})}
           onClick={() => { press(i); item.onClick?.() }}
           onPointerEnter={() => enter(i)}
           onPointerLeave={() => leave(i)}

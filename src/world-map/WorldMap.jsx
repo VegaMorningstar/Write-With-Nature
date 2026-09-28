@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 // Just a string at runtime; the worker itself is emitted as its own chunk.
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { LETTERS } from '../data/letters'
 import { theme, onThemeChange } from '../theme'
 import { mapStyle, landColour } from './basemap'
 import usePanelGlass, { glassSupported } from '../hooks/usePanelGlass'
+import GlassButtons from '../ui-elements/glass-buttons/GlassButtons'
+import { RENDER_MATERIAL } from '../ui-elements/glass-buttons/constants.ts'
 import LiquidGlassPanel from '../ui-elements/liquid-glass/LiquidGlassPanel'
 import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 
@@ -29,6 +31,24 @@ import { PANEL_GLASS } from '../ui-elements/liquid-glass/panelPreset'
 const PIN = 44
 /** And zoomed out, where they have to share the room. */
 const PIN_MIN = 26
+/**
+ * The latch jelly.
+ *
+ * RENDER_MATERIAL with the type brought down. That material is tuned for
+ * RENDER — six characters at 23px in a 196px button — and these labels are
+ * ten, which at that size would have run out of the glass. Smaller suits it
+ * anyway: rendering a collage is the page's main verb and opening a map is
+ * not, so the two should not shout equally loudly.
+ */
+const LATCH_MATERIAL = {
+  ...RENDER_MATERIAL,
+  size: 46,
+  radius: 14,
+  edge: 9,
+  letterSize: 16,
+}
+/** Wide enough for ten characters at that size, with glass to spare. */
+const LATCH_WIDTH = 212
 
 /**
  * One marker per place, not per scene.
@@ -410,6 +430,32 @@ export default function WorldMap() {
     }
   }, [unrolled])
 
+  /**
+   * The catch, as a jelly.
+   *
+   * The same GlassButtons the RENDER button uses, so it is the same lens, the
+   * same squash on press and the same spring back — a second implementation
+   * of jelly physics for one button would drift from the first the moment
+   * either was touched. RENDER_MATERIAL rather than the plain button glass
+   * because this is the other thing on the page that does something rather
+   * than just opening a panel.
+   *
+   * Both labels are ten characters so the jelly is one width in both states.
+   * A jelly that resized under the cursor as it was pressed would fight the
+   * squash animation it is playing at the same time.
+   */
+  const latchButton = useMemo(() => [
+    {
+      key: 'latch',
+      label: unrolled ? 'ROLL IT UP' : 'UNROLL MAP',
+      title: unrolled ? 'Roll the map up' : 'Unroll the map',
+      onClick: () => setUnrolled(u => !u),
+      width: LATCH_WIDTH,
+      fallbackClass: 'world-map-latch',
+      aria: { 'aria-expanded': unrolled, 'aria-controls': 'world-map-roll' },
+    },
+  ], [unrolled])
+
   const count = placesFrom(LETTERS).length
 
   return (
@@ -448,15 +494,9 @@ export default function WorldMap() {
           Every scene in the alphabet, on the ground it was photographed from — {count} places
           across the Earth. Pick one to see the letters cut from it.
         </p>
-        <button
-          type="button"
-          className="world-map-latch"
-          onClick={() => setUnrolled(u => !u)}
-          aria-expanded={unrolled}
-          aria-controls="world-map-roll"
-        >
-          {unrolled ? 'Roll it up' : 'Unroll the map'}
-        </button>
+        <div className="world-map-latch-holder">
+          <GlassButtons items={latchButton} material={LATCH_MATERIAL} />
+        </div>
       </div>
 
       {/* The scroll: a clipping box whose height is the thing that animates,
@@ -474,9 +514,10 @@ export default function WorldMap() {
           leave something on the page, or the panel is a heading with nothing
           under it. Kept in normal flow rather than positioned, so nothing has
           to drive the foot roller down — the box growing does it. */}
-      <div className="world-map-roller is-head" aria-hidden="true" />
-      <div
-        className="world-map-roll"
+      <div className="world-map-scroll">
+        <div className="world-map-roller is-head" aria-hidden="true" />
+        <div
+          className="world-map-roll"
         id="world-map-roll"
         ref={rollRef}
         data-unrolled={unrolled ? 'true' : 'false'}
@@ -492,7 +533,8 @@ export default function WorldMap() {
           {failed && <p className="world-map-failed">{failed}</p>}
         </div>
       </div>
-      <div className="world-map-roller is-foot" ref={rodRef} aria-hidden="true" />
+        <div className="world-map-roller is-foot" ref={rodRef} aria-hidden="true" />
+      </div>
 
       {open && (
         <div className="world-map-detail">

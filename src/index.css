@@ -1431,7 +1431,10 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
   transition: height 1050ms cubic-bezier(0.16, 0.84, 0.32, 1);
 }
 
-/* The catch that opens it. Quiet until wanted, like the rest of the panel. */
+/* The jelly sits in the text column, under the blurb it belongs to. */
+.world-map-latch-holder { margin-top: 0.9rem; position: relative; z-index: 1; }
+
+/* The plain button, for a browser with no WebGPU to make a lens with. */
 .world-map-latch {
   margin-top: 0.9rem;
   padding: 0.4rem 0.9rem;
@@ -1462,6 +1465,13 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
    Two rollers of wound parchment with a torn sheet between them. The first
    attempt drew a single turned rod, which read as a blind on a pole rather
    than as a map an explorer would carry. */
+
+/* The scroll is one object, so the panel's own flex gap must not get between
+   its parts. It sat on a .world-map that is a flex column with gap: 1.2rem,
+   which put 17px of panel background between each roller and the sheet — the
+   paper looked like it was floating near the rollers rather than wound onto
+   them. Wrapped, the gap now falls either side of the whole scroll. */
+.world-map-scroll { position: relative; z-index: 1; }
 
 /* The filter lives in a zero-sized svg; it is referenced, never displayed. */
 .world-map-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
@@ -1496,18 +1506,26 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
   pointer-events: none;
 }
 
-/* The head roller is the one the sheet hangs from, so its shadow falls down
-   onto the map; the foot roller's falls away below. */
-.world-map-roller.is-head { margin-bottom: -2px; }
-.world-map-roller.is-foot { margin-top: -2px; }
+/* Each roller lies on the sheet rather than beside it: the paper has to
+   disappear under the roll, not stop short of it. Half the roller's height of
+   overlap reads as wound without eating into the map. */
+.world-map-roller.is-head { margin-bottom: -9px; }
+.world-map-roller.is-foot { margin-top: -9px; }
 
 /* The sheet turning under the roller, drawn on whichever side the map is. */
+/* The sheet darkening as it turns under the roller.
+
+   With the roller overlapping the map, this now falls across the map itself,
+   which is the point of it: it is the shadow the roll casts on the paper
+   coming off it. Held in to the sheet width so it does not hang past the torn
+   edge, and lifted above the map so it lands on it rather than under it. */
 .world-map-roller::after {
   content: '';
-  position: absolute; left: 10px; right: 10px;
-  height: 16px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.26), rgba(0,0,0,0));
+  position: absolute; left: 18px; right: 18px;
+  height: 22px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.34), rgba(0,0,0,0));
   pointer-events: none;
+  z-index: 3;
 }
 .world-map-roller.is-head::after { top: 100%; }
 .world-map-roller.is-foot::after { bottom: 100%; transform: scaleY(-1); }
@@ -1543,7 +1561,10 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
 .world-map .world-map-canvas {
   /* Held well in, so a band of torn parchment shows down both sides. */
   margin: 0 30px;
-  height: calc(var(--wm-height) - 4px);
+  /* Full height. The sheet runs the whole length of the roll and the rollers
+     lie over its ends; any shortfall here shows as panel background between
+     the map and the roll, which is exactly what it was doing. */
+  height: var(--wm-height);
   /* No frame, barely any rounding: inside a scroll the map is the sheet, not
      a card lying on one. The border and 14px radius it had read as a
      photograph pasted onto the parchment. */
