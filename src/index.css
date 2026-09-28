@@ -68,11 +68,10 @@
   --wm-roll-lit-rgb: 226,211,178;
   --wm-roll-mid-rgb: 198,178,140;
   --wm-roll-dark-rgb: 150,128,92;
-  /* The turned caps on each end of a roller. Dark wood, so they read as the
-     hardware the paper is wound on rather than as more paper. */
-  --wm-wood-lit-rgb: 146,100,52;
-  --wm-wood-mid-rgb: 104,68,32;
-  --wm-wood-dark-rgb: 62,38,14;
+  /* The cord the shut scroll is tied with: leather, so darker than any of
+     the paper it crosses. */
+  --wm-cord-rgb: 96,58,26;
+  --wm-cord-lit-rgb: 140,92,48;
   --wm-sheet-rgb: 209,192,155;
   --wm-sheet-shade-rgb: 191,172,133;
   --wm-stain-rgb: 150,118,64;
@@ -173,13 +172,8 @@
   --wm-sheet-rgb: 96,78,54;
   --wm-sheet-shade-rgb: 78,62,42;
   --wm-stain-rgb: 44,30,14;
-  /* Darker than the light theme rather than lighter, which is the way
-     round it has to be: the roller beside them is now warm too, and a cap
-     only reads as the hardware if it is clearly darker than the paper it
-     holds. On the beige theme the paper is pale and mid-brown is enough. */
-  --wm-wood-lit-rgb: 86,56,26;
-  --wm-wood-mid-rgb: 58,36,14;
-  --wm-wood-dark-rgb: 32,19,6;
+  --wm-cord-rgb: 70,42,18;
+  --wm-cord-lit-rgb: 108,70,34;
   /* Deeper and barely warm, so it still reads as shade against parchment
      without turning brown on a night-blue page. */
   --wm-shade-rgb: 38,22,8;
@@ -1490,9 +1484,9 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
    inset from each end are the ends of the wound sheet. */
 .world-map-roller {
   position: relative; z-index: 2;
-  height: 20px;
-  /* Pulled out past the panel, but less far than the caps, so the caps are
-     the outermost thing on the scroll the way a spindle is. */
+  height: 24px;
+  /* Pulled out past the sheet. The rolled ends of a scroll are wider than
+     the flat part, because the flat part is what got torn narrower. */
   margin: 0 -4px;
   border-radius: 11px / 10px;
   /* Layered front to back. A single four-stop gradient is what made this
@@ -1505,15 +1499,31 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
     repeating-linear-gradient(to bottom,
       rgba(var(--wm-shade-rgb),0.05) 0px, rgba(var(--wm-shade-rgb),0.05) 1px,
       rgba(255,255,255,0.03) 1px, rgba(255,255,255,0.03) 3px),
-    /* 2. age gathering toward the caps, as in old paper handled at the ends */
+    /* 2. the ends, seen end-on: the sheet wound on itself, as rings. This is
+       what says "rolled paper" rather than "tube" — a spiral is the one thing
+       a roll of paper has that a pipe does not. Three light-dark pairs and
+       then the roll's own shading takes over. */
+    radial-gradient(circle at 9px 50%,
+      rgba(var(--wm-roll-lit-rgb),1) 0px, rgba(var(--wm-roll-lit-rgb),1) 1.5px,
+      rgba(var(--wm-shade-rgb),0.55) 2.5px, rgba(var(--wm-roll-mid-rgb),1) 3.5px,
+      rgba(var(--wm-roll-lit-rgb),1) 5px, rgba(var(--wm-shade-rgb),0.45) 6.5px,
+      rgba(var(--wm-roll-mid-rgb),1) 7.5px, rgba(var(--wm-roll-lit-rgb),0.9) 9px,
+      rgba(var(--wm-shade-rgb),0.35) 10.5px, rgba(var(--wm-shade-rgb),0) 12.5px),
+    radial-gradient(circle at calc(100% - 9px) 50%,
+      rgba(var(--wm-roll-lit-rgb),1) 0px, rgba(var(--wm-roll-lit-rgb),1) 1.5px,
+      rgba(var(--wm-shade-rgb),0.55) 2.5px, rgba(var(--wm-roll-mid-rgb),1) 3.5px,
+      rgba(var(--wm-roll-lit-rgb),1) 5px, rgba(var(--wm-shade-rgb),0.45) 6.5px,
+      rgba(var(--wm-roll-mid-rgb),1) 7.5px, rgba(var(--wm-roll-lit-rgb),0.9) 9px,
+      rgba(var(--wm-shade-rgb),0.35) 10.5px, rgba(var(--wm-shade-rgb),0) 12.5px),
+    /* 3. age gathering toward the ends, where the paper has been handled */
     linear-gradient(to right,
-      rgba(var(--wm-stain-rgb),0.34) 0%, rgba(var(--wm-stain-rgb),0) 9%,
-      rgba(var(--wm-stain-rgb),0) 91%, rgba(var(--wm-stain-rgb),0.34) 100%),
-    /* 3. blotching along the roll, so the length is not uniform */
+      rgba(var(--wm-stain-rgb),0.30) 0%, rgba(var(--wm-stain-rgb),0) 8%,
+      rgba(var(--wm-stain-rgb),0) 92%, rgba(var(--wm-stain-rgb),0.30) 100%),
+    /* 4. blotching along the roll, so the length is not uniform */
     radial-gradient(ellipse 90px 12px at 22% 42%, rgba(var(--wm-stain-rgb),0.15), transparent 70%),
     radial-gradient(ellipse 70px 10px at 58% 62%, rgba(var(--wm-stain-rgb),0.13), transparent 70%),
     radial-gradient(ellipse 110px 11px at 81% 38%, rgba(var(--wm-stain-rgb),0.12), transparent 70%),
-    /* 4. the cylinder itself */
+    /* 5. the cylinder itself */
     linear-gradient(to bottom,
       rgba(var(--wm-roll-dark-rgb),0.92) 0%,
       rgba(var(--wm-roll-mid-rgb),1) 7%,
@@ -1538,77 +1548,38 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
 .world-map-roller.is-head { margin-bottom: -9px; }
 .world-map-roller.is-foot { margin-top: -9px; }
 
-/* The turned cap on each end of a roller.
 
-   The thing that was missing: without them a roller is a tube of paper with
-   nothing holding it, which is what made the first version read as a blind on
-   a pole. Taller than the roller so they stand proud of it top and bottom,
-   and pushed out past its ends, the way a scroll's spindle does.
 
-   ::after is the spindle stub beyond the cap, the little turned end you would
-   hold. Small, because at this size any more detail turns to mud. */
-.world-map-cap {
-  position: absolute; top: 50%;
-  transform: translateY(-50%);
-  /* Substantial. At 15px they were technically present and visually not:
-     a 15px detail on an 860px roller reads as a smudge at the end rather
-     than as the thing the paper is wound on. */
-  width: 21px; height: 34px;
-  border-radius: 6px / 8px;
-  background:
-    /* grain, running around the turning */
-    repeating-linear-gradient(to bottom,
-      rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 1px,
-      rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.05) 4px),
-    linear-gradient(to bottom,
-      rgba(var(--wm-wood-dark-rgb),1) 0%,
-      rgba(var(--wm-wood-mid-rgb),1) 12%,
-      rgba(var(--wm-wood-lit-rgb),1) 30%,
-      rgba(var(--wm-wood-mid-rgb),1) 62%,
-      rgba(var(--wm-wood-dark-rgb),1) 88%,
-      rgba(var(--wm-wood-dark-rgb),0.9) 100%);
-  box-shadow:
-    0 3px 7px rgba(var(--wm-shade-rgb),0.5),
-    inset 0 1px 0 rgba(255,255,255,0.16);
-  z-index: 4;
-}
-.world-map-cap.is-left { left: -13px; }
-.world-map-cap.is-right { right: -13px; }
 
-/* The flange where the cap meets the paper: the raised disc that stops the
-   roll sliding off the spindle. A dark edge on the inner side is all it
-   takes at this size, and without it the cap and the roller melt together
-   in the dark theme, where both are brown. */
-.world-map-cap::before {
+
+/* The cord a shut scroll is tied with.
+
+   On the head roll only: shut, the two rolls lie on top of each other and
+   read as one tube, and one tube gets one tie. Crosses the full height and a
+   little past it, so it visibly wraps rather than lying on the surface. The
+   knot is a darker knuckle just below the centre line, where the two ends
+   were pulled together. Fades as the scroll opens — you untie a scroll before
+   you unroll it. */
+.world-map-roller.is-head::before {
   content: '';
-  position: absolute; top: -2px; bottom: -2px;
-  width: 5px;
+  position: absolute; top: -3px; bottom: -3px;
+  left: calc(50% - 4px);
+  width: 8px;
   border-radius: 2px;
-  background: linear-gradient(to bottom,
-    rgba(var(--wm-wood-lit-rgb),1), rgba(var(--wm-wood-dark-rgb),1));
-  box-shadow: 0 2px 5px rgba(var(--wm-shade-rgb),0.5);
+  background:
+    radial-gradient(ellipse 6px 4px at 50% 62%,
+      rgba(var(--wm-cord-rgb),1) 0%, rgba(var(--wm-cord-rgb),1) 60%, rgba(var(--wm-cord-rgb),0) 100%),
+    linear-gradient(to right,
+      rgba(var(--wm-cord-rgb),1) 0%,
+      rgba(var(--wm-cord-lit-rgb),1) 42%,
+      rgba(var(--wm-cord-rgb),1) 100%);
+  box-shadow:
+    0 2px 4px rgba(var(--wm-shade-rgb),0.5),
+    inset 0 0 0 1px rgba(var(--wm-shade-rgb),0.35);
+  z-index: 3;
+  transition: opacity 360ms ease-out;
 }
-.world-map-cap.is-left::before { right: -4px; }
-.world-map-cap.is-right::before { left: -4px; }
-
-.world-map-cap::after {
-  content: '';
-  position: absolute; top: 50%;
-  transform: translateY(-50%);
-  width: 11px; height: 13px;
-  /* Tapered to a point. A turned finial narrows toward its end, and a
-     rounded rectangle there is most of what made the ends look like a
-     cartoon: it read as a peg pushed into a tube. */
-  clip-path: polygon(0% 22%, 62% 0%, 100% 34%, 100% 66%, 62% 100%, 0% 78%);
-  background: linear-gradient(to bottom,
-    rgba(var(--wm-wood-mid-rgb),1) 0%,
-    rgba(var(--wm-wood-lit-rgb),1) 30%,
-    rgba(var(--wm-wood-mid-rgb),1) 66%,
-    rgba(var(--wm-wood-dark-rgb),1) 100%);
-  filter: drop-shadow(0 2px 3px rgba(var(--wm-shade-rgb),0.5));
-}
-.world-map-cap.is-left::after { left: -7px; }
-.world-map-cap.is-right::after { right: -7px; }
+.world-map-scroll[data-unrolled="true"] .world-map-roller.is-head::before { opacity: 0; }
 
 /* The sheet turning under the roller, drawn on whichever side the map is. */
 /* The sheet darkening as it turns under the roller.

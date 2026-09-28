@@ -516,19 +516,17 @@ export default function WorldMap() {
           would clip the rod away too and leave nothing on the page to say a
           map was ever there. Left in flow rather than positioned, so growing
           the box carries the rod down with the leading edge on its own. */}
-      {/* The scroll. A roller at the head, a clipping box whose height is the
-          thing that animates, and a roller at the foot that the growing box
-          carries down with it.
+      {/* The scroll. A roll of paper at the head, a clipping box whose height
+          is the thing that animates, and a roll at the foot that the growing
+          box carries down with it. No spindle: the sheet is simply wound on
+          itself at both ends, and shut it is one tube tied with a cord.
 
           The rollers are outside the clip on purpose: a rolled-up map has to
           leave something on the page, or the panel is a heading with nothing
           under it. Kept in normal flow rather than positioned, so nothing has
           to drive the foot roller down — the box growing does it. */}
       <div className="world-map-scroll" data-unrolled={unrolled ? 'true' : 'false'}>
-        <div className="world-map-roller is-head" aria-hidden="true">
-          <span className="world-map-cap is-left" />
-          <span className="world-map-cap is-right" />
-        </div>
+        <div className="world-map-roller is-head" aria-hidden="true" />
         <div
           className="world-map-roll"
         id="world-map-roll"
@@ -546,10 +544,7 @@ export default function WorldMap() {
           {failed && <p className="world-map-failed">{failed}</p>}
         </div>
       </div>
-        <div className="world-map-roller is-foot" ref={rodRef} aria-hidden="true">
-          <span className="world-map-cap is-left" />
-          <span className="world-map-cap is-right" />
-        </div>
+        <div className="world-map-roller is-foot" ref={rodRef} aria-hidden="true" />
       </div>
 
       {/* Under the map, at the foot of the panel. OpenStreetMap's licence
