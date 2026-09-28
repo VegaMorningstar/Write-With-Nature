@@ -133,8 +133,6 @@ export default function WorldMap() {
   // means the map is not the first thing competing for attention at the foot
   // of the page.
   const [unrolled, setUnrolled] = useState(false)
-  // The map's credits, closed until asked for.
-  const [credit, setCredit] = useState(false)
   const rollRef = useRef(null)
   const rodRef = useRef(null)
 
@@ -247,7 +245,7 @@ export default function WorldMap() {
         node.className = 'wm-pin'
         node.title = place.place
         node.setAttribute('aria-label',
-          `${place.place} — ${place.scenes.length} Landsat ${place.scenes.length === 1 ? 'scene' : 'scenes'}`)
+          `${place.place}, ${place.scenes.length} Landsat ${place.scenes.length === 1 ? 'scene' : 'scenes'}`)
 
         const img = document.createElement('img')
         img.src = thumbFor(place.scenes[0], base)
@@ -497,8 +495,20 @@ export default function WorldMap() {
       <div className="world-map-text">
         <h3 id="world-map-title">Where the letters are</h3>
         <p>
-          Every scene in the alphabet, on the ground it was photographed from — {count} places
-          across the Earth. Pick one to see the letters cut from it.
+          Every scene in the alphabet, on the ground it was photographed from.
+          {' '}{count} places across the Earth. Pick one to see the letters cut from it.
+        </p>
+        {/* The credit, in the text rather than on the map.
+            OpenStreetMap's licence requires attribution and OpenFreeMap asks
+            for it, so it cannot simply go; it can move somewhere it is not a
+            control sitting on the map. */}
+        <p className="world-map-credit">
+          Base map{' '}
+          <a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a>
+          {' and '}
+          <a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a>
+          {', data '}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>.
         </p>
         {/* Opens once and then goes. A map you have asked for stays open —
             offering to roll it back up again is offering to undo the thing
@@ -527,7 +537,10 @@ export default function WorldMap() {
           under it. Kept in normal flow rather than positioned, so nothing has
           to drive the foot roller down — the box growing does it. */}
       <div className="world-map-scroll" data-unrolled={unrolled ? 'true' : 'false'}>
-        <div className="world-map-roller is-head" aria-hidden="true" />
+        <div className="world-map-roller is-head" aria-hidden="true">
+          <span className="world-map-cap is-left" />
+          <span className="world-map-cap is-right" />
+        </div>
         <div
           className="world-map-roll"
         id="world-map-roll"
@@ -545,30 +558,10 @@ export default function WorldMap() {
           {failed && <p className="world-map-failed">{failed}</p>}
         </div>
       </div>
-        <div className="world-map-roller is-foot" ref={rodRef} aria-hidden="true" />
-      </div>
-
-      {/* Required by OpenStreetMap's licence and asked for by OpenFreeMap,
-          so it is always reachable — a closed disclosure, not a hidden one,
-          which is the same bargain MapLibre's own compact control strikes. */}
-      <div className="world-map-credit" data-open={credit ? 'true' : 'false'}>
-        {credit && (
-          <div className="world-map-credit-text">
-            <a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a>
-            {' · '}
-            <a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a>
-            {' · '}
-            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setCredit(c => !c)}
-          aria-expanded={credit}
-          aria-label={credit ? 'Hide map credits' : 'Map credits'}
-        >
-          i
-        </button>
+        <div className="world-map-roller is-foot" ref={rodRef} aria-hidden="true">
+          <span className="world-map-cap is-left" />
+          <span className="world-map-cap is-right" />
+        </div>
       </div>
 
       {open && (

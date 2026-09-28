@@ -68,6 +68,11 @@
   --wm-roll-lit-rgb: 226,211,178;
   --wm-roll-mid-rgb: 198,178,140;
   --wm-roll-dark-rgb: 150,128,92;
+  /* The turned caps on each end of a roller. Dark wood, so they read as the
+     hardware the paper is wound on rather than as more paper. */
+  --wm-wood-lit-rgb: 146,100,52;
+  --wm-wood-mid-rgb: 104,68,32;
+  --wm-wood-dark-rgb: 62,38,14;
   --wm-sheet-rgb: 209,192,155;
   --wm-sheet-shade-rgb: 191,172,133;
   --wm-stain-rgb: 150,118,64;
@@ -158,15 +163,26 @@
      smear of brown rather than as a turned piece of wood. */
   /* Old paper by moonlight: the same parchment, most of its warmth taken
      out, so it sits on the night sky without glowing off it. */
-  --wm-roll-lit-rgb: 120,112,96;
-  --wm-roll-mid-rgb: 88,82,70;
-  --wm-roll-dark-rgb: 54,50,43;
-  --wm-sheet-rgb: 74,70,60;
-  --wm-sheet-shade-rgb: 58,55,47;
-  --wm-stain-rgb: 30,26,18;
+  /* Warm, not grey. The first pass took almost all the colour out to keep
+     the scroll from glowing against the night sky, and what was left read as
+     grey plastic rather than as old paper in low light. Darkened instead of
+     desaturated: the brown stays, there is simply less light on it. */
+  --wm-roll-lit-rgb: 166,138,96;
+  --wm-roll-mid-rgb: 126,101,66;
+  --wm-roll-dark-rgb: 82,62,38;
+  --wm-sheet-rgb: 96,78,54;
+  --wm-sheet-shade-rgb: 78,62,42;
+  --wm-stain-rgb: 44,30,14;
+  /* Darker than the light theme rather than lighter, which is the way
+     round it has to be: the roller beside them is now warm too, and a cap
+     only reads as the hardware if it is clearly darker than the paper it
+     holds. On the beige theme the paper is pale and mid-brown is enough. */
+  --wm-wood-lit-rgb: 86,56,26;
+  --wm-wood-mid-rgb: 58,36,14;
+  --wm-wood-dark-rgb: 32,19,6;
   /* Deeper and barely warm, so it still reads as shade against parchment
      without turning brown on a night-blue page. */
-  --wm-shade-rgb: 26,17,8;
+  --wm-shade-rgb: 38,22,8;
   --sheet-caption: rgba(var(--ink-rgb), 0.82);
 
   /* A pale warm gold rather than #c8962a. At one pixel there is no area for a
@@ -1475,7 +1491,9 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
 .world-map-roller {
   position: relative; z-index: 2;
   height: 20px;
-  margin: 0 -10px;
+  /* Pulled out past the panel, but less far than the caps, so the caps are
+     the outermost thing on the scroll the way a spindle is. */
+  margin: 0 -4px;
   border-radius: 11px / 10px;
   background:
     /* the spiral ends, just inside each cap */
@@ -1501,6 +1519,65 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
    overlap reads as wound without eating into the map. */
 .world-map-roller.is-head { margin-bottom: -9px; }
 .world-map-roller.is-foot { margin-top: -9px; }
+
+/* The turned cap on each end of a roller.
+
+   The thing that was missing: without them a roller is a tube of paper with
+   nothing holding it, which is what made the first version read as a blind on
+   a pole. Taller than the roller so they stand proud of it top and bottom,
+   and pushed out past its ends, the way a scroll's spindle does.
+
+   ::after is the spindle stub beyond the cap, the little turned end you would
+   hold. Small, because at this size any more detail turns to mud. */
+.world-map-cap {
+  position: absolute; top: 50%;
+  transform: translateY(-50%);
+  /* Substantial. At 15px they were technically present and visually not:
+     a 15px detail on an 860px roller reads as a smudge at the end rather
+     than as the thing the paper is wound on. */
+  width: 21px; height: 34px;
+  border-radius: 6px / 8px;
+  background: linear-gradient(to bottom,
+    rgba(var(--wm-wood-mid-rgb),1) 0%,
+    rgba(var(--wm-wood-lit-rgb),1) 26%,
+    rgba(var(--wm-wood-mid-rgb),1) 62%,
+    rgba(var(--wm-wood-dark-rgb),1) 100%);
+  box-shadow:
+    0 3px 7px rgba(var(--wm-shade-rgb),0.5),
+    inset 0 1px 0 rgba(255,255,255,0.16);
+  z-index: 4;
+}
+.world-map-cap.is-left { left: -13px; }
+.world-map-cap.is-right { right: -13px; }
+
+/* The flange where the cap meets the paper: the raised disc that stops the
+   roll sliding off the spindle. A dark edge on the inner side is all it
+   takes at this size, and without it the cap and the roller melt together
+   in the dark theme, where both are brown. */
+.world-map-cap::before {
+  content: '';
+  position: absolute; top: -2px; bottom: -2px;
+  width: 5px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom,
+    rgba(var(--wm-wood-lit-rgb),1), rgba(var(--wm-wood-dark-rgb),1));
+  box-shadow: 0 2px 5px rgba(var(--wm-shade-rgb),0.5);
+}
+.world-map-cap.is-left::before { right: -4px; }
+.world-map-cap.is-right::before { left: -4px; }
+
+.world-map-cap::after {
+  content: '';
+  position: absolute; top: 50%;
+  transform: translateY(-50%);
+  width: 8px; height: 11px;
+  border-radius: 3px;
+  background: linear-gradient(to bottom,
+    rgba(var(--wm-wood-lit-rgb),1), rgba(var(--wm-wood-dark-rgb),1));
+  box-shadow: 0 2px 4px rgba(var(--wm-shade-rgb),0.45);
+}
+.world-map-cap.is-left::after { left: -7px; }
+.world-map-cap.is-right::after { right: -7px; }
 
 /* The sheet turning under the roller, drawn on whichever side the map is. */
 /* The sheet darkening as it turns under the roller.
@@ -1575,42 +1652,14 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
 }
 
 
-/* The map's credit, ours rather than MapLibre's.
-
-   Sits over the foot of the scroll, closed to a single letter until it is
-   asked to open. Positioned against .world-map-scroll rather than the map,
-   so it does not move when the sheet is still unrolling. */
+/* The credit line, under the panel's own text. Quiet, but present: it is
+   there because the data licence requires it, not because a reader needs it. */
 .world-map-credit {
-  position: absolute; right: 26px; bottom: 26px; z-index: 4;
-  display: flex; align-items: center; gap: 6px;
-  pointer-events: none;
+  margin: 0.55rem 0 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem; line-height: 1.6;
+  color: rgba(var(--ink-rgb),0.42);
 }
-.world-map-credit > * { pointer-events: auto; }
-
-.world-map-credit button {
-  width: 18px; height: 18px; padding: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(var(--ink-rgb),0.30);
-  background: rgba(var(--paper-rgb), 0.86);
-  color: rgba(var(--ink-rgb),0.72);
-  font-family: 'DM Mono', monospace; font-size: 10px; line-height: 1;
-  cursor: pointer;
-  transition: color .16s ease-out, border-color .16s ease-out;
-}
-.world-map-credit button:hover,
-.world-map-credit button:focus-visible {
-  color: rgba(var(--ink-rgb),1);
-  border-color: rgba(var(--ink-rgb),0.6);
-}
-
-.world-map-credit-text {
-  padding: 3px 8px;
-  border-radius: 9px;
-  background: rgba(var(--paper-rgb), 0.86);
-  font-family: 'DM Mono', monospace; font-size: 10px; line-height: 1.5;
-  color: rgba(var(--ink-rgb),0.7);
-  white-space: nowrap;
-}
-.world-map-credit-text a { color: rgba(var(--ink-rgb),0.85); text-decoration: none; }
-.world-map-credit-text a:hover,
-.world-map-credit-text a:focus-visible { text-decoration: underline; }
+.world-map-credit a { color: rgba(var(--ink-rgb),0.6); text-decoration: none; }
+.world-map-credit a:hover,
+.world-map-credit a:focus-visible { text-decoration: underline; text-underline-offset: 2px; }
