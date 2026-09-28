@@ -32,6 +32,13 @@ const PIN = 44
 /** And zoomed out, where they have to share the room. */
 const PIN_MIN = 26
 /**
+ * How much of the map's top and bottom the rollers cover: their 9px overlap
+ * onto the sheet plus the 22px curl shadow each casts across it. The fit
+ * has to keep every marker clear of that, or the outermost ones sit under a
+ * roller and can only be reached by panning.
+ */
+const ROLLER_COVER = 9 + 22
+/**
  * The latch jelly.
  *
  * RENDER_MATERIAL with the type brought down. That material is tuned for
@@ -191,7 +198,13 @@ export default function WorldMap() {
         // Room for the markers, which stand on their point and are drawn well
         // outside it — fitting the coordinates alone clips the outermost
         // thumbnails against the edge of the panel.
-        fitBoundsOptions: { padding: PIN, maxZoom: 3 },
+        // More at the top and bottom than the sides. Half a pin hangs past its
+        // point in every direction, but only the top and bottom edges also
+        // have a roller lying across them.
+        fitBoundsOptions: {
+          padding: { top: PIN + ROLLER_COVER, bottom: PIN + ROLLER_COVER, left: PIN, right: PIN },
+          maxZoom: 3,
+        },
         // Ours instead, below. MapLibre's compact control opens itself and
         // will not stay shut: _updateCompact() puts maplibregl-compact-show
         // back on every resize, so collapsing it once does not hold. Rather

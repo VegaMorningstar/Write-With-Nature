@@ -1255,7 +1255,10 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   contain: layout style; isolation: isolate;
 }
 
-.world-map { --wm-height: clamp(320px, 52vh, 560px); }
+/* Taller than it was. Mercator stretches latitude toward the poles, so the
+   span from Deception Island to the Greenland fjords is tall for its width,
+   and at 52vh the fitted view put the ends of it under the rollers. */
+.world-map { --wm-height: clamp(380px, 62vh, 680px); }
 
 .world-map-text { position: relative; z-index: 1; }
 .world-map-text h3 {
