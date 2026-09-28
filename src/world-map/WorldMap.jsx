@@ -133,6 +133,8 @@ export default function WorldMap() {
   // means the map is not the first thing competing for attention at the foot
   // of the page.
   const [unrolled, setUnrolled] = useState(false)
+  // The map's credits, closed until asked for.
+  const [credit, setCredit] = useState(false)
   const rollRef = useRef(null)
   const rodRef = useRef(null)
 
@@ -192,7 +194,12 @@ export default function WorldMap() {
         // outside it — fitting the coordinates alone clips the outermost
         // thumbnails against the edge of the panel.
         fitBoundsOptions: { padding: PIN, maxZoom: 3 },
-        attributionControl: { compact: true },
+        // Ours instead, below. MapLibre's compact control opens itself and
+        // will not stay shut: _updateCompact() puts maplibregl-compact-show
+        // back on every resize, so collapsing it once does not hold. Rather
+        // than keep pulling a class off an element the library owns, the
+        // credit is rendered here where its state is ours to decide.
+        attributionControl: false,
         // One Earth. By default MapLibre repeats the world sideways forever,
         // which at this zoom puts a second Canada and a third Philippines in
         // the same frame and reads as a rendering fault rather than as a
@@ -539,6 +546,29 @@ export default function WorldMap() {
         </div>
       </div>
         <div className="world-map-roller is-foot" ref={rodRef} aria-hidden="true" />
+      </div>
+
+      {/* Required by OpenStreetMap's licence and asked for by OpenFreeMap,
+          so it is always reachable — a closed disclosure, not a hidden one,
+          which is the same bargain MapLibre's own compact control strikes. */}
+      <div className="world-map-credit" data-open={credit ? 'true' : 'false'}>
+        {credit && (
+          <div className="world-map-credit-text">
+            <a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a>
+            {' · '}
+            <a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a>
+            {' · '}
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setCredit(c => !c)}
+          aria-expanded={credit}
+          aria-label={credit ? 'Hide map credits' : 'Map credits'}
+        >
+          i
+        </button>
       </div>
 
       {open && (
