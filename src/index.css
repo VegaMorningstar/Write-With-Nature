@@ -823,7 +823,9 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
 
 .word-label {
   margin-top: 0.5rem;
-  font-family: 'DM Mono', monospace;
+  /* A system face, so there is no webfont to wait for and the caption is
+     never the last thing on the page to arrive. */
+  font-family: 'Times New Roman', Times, serif;
   letter-spacing: 0.22em;
   /* The tracking is all trailing, so a centred word sits half a space right of
      where it looks like it should. Taking it back off the end re-centres it. */
