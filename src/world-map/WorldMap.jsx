@@ -498,18 +498,6 @@ export default function WorldMap() {
           Every scene in the alphabet, on the ground it was photographed from.
           {' '}{count} places across the Earth. Pick one to see the letters cut from it.
         </p>
-        {/* The credit, in the text rather than on the map.
-            OpenStreetMap's licence requires attribution and OpenFreeMap asks
-            for it, so it cannot simply go; it can move somewhere it is not a
-            control sitting on the map. */}
-        <p className="world-map-credit">
-          Base map{' '}
-          <a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a>
-          {' and '}
-          <a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a>
-          {', data '}
-          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>.
-        </p>
         {/* Opens once and then goes. A map you have asked for stays open —
             offering to roll it back up again is offering to undo the thing
             the reader just asked for, and it leaves a control on the page
@@ -563,6 +551,19 @@ export default function WorldMap() {
           <span className="world-map-cap is-right" />
         </div>
       </div>
+
+      {/* Under the map, at the foot of the panel. OpenStreetMap's licence
+          requires attribution and OpenFreeMap asks for it, so it cannot go
+          altogether; below the scroll it is out of the way of both the blurb
+          and the map. */}
+      <p className="world-map-credit">
+        Base map{' '}
+        <a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a>
+        {' and '}
+        <a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a>
+        {', data '}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>.
+      </p>
 
       {open && (
         <div className="world-map-detail">

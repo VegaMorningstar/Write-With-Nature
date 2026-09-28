@@ -1495,22 +1495,40 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
      the outermost thing on the scroll the way a spindle is. */
   margin: 0 -4px;
   border-radius: 11px / 10px;
+  /* Layered front to back. A single four-stop gradient is what made this
+     look drawn rather than turned: real paper wound on a spindle has a hard
+     specular band near the top, a long fall into shadow, a thin bounce of
+     light off whatever is below it, fibres running the length of the roll,
+     and age gathering at the ends. Each of those is a layer. */
   background:
-    /* the spiral ends, just inside each cap */
-    radial-gradient(ellipse 10px 9px at 16px 50%,
-      rgba(var(--wm-roll-dark-rgb),0.55), rgba(var(--wm-roll-dark-rgb),0) 70%),
-    radial-gradient(ellipse 10px 9px at calc(100% - 16px) 50%,
-      rgba(var(--wm-roll-dark-rgb),0.55), rgba(var(--wm-roll-dark-rgb),0) 70%),
-    /* the cylinder, lit from above */
+    /* 1. the wound edge: fine lengthwise fibres, barely there */
+    repeating-linear-gradient(to bottom,
+      rgba(var(--wm-shade-rgb),0.05) 0px, rgba(var(--wm-shade-rgb),0.05) 1px,
+      rgba(255,255,255,0.03) 1px, rgba(255,255,255,0.03) 3px),
+    /* 2. age gathering toward the caps, as in old paper handled at the ends */
+    linear-gradient(to right,
+      rgba(var(--wm-stain-rgb),0.34) 0%, rgba(var(--wm-stain-rgb),0) 9%,
+      rgba(var(--wm-stain-rgb),0) 91%, rgba(var(--wm-stain-rgb),0.34) 100%),
+    /* 3. blotching along the roll, so the length is not uniform */
+    radial-gradient(ellipse 90px 12px at 22% 42%, rgba(var(--wm-stain-rgb),0.15), transparent 70%),
+    radial-gradient(ellipse 70px 10px at 58% 62%, rgba(var(--wm-stain-rgb),0.13), transparent 70%),
+    radial-gradient(ellipse 110px 11px at 81% 38%, rgba(var(--wm-stain-rgb),0.12), transparent 70%),
+    /* 4. the cylinder itself */
     linear-gradient(to bottom,
-      rgba(var(--wm-roll-dark-rgb),0.85) 0%,
-      rgba(var(--wm-roll-lit-rgb),1) 18%,
-      rgba(var(--wm-roll-mid-rgb),1) 52%,
-      rgba(var(--wm-roll-dark-rgb),1) 88%,
-      rgba(var(--wm-roll-dark-rgb),0.9) 100%);
+      rgba(var(--wm-roll-dark-rgb),0.92) 0%,
+      rgba(var(--wm-roll-mid-rgb),1) 7%,
+      rgba(var(--wm-roll-lit-rgb),1) 21%,
+      rgba(var(--wm-roll-lit-rgb),1) 29%,
+      rgba(var(--wm-roll-mid-rgb),1) 51%,
+      rgba(var(--wm-roll-dark-rgb),1) 79%,
+      rgba(var(--wm-shade-rgb),0.62) 94%,
+      rgba(var(--wm-roll-mid-rgb),0.72) 100%);
   box-shadow:
-    0 4px 10px rgba(var(--wm-shade-rgb),0.42),
-    inset 0 1px 0 rgba(255,255,255,0.28);
+    0 5px 12px rgba(var(--wm-shade-rgb),0.46),
+    /* the lit crown and the dark underside, drawn inside the silhouette so
+       the tube has thickness rather than being a painted stripe */
+    inset 0 1px 0 rgba(255,255,255,0.34),
+    inset 0 -2px 3px rgba(var(--wm-shade-rgb),0.45);
   pointer-events: none;
 }
 
@@ -1537,11 +1555,18 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
      than as the thing the paper is wound on. */
   width: 21px; height: 34px;
   border-radius: 6px / 8px;
-  background: linear-gradient(to bottom,
-    rgba(var(--wm-wood-mid-rgb),1) 0%,
-    rgba(var(--wm-wood-lit-rgb),1) 26%,
-    rgba(var(--wm-wood-mid-rgb),1) 62%,
-    rgba(var(--wm-wood-dark-rgb),1) 100%);
+  background:
+    /* grain, running around the turning */
+    repeating-linear-gradient(to bottom,
+      rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 1px,
+      rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.05) 4px),
+    linear-gradient(to bottom,
+      rgba(var(--wm-wood-dark-rgb),1) 0%,
+      rgba(var(--wm-wood-mid-rgb),1) 12%,
+      rgba(var(--wm-wood-lit-rgb),1) 30%,
+      rgba(var(--wm-wood-mid-rgb),1) 62%,
+      rgba(var(--wm-wood-dark-rgb),1) 88%,
+      rgba(var(--wm-wood-dark-rgb),0.9) 100%);
   box-shadow:
     0 3px 7px rgba(var(--wm-shade-rgb),0.5),
     inset 0 1px 0 rgba(255,255,255,0.16);
@@ -1570,11 +1595,17 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
   content: '';
   position: absolute; top: 50%;
   transform: translateY(-50%);
-  width: 8px; height: 11px;
-  border-radius: 3px;
+  width: 11px; height: 13px;
+  /* Tapered to a point. A turned finial narrows toward its end, and a
+     rounded rectangle there is most of what made the ends look like a
+     cartoon: it read as a peg pushed into a tube. */
+  clip-path: polygon(0% 22%, 62% 0%, 100% 34%, 100% 66%, 62% 100%, 0% 78%);
   background: linear-gradient(to bottom,
-    rgba(var(--wm-wood-lit-rgb),1), rgba(var(--wm-wood-dark-rgb),1));
-  box-shadow: 0 2px 4px rgba(var(--wm-shade-rgb),0.45);
+    rgba(var(--wm-wood-mid-rgb),1) 0%,
+    rgba(var(--wm-wood-lit-rgb),1) 30%,
+    rgba(var(--wm-wood-mid-rgb),1) 66%,
+    rgba(var(--wm-wood-dark-rgb),1) 100%);
+  filter: drop-shadow(0 2px 3px rgba(var(--wm-shade-rgb),0.5));
 }
 .world-map-cap.is-left::after { left: -7px; }
 .world-map-cap.is-right::after { right: -7px; }
@@ -1586,9 +1617,14 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
    which is the point of it: it is the shadow the roll casts on the paper
    coming off it. Held in to the sheet width so it does not hang past the torn
    edge, and lifted above the map so it lands on it rather than under it. */
+/* Only as wide as the map. It used to run to within 18px of the panel,
+   which took it out over the torn parchment either side, where a straight
+   edged shadow on a ragged edge reads as a rectangle laid on the paper. The
+   sheet's own shading is in the parchment layer now, where the tear filter
+   displaces it along with everything else. */
 .world-map-roller::after {
   content: '';
-  position: absolute; left: 18px; right: 18px;
+  position: absolute; left: 30px; right: 30px;
   height: 22px;
   background: linear-gradient(to bottom,
     rgba(var(--wm-shade-rgb),0.42), rgba(var(--wm-shade-rgb),0));
@@ -1620,6 +1656,11 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
      parchment on both sides of where it bites. */
   position: absolute; inset: 0 8px;
   background:
+    /* The roller's shadow on the paper, drawn here rather than over the top.
+       Inside this element it goes through #wm-torn with everything else, so
+       it follows the ragged edge instead of ending in a straight line. */
+    linear-gradient(to bottom, rgba(var(--wm-shade-rgb),0.46), transparent 46px),
+    linear-gradient(to top, rgba(var(--wm-shade-rgb),0.40), transparent 40px),
     radial-gradient(ellipse at 18% 22%, rgba(var(--wm-stain-rgb),0.30), transparent 42%),
     radial-gradient(ellipse at 82% 68%, rgba(var(--wm-stain-rgb),0.26), transparent 46%),
     radial-gradient(ellipse at 52% 92%, rgba(var(--wm-stain-rgb),0.22), transparent 40%),
@@ -1655,7 +1696,9 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
 /* The credit line, under the panel's own text. Quiet, but present: it is
    there because the data licence requires it, not because a reader needs it. */
 .world-map-credit {
-  margin: 0.55rem 0 0;
+  /* At the foot of the panel: room above it, and the panel padding below. */
+  margin: 0.4rem 0 0;
+  position: relative; z-index: 1;
   font-family: 'DM Mono', monospace;
   font-size: 0.58rem; line-height: 1.6;
   color: rgba(var(--ink-rgb),0.42);
