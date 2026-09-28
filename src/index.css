@@ -1260,6 +1260,22 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
    and at 52vh the fitted view put the ends of it under the rollers. */
 .world-map { --wm-height: clamp(420px, 70vh, 780px); }
 
+/* Wider than the column it sits in.
+
+   The page is a 980px column and the map was getting about 856px of it after
+   the panel's padding and the torn band either side. Taking the band away
+   would lose the tear, so instead the whole scroll bleeds out past the
+   column, up to 120px a side. Self-limiting rather than a breakpoint: it
+   bleeds by however much room the viewport actually has, stops 16px short of
+   the edge, and is zero on a screen narrower than the column, so it can
+   never cause a sideways scroll. 100vw counts the scrollbar on desktop, and
+   the 16px gutter absorbs that. */
+.world-map {
+  --wm-bleed: max(0px, min(120px, calc((100vw - 980px) / 2 - 16px)));
+  margin-left: calc(-1 * var(--wm-bleed));
+  margin-right: calc(-1 * var(--wm-bleed));
+}
+
 .world-map-text { position: relative; z-index: 1; }
 .world-map-text h3 {
   margin: 0 0 0.5rem; font-size: 0.95rem; letter-spacing: 0.04em;
