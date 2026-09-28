@@ -1503,63 +1503,52 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
    inset from each end are the ends of the wound sheet. */
 .world-map-roller {
   position: relative; z-index: 2;
-  height: 24px;
-  /* Pulled out past the sheet. The rolled ends of a scroll are wider than
-     the flat part, because the flat part is what got torn narrower. */
-  margin: 0 -4px;
+  /* Out past the sheet by a finial: the rolled ends of a scroll are wider
+     than the torn flat part, and here the finial is the part that projects. */
+  margin: 0 calc(-1 * var(--wm-cap));
   border-radius: 11px / 10px;
-  /* Layered front to back. A single four-stop gradient is what made this
-     look drawn rather than turned: real paper wound on a spindle has a hard
-     specular band near the top, a long fall into shadow, a thin bounce of
-     light off whatever is below it, fibres running the length of the roll,
-     and age gathering at the ends. Each of those is a layer. */
-  background:
-    /* 1. the wound edge: fine lengthwise fibres, barely there */
-    repeating-linear-gradient(to bottom,
-      rgba(var(--wm-shade-rgb),0.05) 0px, rgba(var(--wm-shade-rgb),0.05) 1px,
-      rgba(255,255,255,0.03) 1px, rgba(255,255,255,0.03) 3px),
-    /* 2. the ends, seen end-on: the sheet wound on itself, as rings. This is
-       what says "rolled paper" rather than "tube" — a spiral is the one thing
-       a roll of paper has that a pipe does not. Three light-dark pairs and
-       then the roll's own shading takes over. */
-    radial-gradient(circle at 9px 50%,
-      rgba(var(--wm-roll-lit-rgb),1) 0px, rgba(var(--wm-roll-lit-rgb),1) 1.5px,
-      rgba(var(--wm-shade-rgb),0.55) 2.5px, rgba(var(--wm-roll-mid-rgb),1) 3.5px,
-      rgba(var(--wm-roll-lit-rgb),1) 5px, rgba(var(--wm-shade-rgb),0.45) 6.5px,
-      rgba(var(--wm-roll-mid-rgb),1) 7.5px, rgba(var(--wm-roll-lit-rgb),0.9) 9px,
-      rgba(var(--wm-shade-rgb),0.35) 10.5px, rgba(var(--wm-shade-rgb),0) 12.5px),
-    radial-gradient(circle at calc(100% - 9px) 50%,
-      rgba(var(--wm-roll-lit-rgb),1) 0px, rgba(var(--wm-roll-lit-rgb),1) 1.5px,
-      rgba(var(--wm-shade-rgb),0.55) 2.5px, rgba(var(--wm-roll-mid-rgb),1) 3.5px,
-      rgba(var(--wm-roll-lit-rgb),1) 5px, rgba(var(--wm-shade-rgb),0.45) 6.5px,
-      rgba(var(--wm-roll-mid-rgb),1) 7.5px, rgba(var(--wm-roll-lit-rgb),0.9) 9px,
-      rgba(var(--wm-shade-rgb),0.35) 10.5px, rgba(var(--wm-shade-rgb),0) 12.5px),
-    /* 3. age gathering toward the ends, where the paper has been handled */
-    linear-gradient(to right,
-      rgba(var(--wm-stain-rgb),0.30) 0%, rgba(var(--wm-stain-rgb),0) 8%,
-      rgba(var(--wm-stain-rgb),0) 92%, rgba(var(--wm-stain-rgb),0.30) 100%),
-    /* 4. blotching along the roll, so the length is not uniform */
-    radial-gradient(ellipse 90px 12px at 22% 42%, rgba(var(--wm-stain-rgb),0.15), transparent 70%),
-    radial-gradient(ellipse 70px 10px at 58% 62%, rgba(var(--wm-stain-rgb),0.13), transparent 70%),
-    radial-gradient(ellipse 110px 11px at 81% 38%, rgba(var(--wm-stain-rgb),0.12), transparent 70%),
-    /* 5. the cylinder itself */
+  /* The photograph's roller, in three pieces at a fixed height.
+
+     Drawing a turned finial with gradients was tried at length and never got
+     past a cartoon of one; a photograph carries it. But a photograph of a
+     whole roller has one aspect ratio, and scaled to the panel's width it
+     came out 173px tall — seven times the drawn roller, and a third of the
+     map. So it is cut into three by scripts/make-scroll-slices.mjs: the two
+     finials keep their proportions at this height, and only the cylinder
+     between them is stretched to whatever width the panel needs. The stretch
+     runs along the cylinder's own shading, which is the direction paper
+     texture forgives. The caps are painted over the middle's ends, so the
+     seam is under a finial rather than on the paper.
+
+     The cap's width is the photograph's finial at this height:
+     0.97556 of the band's height, from geometry.json. */
+  height: 40px;
+  background-repeat: no-repeat;
+  background-position: left center, right center, center;
+  background-size: auto 100%, auto 100%, 100% 100%;
+  /* The drawn roller's cylinder shading still sits under the images, so if
+     one is slow to arrive there is a roller there and not a hole. */
+  background-image:
     linear-gradient(to bottom,
-      rgba(var(--wm-roll-dark-rgb),0.92) 0%,
-      rgba(var(--wm-roll-mid-rgb),1) 7%,
-      rgba(var(--wm-roll-lit-rgb),1) 21%,
-      rgba(var(--wm-roll-lit-rgb),1) 29%,
-      rgba(var(--wm-roll-mid-rgb),1) 51%,
-      rgba(var(--wm-roll-dark-rgb),1) 79%,
-      rgba(var(--wm-shade-rgb),0.62) 94%,
-      rgba(var(--wm-roll-mid-rgb),0.72) 100%);
-  box-shadow:
-    0 5px 12px rgba(var(--wm-shade-rgb),0.46),
-    /* the lit crown and the dark underside, drawn inside the silhouette so
-       the tube has thickness rather than being a painted stripe */
-    inset 0 1px 0 rgba(255,255,255,0.34),
-    inset 0 -2px 3px rgba(var(--wm-shade-rgb),0.45);
-  pointer-events: none;
+      rgba(var(--wm-roll-dark-rgb),0.9) 0%,
+      rgba(var(--wm-roll-lit-rgb),1) 25%,
+      rgba(var(--wm-roll-mid-rgb),1) 55%,
+      rgba(var(--wm-roll-dark-rgb),1) 100%);
+  box-shadow: 0 5px 12px rgba(var(--wm-shade-rgb),0.46);
 }
+.world-map[data-near="true"] .world-map-roller.is-head {
+  background-image: url(./scroll/head-l.webp), url(./scroll/head-r.webp), url(./scroll/head-m.webp);
+}
+.world-map[data-near="true"] .world-map-roller.is-foot {
+  background-image: url(./scroll/foot-l.webp), url(./scroll/foot-r.webp), url(./scroll/foot-m.webp);
+}
+/* The photograph is one warm colour. On the night sky it is turned down
+   rather than recoloured, so it is the same brass with less light on it. */
+:root[data-theme="dark"] .world-map[data-near="true"] .world-map-roller {
+  filter: brightness(0.6) saturate(0.85);
+}
+/* The finials hang out past the paper by their own width. */
+.world-map { --wm-cap: 39px; }
 
 /* Each roller lies on the sheet rather than beside it: the paper has to
    disappear under the roll, not stop short of it. Half the roller's height of
@@ -1610,16 +1599,16 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
 /* Exactly as wide as the map, and not a pixel more.
 
    Measured against the roller, which is the element this is drawn on, and
-   the roller is 4px wider than the sheet at each end (its margin: 0 -4px).
-   So 30px in from the roller is 26px in from the sheet, while the map begins
-   30px in from the sheet: 4px of straight-edged shadow was landing on the
-   torn band beside the map and reading as a second, rectangular shadow next
-   to the ragged one. The 4px is the roller's outset; if either number moves,
-   this one has to move with it. The sheet's own shading lives in the
+   the roller is wider than the sheet at each end by a finial (--wm-cap).
+   Measured against the roller, 30px in is less than 30px in from the sheet,
+   while the map begins 30px in from the sheet: the difference was landing on
+   the torn band beside the map as a straight-edged strip and reading as a
+   second, rectangular shadow next to the ragged one. The outset is the
+   roller's; if either number moves, this one has to move with it. The sheet's own shading lives in the
    parchment layer, where the tear filter bends it. */
 .world-map-roller::after {
   content: '';
-  position: absolute; left: calc(30px + 4px); right: calc(30px + 4px);
+  position: absolute; left: calc(30px + var(--wm-cap)); right: calc(30px + var(--wm-cap));
   height: 22px;
   background: linear-gradient(to bottom,
     rgba(var(--wm-shade-rgb),0.42), rgba(var(--wm-shade-rgb),0));

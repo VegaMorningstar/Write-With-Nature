@@ -349,6 +349,10 @@ export default function WorldMap() {
       if (!entries.some(e => e.isIntersecting)) return
       io.disconnect()
       warmLibrary().catch(() => { /* build() reports it if it matters */ })
+      // The rollers' six images are small, but they are still six requests
+      // the first screen of the page has no reason to make. The stylesheet
+      // applies them once this is set.
+      el.dataset.near = 'true'
     }, { rootMargin: '600px' })
     io.observe(el)
     return () => io.disconnect()
