@@ -62,6 +62,27 @@ function thumbFor(scene, base) {
   return `${base}map-thumbs/${stem.replace('/', '__')}.webp`
 }
 
+/**
+ * Fetch the map library, at most once.
+ *
+ * Split from building the map so the download can start when the panel comes
+ * near while the map itself waits to be asked for. The scroll takes about a
+ * second to open, which is usually enough to cover the rest.
+ */
+let libraryPromise = null
+function warmLibrary() {
+  if (!libraryPromise) {
+    libraryPromise = Promise.all([
+      import('maplibre-gl'),
+      import('maplibre-gl/dist/maplibre-gl.css'),
+    ]).then(([lib]) => lib)
+    // A failed warm-up must not be cached as a permanent failure; the next
+    // attempt should be allowed to try the network again.
+    libraryPromise.catch(() => { libraryPromise = null })
+  }
+  return libraryPromise
+}
+
 export default function WorldMap() {
   const panelRef = useRef(null)
   usePanelGlass(panelRef, { scale: -80, chroma: 5, blur: 2.5, saturate: 1.3, mode: 'polar', aberrationIntensity: 5, elasticity: 0 })
@@ -72,9 +93,15 @@ export default function WorldMap() {
   const [open, setOpen] = useState(null)   // the place whose scenes are on show
   const [failed, setFailed] = useState(null)
 
+  // Rolled up to start. The panel is a scroll an explorer opens, and it also
+  // means the map is not the first thing competing for attention at the foot
+  // of the page.
+  const [unrolled, setUnrolled] = useState(false)
+  const rollRef = useRef(null)
+
   useEffect(() => {
     const el = holder.current
-    if (!el) return
+    if (!el || mapRef.current) return
     const base = import.meta.env.BASE_URL
     const places = placesFrom(LETTERS)
     let dead = false
@@ -84,16 +111,14 @@ export default function WorldMap() {
       // MapLibre is about a megabyte, and this panel is at the foot of a page
       // whose whole first screen is a place to type. Loaded statically it went
       // into the main chunk and doubled it, so everyone paid for the map on
-      // first paint whether they ever scrolled to it. Imported here instead,
-      // from inside the observer below, so the download starts when the panel
-      // is nearly in view and the rest of the page is already running.
+      // first paint whether they ever scrolled to it.
+      //
+      // warmLibrary() below starts the download when the panel comes near, so
+      // by the time the scroll is opened it is usually already in cache; this
+      // awaits whatever that started, or starts it now.
       let MapLibreMap, Marker, NavigationControl
       try {
-        const [lib] = await Promise.all([
-          import('maplibre-gl'),
-          import('maplibre-gl/dist/maplibre-gl.css'),
-        ])
-        ;({ Map: MapLibreMap, Marker, NavigationControl } = lib)
+        ;({ Map: MapLibreMap, Marker, NavigationControl } = await warmLibrary())
       } catch {
         if (!dead) setFailed('The map library could not be loaded.')
         return
@@ -205,23 +230,30 @@ export default function WorldMap() {
       }
     }
 
-    // Built when the panel comes near, not on mount. rootMargin gives it a
-    // screen of warning so the tiles are usually there by the time it is.
+    // Built when the panel comes near, and deliberately not when the scroll
+    // is opened.
+    //
+    // Building it costs a library, a GL context and 84 marker nodes, and the
+    // height of the scroll animates on the main thread. Doing both at once
+    // starved the animation completely: measured, the sheet sat at 0 for the
+    // first 300ms and then jumped to full. Built in advance, the click has
+    // nothing left to do but let the transition run.
     const io = new IntersectionObserver(entries => {
       if (!entries.some(e => e.isIntersecting)) return
       io.disconnect()
       build()
-    }, { rootMargin: '400px' })
+    }, { rootMargin: '600px' })
     io.observe(el)
 
-    return () => {
-      dead = true
-      io.disconnect()
-      markersRef.current.forEach(m => m.remove())
-      markersRef.current = []
-      map?.remove()
-      mapRef.current = null
-    }
+    return () => { dead = true; io.disconnect() }
+  }, [])
+
+  // Everything the map holds, released when the panel itself goes.
+  useEffect(() => () => {
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+    mapRef.current?.remove()
+    mapRef.current = null
   }, [])
 
   // The map follows the page. Its own style is swapped rather than the map
@@ -237,6 +269,62 @@ export default function WorldMap() {
     }
   }), [])
 
+  /**
+   * A rolled map holds nothing open and catches no keyboard.
+   *
+   * The detail panel hangs below the scroll, so leaving it up under a rolled
+   * map reads as a caption with nothing above it. And a clipped map is still
+   * in the document: without `inert` its zoom buttons and all 84 markers stay
+   * tabbable, so a keyboard would disappear into a map nobody can see.
+   */
+  useEffect(() => {
+    if (!unrolled) setOpen(null)
+    const el = rollRef.current
+    if (!el) return
+    // Set as an attribute rather than a prop: React 18 does not pass `inert`
+    // through, and this works the same either way.
+    if (unrolled) el.removeAttribute('inert')
+    else el.setAttribute('inert', '')
+  }, [unrolled])
+
+  /** Start pulling the library down as the panel comes into view. */
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(entries => {
+      if (!entries.some(e => e.isIntersecting)) return
+      io.disconnect()
+      warmLibrary().catch(() => { /* build() reports it if it matters */ })
+    }, { rootMargin: '600px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  /**
+   * Nudge the map when the scroll opens, and again once it has settled.
+   *
+   * Precautionary rather than a fix for anything observed. The map is built
+   * behind the closed scroll and comes up correctly on reveal — a clipped
+   * container still has its full layout size, so MapLibre measures it right.
+   * What this covers is the window being resized while the map was shut,
+   * which changes --wm-height without the map hearing about it. resize()
+   * re-reads the container and costs nothing when nothing has changed.
+   */
+  useEffect(() => {
+    if (!unrolled) return
+    const el = rollRef.current
+    if (!el) return
+    const settle = () => {
+      const m = mapRef.current
+      if (!m) return
+      m.resize()
+      m.triggerRepaint()
+    }
+    settle()                                  // as it starts to open
+    el.addEventListener('transitionend', settle)   // and once it has
+    return () => el.removeEventListener('transitionend', settle)
+  }, [unrolled])
+
   const count = placesFrom(LETTERS).length
 
   return (
@@ -246,14 +334,38 @@ export default function WorldMap() {
         <h3 id="world-map-title">Where the letters are</h3>
         <p>
           Every scene in the alphabet, on the ground it was photographed from — {count} places
-          across {' '}the Earth. Pick one to see the letters cut from it.
+          across the Earth. Pick one to see the letters cut from it.
         </p>
+        <button
+          type="button"
+          className="world-map-latch"
+          onClick={() => setUnrolled(u => !u)}
+          aria-expanded={unrolled}
+          aria-controls="world-map-roll"
+        >
+          {unrolled ? 'Roll it up' : 'Unroll the map'}
+        </button>
       </div>
 
-      <div className="world-map-canvas" style={{ background: landColour(theme()) }}>
-        <div ref={holder} className="world-map-gl" />
-        {failed && <p className="world-map-failed">{failed}</p>}
+      {/* The scroll: a clipping box whose height is the thing that animates,
+          and a rod below it in normal flow.
+
+          The rod sits outside the clip on purpose. Inside it, a rolled-up map
+          would clip the rod away too and leave nothing on the page to say a
+          map was ever there. Left in flow rather than positioned, so growing
+          the box carries the rod down with the leading edge on its own. */}
+      <div
+        className="world-map-roll"
+        id="world-map-roll"
+        ref={rollRef}
+        data-unrolled={unrolled ? 'true' : 'false'}
+      >
+        <div className="world-map-canvas" style={{ background: landColour(theme()) }}>
+          <div ref={holder} className="world-map-gl" />
+          {failed && <p className="world-map-failed">{failed}</p>}
+        </div>
       </div>
+      <div className="world-map-dowel" aria-hidden="true" />
 
       {open && (
         <div className="world-map-detail">

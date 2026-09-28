@@ -59,6 +59,10 @@
      MapLibre's zoom glyphs, which ship as dark images for a white control. */
   --paper-rgb: 217,205,180;
   --wm-ctrl-filter: none;
+  /* The rod the map winds onto: a turned wooden dowel, so it takes the
+     page's gold rather than a colour of its own. */
+  --wm-rod-rgb: 168,124,58;
+  --wm-rod-shade-rgb: 118,84,36;
   --sheet-caption: rgba(var(--ink-rgb), 0.62);
 
   /* The two hairlines flanking the masthead ornament. On paper this is exactly
@@ -138,6 +142,10 @@
      images, so flipping them is exactly right and costs no second sprite. */
   --paper-rgb: 5,8,20;
   --wm-ctrl-filter: invert(1);
+  /* Lifted against the night sky, where the light-theme rod reads as a
+     smear of brown rather than as a turned piece of wood. */
+  --wm-rod-rgb: 154,126,86;
+  --wm-rod-shade-rgb: 86,68,46;
   --sheet-caption: rgba(var(--ink-rgb), 0.82);
 
   /* A pale warm gold rather than #c8962a. At one pixel there is no area for a
@@ -1216,6 +1224,8 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   contain: layout style; isolation: isolate;
 }
 
+.world-map { --wm-height: clamp(320px, 52vh, 560px); }
+
 .world-map-text { position: relative; z-index: 1; }
 .world-map-text h3 {
   margin: 0 0 0.5rem; font-size: 0.95rem; letter-spacing: 0.04em;
@@ -1230,7 +1240,7 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
    stop at the panel's own curve instead of squaring off inside it. */
 .world-map-canvas {
   position: relative; z-index: 1;
-  height: clamp(320px, 52vh, 560px);
+  height: var(--wm-height);
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(var(--ink-rgb),0.14);
@@ -1380,4 +1390,91 @@ a.world-map-dms:hover, a.world-map-dms:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .wm-pin { transition: none; }
+}
+
+/* ── Unrolling the map ─────────────────────────────────────────────────────
+   The panel opens like a scroll: the sheet comes down from under the heading
+   and the rod travels down with its bottom edge; rolling up runs it back.
+
+   Height is what animates, on a box that clips. Not transform: scaling the
+   sheet would squash the map and its markers on the way down, and the whole
+   point is that the ground is being *revealed*, not stretched into place. The
+   map inside keeps its full height throughout, so MapLibre never sees its
+   container resize and never has to re-project anything. */
+.world-map-roll {
+  position: relative; z-index: 1;
+  height: 0;
+  overflow: hidden;
+  /* Rolling up: quicker, and eased into the finish like a sheet snapping
+     back around its rod. */
+  transition: height 620ms cubic-bezier(0.55, 0, 0.85, 0.35);
+}
+.world-map-roll[data-unrolled="true"] {
+  height: var(--wm-height);
+  /* Unrolling: slower and eased out, the weight of the sheet carrying it down
+     and settling. The two directions are deliberately not the same curve —
+     paper falls open and is pulled shut. */
+  transition: height 1050ms cubic-bezier(0.16, 0.84, 0.32, 1);
+}
+
+/* The rod the sheet is wound on.
+
+   In flow directly under the roll, so the growing box pushes it down and it
+   arrives at the leading edge for free. Wider than the panel's text column by
+   a few pixels at each end, the way a scroll's dowel projects past its
+   paper. */
+.world-map-dowel {
+  position: relative; z-index: 2;
+  height: 12px;
+  margin: 0 -6px;
+  border-radius: 6px;
+  background:
+    linear-gradient(to bottom,
+      rgba(255,255,255,0.34) 0%,
+      rgba(var(--wm-rod-rgb), 1) 38%,
+      rgba(var(--wm-rod-shade-rgb), 1) 78%,
+      rgba(var(--wm-rod-shade-rgb), 1) 100%);
+  box-shadow:
+    0 3px 8px rgba(0,0,0,0.30),
+    inset 0 1px 0 rgba(255,255,255,0.22);
+  pointer-events: none;
+}
+
+/* The curl: the sheet darkening as it turns under the rod. Sits just above
+   it, so while the map is unrolling this shadow sweeps down the map with the
+   rod and the paper looks like it is coming off a roll rather than a blind
+   being lowered. */
+.world-map-dowel::before {
+  content: '';
+  position: absolute; left: 6px; right: 6px; bottom: 100%;
+  height: 22px;
+  background: linear-gradient(to top, rgba(0,0,0,0.30), rgba(0,0,0,0));
+  pointer-events: none;
+}
+
+/* The catch that opens it. Quiet until wanted, like the rest of the panel. */
+.world-map-latch {
+  margin-top: 0.9rem;
+  padding: 0.4rem 0.9rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(var(--ink-rgb),0.78);
+  background: rgba(var(--paper-rgb), 0.5);
+  border: 1px solid rgba(var(--ink-rgb),0.24);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color .18s ease-out, border-color .18s ease-out, background .18s ease-out;
+}
+.world-map-latch:hover,
+.world-map-latch:focus-visible {
+  color: rgba(var(--ink-rgb),1);
+  border-color: rgba(var(--ink-rgb),0.5);
+  background: rgba(var(--paper-rgb), 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The map still opens and closes, it just stops being a performance. */
+  .world-map-roll,
+  .world-map-roll[data-unrolled="true"] { transition: none; }
+  .world-map-latch { transition: none; }
 }
