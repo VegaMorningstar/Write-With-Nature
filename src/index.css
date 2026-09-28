@@ -826,10 +826,16 @@ textarea::placeholder { color: rgba(var(--ink-rgb),0.45); font-style: italic; }
   /* A system face, so there is no webfont to wait for and the caption is
      never the last thing on the page to arrive. */
   font-family: 'Times New Roman', Times, serif;
-  letter-spacing: 0.22em;
+  /* Light tracking. The 0.22em this had was chosen for a monospace set in
+     capitals, where the letters are already on a fixed pitch and the air
+     between them reads as deliberate. Times New Roman in mixed case is
+     drawn to sit close, and that much space pulled the word apart into
+     separate letters instead of a label. */
+  letter-spacing: 0.04em;
   /* The tracking is all trailing, so a centred word sits half a space right of
-     where it looks like it should. Taking it back off the end re-centres it. */
-  text-indent: 0.22em;
+     where it looks like it should. Taking it back off the end re-centres it.
+     Mirrors the letter-spacing above; the two move together. */
+  text-indent: 0.04em;
   /* No text-transform. The spelling arrives already set — captionOf() in
      Board.jsx gives it a capital and a lower-case tail — and `capitalize`
      could not do the job anyway: it upper-cases each word's first letter
